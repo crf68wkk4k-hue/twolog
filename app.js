@@ -158,9 +158,11 @@
   if (!("name" in S.theme)) S.theme.name = null;
   if (!("log" in S.theme)) S.theme.log = null;
   if (S.theme.mode !== "dark") S.theme.mode = "light";
+  if (!S.theme.pages || typeof S.theme.pages !== "object") S.theme.pages = {};
   if (S.couple.fmt !== "Y") S.couple.fmt = "D";
   if (typeof S.couple.phrase !== "string") S.couple.phrase = "함께한 지";
   if (!S.couple.colors || typeof S.couple.colors !== "object") S.couple.colors = {};
+  if (!S.couple.pics || typeof S.couple.pics !== "object") S.couple.pics = {};
   if (!("me" in S.couple.colors)) S.couple.colors.me = "#F7C6D4";
   if (!("you" in S.couple.colors)) S.couple.colors.you = "#BCE0F7";
   if (!S.couple.sched || typeof S.couple.sched !== "object") S.couple.sched = {};
@@ -232,6 +234,22 @@
   }
   function modeLabel() { return (S.theme || {}).mode === "dark" ? "라이트 모드로 바꾸기" : "다크 모드로 바꾸기"; }
 
+  /* 페이지 캡션(제목 줄) 바탕색 — 글씨는 항상 #111111 */
+  var PAGES = [
+    { k: "home", n: "홈" }, { k: "cal", n: "캘린더" }, { k: "diary", n: "노트" },
+    { k: "photo", n: "사진첩" }, { k: "set", n: "설정" }
+  ];
+  var CAP_BG = ["#FAEDE8", "#EDF1EC", "#ECF2F7", "#F8EBEE", "#FBF3DE", "#F4F4F4"];
+  function pageCap(page) {
+    var v = ((S.theme || {}).pages || {})[page];
+    return typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v : "";
+  }
+  function capCls(page) { return pageCap(page) ? " cap-tint" : ""; }
+  function capStyle(page) {
+    var c = pageCap(page);
+    return c ? ' style="--cap:' + c + '"' : "";
+  }
+
   function applyTheme() {
     var root = document.documentElement, t = S.theme || {};
     var dark = (t.mode === "dark");
@@ -278,6 +296,27 @@
     S.theme = S.theme || { name: null, log: null };
     S.theme[target] = color ? String(color).toLowerCase() : null;
     save(); applyTheme(); renderAll(); syncThemeSheet();
+  }
+  function setPageCap(page, color) {
+    if (!page) return;
+    var v = String(color || "").trim();
+    if (v && !/^#[0-9a-fA-F]{6}$/.test(v)) return;
+    S.theme.pages = S.theme.pages || {};
+    if (v) S.theme.pages[page] = v.toUpperCase(); else delete S.theme.pages[page];
+    save();
+    var val = v ? v.toUpperCase() : "";
+    /* 화면 전체를 다시 그리지 않고 지금 보이는 페이지 띠만 바로 바꿔요 (색 고르는 중에 창이 닫히지 않도록) */
+    document.querySelectorAll('[data-pg="' + page + '"]').forEach(function (el) {
+      el.classList.toggle("cap-tint", !!val);
+      if (val) el.style.setProperty("--cap", val); else el.style.removeProperty("--cap");
+    });
+    var row = document.querySelector('.cap-row[data-caprow="' + page + '"]');
+    if (row) row.querySelectorAll(".sw").forEach(function (b) {
+      b.classList.toggle("sel", (b.getAttribute("data-color") || "") === val);
+    });
+    document.querySelectorAll('input.js-page[data-page="' + page + '"]').forEach(function (inp) {
+      if (val && inp.value.toUpperCase() !== val) inp.value = val;
+    });
   }
 
   /* ------------------------------------------------------------------ types */
@@ -462,7 +501,7 @@
 
     var html = "";
     var nmOn = S.theme && S.theme.name;
-    html += '<div class="brand"><span class="mark"><i></i><i></i></span><b>투로그</b>' +
+    html += '<div class="brand' + capCls("home") + '"' + capStyle("home") + ' data-pg="home"><span class="mark"><i></i><i></i></span><b>투로그</b>' +
       '<span class="who' + (nmOn ? " tinted" : "") + '">' + esc(c.me) + " · " + esc(c.you) + "</span>" +
       '<button class="icon-btn pal" data-act="toggleMode" aria-label="' + modeLabel() + '" title="' + modeLabel() + '">' + modeIcon() + "</button>" +
       '<button class="icon-btn pal" data-act="openTheme" aria-label="컬러 설정">' + IC.palette + "</button></div>";
@@ -576,8 +615,7 @@
     return w === "me" || w === "you" ? w : "both";
   }
   function avSquare(person) {
-    var nm = person === "me" ? S.couple.me : S.couple.you;
-    return '<span class="av ' + person + '" aria-label="' + esc(nm) + '">' + esc(String(nm || "?").slice(0, 1)) + "</span>";
+    return avSpan(person);
   }
   function whoRow(e) {
     var w = evWho(e);
@@ -606,7 +644,7 @@
     });
 
     var html = "";
-    html += '<header class="hdr"><div><h1><span class="eh">🗓️</span> 캘린더</h1><p class="sub">우리 일정과 기념일</p></div>' +
+    html += '<header class="hdr' + capCls("cal") + '"' + capStyle("cal") + ' data-pg="cal"><div><h1><span class="eh">🗓️</span> 캘린더</h1><p class="sub">우리 일정과 기념일</p></div>' +
       '<button class="round-btn" data-act="addEvent" aria-label="일정 추가">' + IC.plus + "</button></header>";
 
     html += '<div class="cal"><div class="cal-head"><div class="cal-month">' + y + "년 " + (m + 1) + "월</div>" +
@@ -683,7 +721,7 @@
     S.ui.seg = seg;
 
     var html = "";
-    html += '<header class="hdr"><div><h1><span class="eh">📖</span> 노트</h1><p class="sub">함께 쌓는 우리 기록</p></div></header>';
+    html += '<header class="hdr' + capCls("diary") + '"' + capStyle("diary") + ' data-pg="diary"><div><h1><span class="eh">📖</span> 노트</h1><p class="sub">함께 쌓는 우리 기록</p></div></header>';
     html += '<div class="seg">';
     NOTE_BASE.forEach(function (s) { html += segBtn(seg, s[0], s[1]); });
     html += "</div>";
@@ -834,7 +872,7 @@
   }
 
   function renderPhoto() {
-    var h = '<header class="hdr"><div><h1><span class="eh">🖼️</span> 사진첩</h1><p class="sub">' + S.photos.length + "장의 순간</p></div>" +
+    var h = '<header class="hdr' + capCls("photo") + '"' + capStyle("photo") + ' data-pg="photo"><div><h1><span class="eh">🖼️</span> 사진첩</h1><p class="sub">' + S.photos.length + "장의 순간</p></div>" +
       '<div class="hdr-acts"><button class="round-btn" data-act="addPhoto" aria-label="사진 추가" title="사진 추가">' + IC.plus + "</button></div></header>";
     var groups = [];
     var map = {};
@@ -934,9 +972,9 @@
     var opts = Object.keys(TYPE).map(function (k) {
       return '<option value="' + k + '">' + TYPE[k].label + "</option>";
     }).join("");
-    var wopts = '<button type="button" class="wopt active" data-act="who" data-who="both"><span class="av me">' + esc(String(S.couple.me).slice(0, 1)) + '</span><span class="av you">' + esc(String(S.couple.you).slice(0, 1)) + "</span>함께</button>" +
-      '<button type="button" class="wopt" data-act="who" data-who="me"><span class="av me">' + esc(String(S.couple.me).slice(0, 1)) + "</span>" + esc(S.couple.me) + "</button>" +
-      '<button type="button" class="wopt" data-act="who" data-who="you"><span class="av you">' + esc(String(S.couple.you).slice(0, 1)) + "</span>" + esc(S.couple.you) + "</button>";
+    var wopts = '<button type="button" class="wopt active" data-act="who" data-who="both">' + avSpan("me") + avSpan("you") + "함께</button>" +
+      '<button type="button" class="wopt" data-act="who" data-who="me">' + avSpan("me") + esc(S.couple.me) + "</button>" +
+      '<button type="button" class="wopt" data-act="who" data-who="you">' + avSpan("you") + esc(S.couple.you) + "</button>";
     return sheetHead("일정 추가") +
       '<form class="form" id="sheetForm">' +
       '<div class="f"><label>제목</label><input class="field" name="title" placeholder="예) 성수 데이트" required autocomplete="off"></div>' +
@@ -1020,6 +1058,55 @@
       '</div><input type="hidden" name="fmt" value="' + (c.fmt === "Y" ? "Y" : "D") + '"></div>' +
       '<p style="font-size:11.5px;color:var(--ink-3);line-height:1.6;margin-top:-2px">이 날을 기준으로 D-day와 기념일을 계산해요.</p>' +
       '<button class="btn-primary" type="submit">저장하기</button></form>';
+  }
+
+  function newInviteCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
+
+  /* 커플 연결 시트 — 초대 코드는 여기서만 보입니다 */
+  function formLink() {
+    var li = S.link || {};
+    var code = myInviteCode();
+    var h = sheetHead("커플 연결");
+    if (li.connected) {
+      h += '<div class="link-on"><span class="set-av' + (avPic("you") ? " pic" : "") + '" style="background:' + avColor("you") + '">' + avInner("you") + "</span>" +
+        '<div><div class="link-nm">' + esc(S.couple.you) + "</div><div class=\"link-sub\">커플 연결됨 · 함께 기록 중</div></div></div>";
+      h += '<div class="set-card" style="margin:18px 0 0"><div class="set-lbl">내 초대 코드</div>' +
+        '<div class="set-code-row"><div class="set-code">' + codeFmt(code) + "</div>" +
+        '<button class="set-btn" data-act="copyCode">복사</button></div>' +
+        '<div class="set-hint">다른 기기에서 이 코드를 입력하면 이어서 함께 쓸 수 있어요.</div></div>';
+      h += '<div style="height:18px"></div><button class="btn-line" data-act="unlink">연결 해제</button>';
+      h += '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
+      return h;
+    }
+    h += '<p class="sheet-sub">내 초대 코드를 상대에게 알려 주거나, 상대 코드를 입력하면 연결돼요.</p>';
+    h += '<div class="set-card" style="margin:14px 0 0"><div class="set-lbl">내 초대 코드</div>' +
+      '<div class="set-code-row"><div class="set-code">' + codeFmt(code) + "</div>" +
+      '<button class="set-btn" data-act="copyCode">복사</button></div>' +
+      '<button class="link-mini" data-act="newCode">코드 새로 만들기</button>' +
+      '<div class="set-hint">이 6자리를 상대에게 알려 주세요.</div></div>';
+    h += '<div class="link-or"><span>또는</span></div>';
+    h += '<form class="form" id="linkForm" style="margin-top:0">' +
+      '<div class="f"><label>상대 초대 코드</label>' +
+      '<div class="link-in-row"><input class="field" name="code" inputmode="numeric" maxlength="6" placeholder="6자리 숫자" autocomplete="off">' +
+      '<button class="set-btn on" type="submit">연결하기</button></div></div></form>';
+    h += '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
+    return h;
+  }
+
+  function capPickRows() {
+    return PAGES.map(function (p) {
+      var cur = pageCap(p.k);
+      var h = '<div class="cap-row" data-caprow="' + p.k + '"><span class="cap-nm">' + p.n + '</span><div class="cap-sws">';
+      h += '<button type="button" class="sw none' + (!cur ? " sel" : "") + '" data-act="pickCap" data-page="' + p.k +
+        '" data-color="" aria-label="' + p.n + ' 기본"></button>';
+      CAP_BG.forEach(function (c) {
+        h += '<button type="button" class="sw' + (cur && cur.toUpperCase() === c ? " sel" : "") + '" data-act="pickCap" data-page="' + p.k +
+          '" data-color="' + c + '" style="background:' + c + '" aria-label="' + p.n + " " + c + '"></button>';
+      });
+      h += '</div><input type="color" class="cap-pick js-page" data-page="' + p.k + '" value="' + (cur || "#FFFFFF") +
+        '" aria-label="' + p.n + ' 캡션 색 직접 고르기"></div>';
+      return h;
+    }).join("");
   }
 
   function swRow(target, cur) {
@@ -1234,6 +1321,66 @@
 
   /* ------------------------------------------------------------------ settings */
   function initials(n) { return esc(String(n || "?").slice(0, 1)); }
+
+  /* --------------------------------------------------- 프로필 사진 (동그란 아바타)
+     작은 JPEG dataURL 로 만들어 상태(couple.pics)에 함께 저장합니다. */
+  function avPic(who) {
+    var p = (S.couple.pics || {})[who];
+    return typeof p === "string" && p.indexOf("data:image/") === 0 ? p : "";
+  }
+  function avInner(who) {
+    var pic = avPic(who);
+    if (pic) return '<img class="av-img" src="' + pic + '" alt="">';
+    return initials(who === "me" ? S.couple.me : S.couple.you);
+  }
+  function avSpan(who, extra) {
+    var nm = who === "me" ? S.couple.me : S.couple.you;
+    return '<span class="av ' + who + (avPic(who) ? " pic" : "") + (extra ? " " + extra : "") +
+      '" aria-label="' + esc(nm) + '">' + avInner(who) + "</span>";
+  }
+  /* 고른 사진을 가운데 기준으로 정사각형 256px JPEG 로 줄입니다 */
+  function squareAvatar(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file) return reject(new Error("no file"));
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error("read")); };
+      reader.onload = function () {
+        var img = new Image();
+        img.onerror = function () { reject(new Error("decode")); };
+        img.onload = function () {
+          try {
+            var SIDE = 256;
+            var cv = document.createElement("canvas");
+            cv.width = SIDE; cv.height = SIDE;
+            var ctx = cv.getContext("2d");
+            var m = Math.min(img.width, img.height) || 1;
+            var sx = (img.width - m) / 2, sy = (img.height - m) / 2;
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, SIDE, SIDE);
+            ctx.drawImage(img, sx, sy, m, m, 0, 0, SIDE, SIDE);
+            var url = cv.toDataURL("image/jpeg", 0.82);
+            if (url.length > 180000) url = cv.toDataURL("image/jpeg", 0.62);
+            if (url.length > 180000) url = cv.toDataURL("image/jpeg", 0.45);
+            resolve(url);
+          } catch (e) { reject(e); }
+        };
+        img.src = String(reader.result || "");
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  function avatarPickRow(who) {
+    var nm = who === "me" ? S.couple.me : S.couple.you;
+    var has = !!avPic(who);
+    return '<div class="av-line">' +
+      '<button type="button" class="set-av pick' + (has ? " pic" : "") + '" data-act="pickPic" data-who="' + who +
+      '" style="background:' + avColor(who) + '" aria-label="' + esc(nm) + ' 프로필 사진 선택">' + avInner(who) + "</button>" +
+      '<span class="av-nm">' + esc(nm) + "</span>" +
+      '<span class="av-acts"><button type="button" class="set-btn" data-act="pickPic" data-who="' + who + '">' +
+      (has ? "사진 바꾸기" : "사진 선택") + "</button>" +
+      (has ? '<button type="button" class="set-btn ghost" data-act="clearPic" data-who="' + who + '">기본으로</button>' : "") +
+      "</span></div>";
+  }
   function avColor(who) {
     var c = (S.couple.colors || {})[who];
     return c || (who === "me" ? "#D96B52" : "#5F6F65");
@@ -1263,7 +1410,7 @@
   }
   function avatarPick(who, name) {
     var cur = avColor(who);
-    var h = '<div class="av-line"><span class="set-av sm" style="background:' + cur + '">' + initials(name) + "</span>" +
+    var h = '<div class="av-line"><span class="set-av sm' + (avPic(who) ? " pic" : "") + '" style="background:' + cur + '">' + avInner(who) + "</span>" +
       '<span class="av-nm">' + esc(name) + "</span></div>";
     h += '<div class="sw-grid" data-av="' + who + '" style="margin-top:10px">';
     SOFT.forEach(function (p) {
@@ -1300,31 +1447,20 @@
     var c = S.couple, t = S.theme || {}, li = S.link || {}, dark = t.mode === "dark";
     var remote = !!(Store && Store.mode === "remote");
     var acct = (S.auth || {});
-    var h = '<header class="hdr"><div><h1><span class="eh">⚙️</span> 설정</h1><p class="sub">계정·연결·화면을 내 방식으로</p></div></header>';
+    var h = '<header class="hdr' + capCls("set") + '"' + capStyle("set") + ' data-pg="set"><div><h1><span class="eh">⚙️</span> 설정</h1><p class="sub">계정·연결·화면을 내 방식으로</p></div></header>';
 
     /* ---- 계정 및 커플 연결 ---- */
     h += '<div class="sec"><h2>👤 계정 및 커플 연결</h2><span class="more">' + (li.connected ? "연결됨" : "미연결") + "</span></div>";
     h += '<div class="list">';
-    h += '<div class="row"><span class="set-av" style="background:' + avColor("me") + '">' + initials(c.me) + "</span>" +
+    h += '<div class="row"><button type="button" class="set-av pick' + (avPic("me") ? " pic" : "") + '" data-act="pickPic" data-who="me" style="background:' + avColor("me") + '" aria-label="' + esc(c.me) + ' 프로필 사진 선택">' + avInner("me") + "</button>" +
       '<div class="body" style="flex:1 1 auto;min-width:0"><div class="t" style="font-size:13.5px;font-weight:600;letter-spacing:-.02em">' + esc(c.me) + "</div>" +
       '<div style="font-size:11px;color:var(--ink-3);margin-top:2px">' + (remote && acct.email ? esc(acct.email) : "내 계정 · 로그인됨") + "</div></div>" +
       '<span class="chip plain">나</span></div>';
-    h += '<div class="row"><span class="set-av" style="background:' + avColor("you") + '">' + initials(c.you) + "</span>" +
+    h += '<div class="row"><button type="button" class="set-av pick' + (avPic("you") ? " pic" : "") + '" data-act="pickPic" data-who="you" style="background:' + avColor("you") + '" aria-label="' + esc(c.you) + ' 프로필 사진 선택">' + avInner("you") + "</button>" +
       '<div class="body" style="flex:1 1 auto;min-width:0"><div class="t" style="font-size:13.5px;font-weight:600;letter-spacing:-.02em">' + esc(c.you) + "</div>" +
-      '<div style="font-size:11px;color:var(--ink-3);margin-top:2px">' + (li.connected ? "커플 연결됨 · 함께 기록 중" : "아직 연결되지 않았어요") + "</div></div>" +
-      '<span class="chip ' + (li.connected ? "coral" : "plain") + '">' + (li.connected ? "연결됨" : "미연결") + "</span></div>";
+      '<div style="font-size:11px;color:var(--ink-3);margin-top:2px">' + (li.connected ? "커플 연결됨 · 함께 기록 중" : "초대 코드로 연결할 수 있어요") + "</div></div>" +
+      '<button class="chip ' + (li.connected ? "coral" : "plain") + '" data-act="linkSheet" aria-label="커플 연결 설정">' + (li.connected ? "연결됨" : "미연결") + "</button></div>";
     h += "</div>";
-
-    h += '<div class="set-card"><div class="set-lbl">내 초대 코드</div>' +
-      '<div class="set-code-row"><div class="set-code">' + codeFmt(myInviteCode()) + "</div>" +
-      '<button class="set-btn" data-act="copyCode">복사</button></div>' +
-      '<div class="set-hint">이 6자리 코드를 상대에게 알려 주면 커플로 연결돼요.</div></div>';
-
-    h += '<div class="set-card"><div class="set-lbl">상대 초대 코드</div>' +
-      '<form class="set-form" id="linkForm"><input class="field" name="code" inputmode="numeric" maxlength="6" placeholder="6자리 숫자" autocomplete="off">' +
-      '<button class="set-btn on" type="submit">연결</button></form>' +
-      (li.connected ? '<button class="set-btn warn" data-act="unlink" style="width:100%;margin-top:10px">커플 연결 해제</button>' : "") +
-      "</div>";
 
     h += '<div class="set-card"><div class="set-lbl">동기화</div>' +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px">' +
@@ -1338,31 +1474,21 @@
 
     h += '<div style="margin:14px 20px 0"><button class="set-btn warn" data-act="logout" style="width:100%;height:46px">로그아웃</button></div>';
 
-    /* ---- 화면 및 기념일 ---- */
-    h += '<div class="sec"><h2>🎛️ 화면 및 기념일</h2></div>';
+    /* ---- 화면 및 꾸미기 ---- */
+    h += '<div class="sec"><h2>🎛️ 화면 및 꾸미기</h2></div>';
     h += '<div class="list">';
     h += '<div class="set-block"><span class="set-lbl">화면</span><div class="seg seg-sm" data-group="mode">' +
       '<button type="button" class="seg-btn' + (dark ? "" : " active") + '" data-act="mode" data-mode="light">라이트</button>' +
       '<button type="button" class="seg-btn' + (dark ? " active" : "") + '" data-act="mode" data-mode="dark">다크</button></div></div>';
-    h += '<div class="set-block"><span class="set-lbl">이름 색</span>' + swRow("name", t.name || "") + "</div>";
-    h += '<div class="set-block"><span class="set-lbl">최근 기록 색</span>' + swRow("log", t.log || "") + "</div>";
+    h += '<div class="set-block"><span class="set-lbl">페이지 캡션 색</span>' + capPickRows() +
+      '<div class="set-hint">페이지마다 제목 줄의 바탕색을 고를 수 있어요. 글씨는 라이트·다크 모두 검정으로 또렷하게 보여요.</div></div>';
+    h += '<div class="set-block"><span class="set-lbl">프로필 사진</span>' + avatarPickRow("me") + avatarPickRow("you") +
+      '<div class="set-hint" style="margin-top:10px">동그란 사진을 눌러 앨범에서 고르면 돼요. 사진이 없으면 이름 첫 글자로 보여요.</div></div>';
     h += '<div class="set-block"><span class="set-lbl">프로필 색</span>' + avatarPick("me", c.me) + avatarPick("you", c.you) + "</div>";
     h += '<div class="set-block"><span class="set-lbl">일정 색 · 캘린더</span>' + schedPick("me") + schedPick("you") + schedPick("both") + "</div>";
+    h += '<div class="set-block"><div class="set-hint" style="margin-top:0">이름 · 처음 만난 날 · 표기 방식은 홈의 D-day 카드를 눌러 바꿀 수 있어요.</div></div>';
     h += "</div>";
 
-    /* ---- 커플 정보 ---- */
-    h += '<div class="sec"><h2>💞 커플 정보</h2></div>';
-    h += '<div class="pad"><form class="form" id="setForm" style="margin-top:0">' +
-      '<div class="two"><div class="f"><label>나</label><input class="field" name="me" value="' + esc(c.me) + '"></div>' +
-      '<div class="f"><label>상대</label><input class="field" name="you" value="' + esc(c.you) + '"></div></div>' +
-      '<div class="f"><label>처음 만난 날</label><input class="field" type="date" name="since" value="' + c.since + '" required></div>' +
-      '<div class="f"><label>기념일 문구</label><input class="field" name="phrase" value="' + esc(c.phrase || "함께한 지") + '" placeholder="함께한 지" autocomplete="off"></div>' +
-      '<p class="sheet-sub" style="margin-top:-4px">홈에 ‘' + esc(c.me) + josa(c.me, "과", "와") + " " + esc(c.you) + josa(c.you, "이", "가") + " " + esc(c.phrase || "함께한 지") + "’처럼 보여요.</p>" +
-      '<div class="f"><label>D-day 표기</label><div class="seg seg-sm" data-group="fmt">' +
-      '<button type="button" class="seg-btn' + (c.fmt === "Y" ? "" : " active") + '" data-act="fmt" data-fmt="D">일수로 · D+365일</button>' +
-      '<button type="button" class="seg-btn' + (c.fmt === "Y" ? " active" : "") + '" data-act="fmt" data-fmt="Y">연·일로 · 1년 4일째</button></div>' +
-      '<input type="hidden" name="fmt" value="' + (c.fmt === "Y" ? "Y" : "D") + '"></div>' +
-      '<button class="btn-primary" type="submit">저장하기</button></form></div>';
     h += '<div style="height:26px"></div>';
     h += '<p class="cp-note" style="text-align:center;padding:0 24px">' + installHint() + "</p>";
     h += '<div style="height:26px"></div>';
@@ -1406,7 +1532,7 @@
     var h = '<div class="login"><div class="mark"><i></i><i></i></div>' +
       '<h1 class="login-t">다시, 우리</h1>' +
       '<p class="login-s">' + esc(c.me) + josa(c.me, "과", "와") + " " + esc(c.you) + josa(c.you, "이", "가") + " 함께한 기록이 그대로 기다리고 있어요.<br>다시 시작하면 바로 이어져요.</p>" +
-      '<div class="login-card"><span class="set-av" style="background:' + avColor("me") + '">' + initials(c.me) + "</span>" +
+      '<div class="login-card"><span class="set-av' + (avPic("me") ? " pic" : "") + '" style="background:' + avColor("me") + '">' + avInner("me") + "</span>" +
       '<div><div class="nm">' + esc(c.me) + "</div><div class=\"st\">로그아웃된 계정 · 기록은 안전하게 보관 중</div></div></div>" +
       '<button class="btn-primary" data-act="login">다시 시작하기</button>' +
       '<button class="btn-line" data-act="loginOther">다른 계정으로 시작</button>' +
@@ -1776,19 +1902,30 @@
 
     if (act === "copyCode") { copyText(myInviteCode(), "초대 코드를 복사했어요"); return; }
 
+    if (act === "linkSheet") { openSheet(formLink()); return; }
+
+    if (act === "newCode") {
+      S.link = S.link || {};
+      S.link.code = newInviteCode();
+      save();
+      openSheet(formLink());
+      toast("초대 코드를 새로 만들었어요");
+      return;
+    }
+
     if (act === "unlink") {
       if (Store && Store.mode === "remote") {
         toast("연결을 해제하는 중…");
         Store.couple.leave().then(function (res) {
           if (res && res.error) { toast("해제하지 못했어요"); return; }
           S.link.connected = false;
-          save(); renderAll(); toast("커플 연결을 해제했어요");
+          save(); closeSheet(); renderAll(); toast("커플 연결을 해제했어요");
         }).catch(function () { toast("해제하지 못했어요"); });
         return;
       }
       S.link.connected = false;
       S.link.partnerCode = "";
-      save(); renderAll(); toast("커플 연결을 해제했어요"); return;
+      save(); closeSheet(); renderAll(); toast("커플 연결을 해제했어요"); return;
     }
 
     if (act === "pickSched") {
@@ -1799,12 +1936,36 @@
       save(); renderAll(); toast("일정 색을 바꿨어요"); return;
     }
 
+    if (act === "pickCap") {
+      var pg = el.getAttribute("data-page") || "";
+      var pgCol = el.getAttribute("data-color") || "";
+      setPageCap(pg, pgCol);
+      toast(pgCol ? "캡션 색을 바꿨어요" : "기본 캡션으로 돌렸어요");
+      return;
+    }
+
     if (act === "pickAvatar") {
       var aWho = el.getAttribute("data-who");
       var aCol = el.getAttribute("data-color") || "";
       S.couple.colors = S.couple.colors || {};
       S.couple.colors[aWho] = aCol || null;
       save(); applyTheme(); renderAll(); toast("프로필 색을 바꿨어요"); return;
+    }
+
+    if (act === "pickPic") {
+      var pWho = el.getAttribute("data-who") === "you" ? "you" : "me";
+      var ai = $("#avatarInput");
+      if (!ai) return;
+      ai.value = "";
+      ai.setAttribute("data-who", pWho);
+      ai.click();
+      return;
+    }
+
+    if (act === "clearPic") {
+      var cWho = el.getAttribute("data-who") === "you" ? "you" : "me";
+      if (S.couple.pics) delete S.couple.pics[cWho];
+      save(); renderAll(); toast("프로필 사진을 지웠어요"); return;
     }
 
     if (act === "openPhoto") { openPhoto(el.getAttribute("data-id")); return; }
@@ -1923,14 +2084,15 @@
         var lbtn = ev.target.querySelector("button");
         if (lbtn) { lbtn.disabled = true; lbtn.textContent = "연결 중"; }
         Store.couple.join(rawCode).then(function (res) {
-          if (lbtn) { lbtn.disabled = false; lbtn.textContent = "연결"; }
+          if (lbtn) { lbtn.disabled = false; lbtn.textContent = "연결하기"; }
           if (!res || res.error) { toast("연결하지 못했어요. 코드를 확인해 주세요"); return; }
           return Store.reload().then(function (doc) {
             if (doc) { var keepUi = S.ui; S = normalizeState(doc); S.ui = keepUi; applyTheme(); renderAll(); }
+            closeSheet();
             toast("커플 연결을 완료했어요");
           });
         }).catch(function () {
-          if (lbtn) { lbtn.disabled = false; lbtn.textContent = "연결"; }
+          if (lbtn) { lbtn.disabled = false; lbtn.textContent = "연결하기"; }
           toast("연결하지 못했어요");
         });
         return;
@@ -1938,7 +2100,7 @@
 
       S.link.connected = true;
       S.link.partnerCode = rawCode;
-      save(); renderAll(); toast("커플 연결을 완료했어요");
+      save(); closeSheet(); renderAll(); toast("커플 연결을 완료했어요");
       return;
     }
 
@@ -1991,6 +2153,21 @@
     var t = ev.target;
     if (t && t.classList && t.classList.contains("js-color")) setThemeColor(t.getAttribute("data-target"), t.value);
     if (t && t.classList && t.classList.contains("js-cap")) setCapColor(t.getAttribute("data-id"), t.value);
+    if (t && t.classList && t.classList.contains("js-page")) setPageCap(t.getAttribute("data-page"), t.value);
+  });
+
+  /* 파일 선택 → 프로필 사진 (동그란 아바타) */
+  document.addEventListener("change", function (ev) {
+    if (!ev.target || ev.target.id !== "avatarInput") return;
+    var file = (ev.target.files || [])[0];
+    if (!file) return;
+    var w = ev.target.getAttribute("data-who") === "you" ? "you" : "me";
+    squareAvatar(file).then(function (url) {
+      S.couple.pics = S.couple.pics || {};
+      S.couple.pics[w] = url;
+      save(); renderAll();
+      toast("프로필 사진을 바꿨어요");
+    }).catch(function () { toast("사진을 불러오지 못했어요. 다른 사진으로 해볼까요?"); });
   });
 
   /* 파일 선택 → 사진 추가 시트 */

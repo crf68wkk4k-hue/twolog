@@ -439,6 +439,7 @@ textarea.qfield{height:auto; min-height:44px; padding:11px 12px; line-height:1.5
 .set-btn:active{background:var(--surface-2)}
 .set-btn.on{background:var(--ink); border-color:var(--ink); color:var(--bg)}
 .set-btn.warn{color:var(--accent-deep)}
+.set-btn.ghost{border-color:var(--line-2); color:var(--ink-3); height:32px; padding:0 10px}
 .set-form{display:flex; gap:8px; margin-top:11px}
 .set-form .field{flex:1 1 auto; width:auto; min-width:0; height:38px}
 .set-block{padding:14px 15px; border-bottom:1px solid var(--line-2)}
@@ -568,6 +569,24 @@ html[data-mode="dark"] .btag.done{color:#A9BCAF}
 *,*::before,*::after,svg,svg *{border-radius:0 !important}
 svg [rx]{rx:0}
 
+/* ---------- 프로필 사진만 동그랗게 (사각 잠금 예외) ---------- */
+.av,.set-av,.av-img,.chip.link{border-radius:50% !important}
+.av,.set-av{overflow:hidden}
+.av-img{width:100%; height:100%; object-fit:cover; display:block; border-radius:50% !important}
+.av.pic,.set-av.pic{background:var(--surface-2) !important}
+.set-av.pick{border:0; padding:0; cursor:pointer}
+.set-av.pick .av-img{pointer-events:none}
+.av-acts{margin-left:auto; display:flex; align-items:center; gap:6px}
+.link-on{display:flex; align-items:center; gap:11px}
+.link-nm{font-size:14.5px; font-weight:700; letter-spacing:-.02em}
+.link-sub{font-size:11.5px; color:var(--ink-3); margin-top:2px}
+.link-mini{margin-top:9px; font-size:11.5px; font-weight:600; color:var(--ink-2); text-decoration:underline; text-underline-offset:3px}
+.link-in-row{display:flex; align-items:center; gap:8px; margin-top:0}
+.link-in-row .field{flex:1 1 auto; min-width:0}
+.link-in-row .set-btn{flex:0 0 auto; height:44px}
+.link-or{display:flex; align-items:center; gap:10px; margin:20px 0 14px; font-size:11px; color:var(--ink-3)}
+.link-or:before,.link-or:after{content:""; flex:1 1 auto; height:1px; background:var(--line)}
+
 /* ---------- mobile ---------- */
 @media (max-width:520px){
   body{padding:0; background:var(--bg); align-items:stretch}
@@ -586,6 +605,28 @@ svg [rx]{rx:0}
 /* 커스텀 리스트가 없을 때 '+ 추가' 는 한 줄 전체를 씀 */
 .lstbar .seg-add:only-child{flex:1 1 auto}
 .lstbar .seg-add{height:32px}
+
+/* ---------- 페이지 캡션 띠: 바탕색만 바뀌고 글씨는 항상 검정 ---------- */
+.brand.cap-tint,.hdr.cap-tint{background:var(--cap); box-shadow:inset 0 0 0 1px rgba(28,28,30,.07)}
+.brand.cap-tint{margin:10px 20px 0; padding:11px 16px}
+.hdr.cap-tint{margin:10px 20px 0; padding:14px 16px 13px}
+.brand.cap-tint b,.brand.cap-tint .who{color:#111111}
+.hdr.cap-tint h1,.hdr.cap-tint h1 .eh,.hdr.cap-tint .sub{color:#111111}
+.hdr.cap-tint .sub{opacity:.62}
+.hdr.cap-tint .round-btn{background:transparent; border-color:rgba(28,28,30,.22); color:#111111}
+.brand.cap-tint .icon-btn{color:rgba(28,28,30,.55)}
+
+/* 설정: 페이지마다 캡션 바탕색 고르기 */
+.cap-row{display:flex; align-items:center; gap:8px; margin-top:10px}
+.cap-row:first-of-type{margin-top:0}
+.cap-row .cap-nm{width:42px; flex:0 0 42px; font-size:11.5px; font-weight:600; color:var(--ink-2)}
+.cap-sws{display:flex; align-items:center; gap:5px; flex:1 1 auto; min-width:0}
+.cap-sws .sw{width:20px; height:20px; flex:0 0 20px}
+.cap-sws .sw.none{background:var(--surface); border:1px dashed var(--line); position:relative}
+.cap-sws .sw.none:after{content:""; position:absolute; left:3px; right:3px; top:50%; height:1px; background:var(--ink-3); transform:rotate(-45deg)}
+.cap-pick{-webkit-appearance:none; appearance:none; width:26px; height:26px; flex:0 0 26px; padding:0; border:1px solid var(--line); background:var(--surface); cursor:pointer}
+.cap-pick::-webkit-color-swatch-wrapper{padding:0}
+.cap-pick::-webkit-color-swatch{border:0}
 
 /* ==========================================================================
    photos: real uploads (file input → compressed blob)
