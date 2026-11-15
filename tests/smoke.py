@@ -124,7 +124,11 @@ with sync_playwright() as p:
 
     page.locator("#tabbar .tab").nth(4).click()
     page.wait_for_timeout(250)
-    check("설정 초대 코드", len(page.locator("#s-set .set-code").inner_text().replace(" ", "")) == 6)
+    page.locator('#s-set [data-act="linkSheet"]').first.click()
+    page.wait_for_timeout(300)
+    check("설정 초대 코드", len(page.locator("#sheet .set-code").inner_text().replace(" ", "")) == 6)
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(200)
 
     man = page.evaluate("fetch('manifest.json').then(r => r.json())")
     check("manifest standalone", man.get("display") == "standalone", man.get("display"))
