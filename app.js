@@ -63,7 +63,7 @@
   function seed() {
     var t = today;
     return {
-      couple: { me: "소영", you: "준영", since: addDays(t, -365), fmt: "D", phrase: "함께한 지", colors: { me: "#F7C6D4", you: "#BCE0F7" }, sched: { me: "#F7C6D4", you: "#BCE0F7", both: "#D6C5F7" } },
+      couple: { me: "소영", you: "준영", since: addDays(t, -365), fmt: "D", phrase: "함께한 지", colors: { me: "#9E636B", you: "#3D5C82" }, sched: { me: "#9E636B", you: "#3D5C82", both: "#625A7F" } },
       link: { code: "371502", connected: true, partnerCode: "" },
       auth: { out: false },
       events: [
@@ -149,6 +149,16 @@
   /* 이전 초기값(상대 이름 "민준")을 저장해 둔 기기는 한 번만 "준영"으로 바꿉니다.
      이후에 설정에서 직접 고친 이름은 mig 표시 덕분에 건드리지 않아요. */
   if (!S.mig || typeof S.mig !== "object") S.mig = {};
+  if (!S.mig.palette) {
+    var OLDCOL = { "#F7C6D4": "#9E636B", "#BCE0F7": "#3D5C82", "#D6C5F7": "#625A7F" };
+    ["me", "you", "both"].forEach(function (w) {
+      var sc = String(((S.couple.sched || {})[w]) || "").toUpperCase();
+      var ac = String(((S.couple.colors || {})[w]) || "").toUpperCase();
+      if (OLDCOL[sc]) S.couple.sched[w] = OLDCOL[sc];
+      if (OLDCOL[ac]) S.couple.colors[w] = OLDCOL[ac];
+    });
+    S.mig.palette = 1;
+  }
   if (!S.mig.you) {
     if (S.couple && S.couple.you === "민준") S.couple.you = "준영";
     S.mig.you = 1;
@@ -173,8 +183,8 @@
   }
   if (!S.couple.colors || typeof S.couple.colors !== "object") S.couple.colors = {};
   if (!S.couple.pics || typeof S.couple.pics !== "object") S.couple.pics = {};
-  if (!("me" in S.couple.colors)) S.couple.colors.me = "#F7C6D4";
-  if (!("you" in S.couple.colors)) S.couple.colors.you = "#BCE0F7";
+  if (!("me" in S.couple.colors)) S.couple.colors.me = "#9E636B";
+  if (!("you" in S.couple.colors)) S.couple.colors.you = "#3D5C82";
   if (!S.couple.sched || typeof S.couple.sched !== "object") S.couple.sched = {};
   ["me", "you", "both"].forEach(function (k) {
     if (!S.couple.sched[k]) S.couple.sched[k] = SCHED_DEFAULT[k];
@@ -223,10 +233,10 @@
     { n: "핑크", c: "#F7C6D4" }, { n: "스카이", c: "#BCE0F7" }, { n: "라벤더", c: "#D6C5F7" }, { n: "민트", c: "#C8E9D5" },
     { n: "버터", c: "#F8E6A8" }, { n: "피치", c: "#FAD4C0" }, { n: "라임", c: "#DDEBC0" }, { n: "로즈", c: "#EFD3DC" }
   ];
-  var SCHED_DEFAULT = { me: "#F7C6D4", you: "#BCE0F7", both: "#D6C5F7" };
+  var SCHED_DEFAULT = { me: "#9E636B", you: "#3D5C82", both: "#625A7F" };
   /* 일정·프로필 색 팔레트 (12색) */
-  var OWNER_COLORS = ["#E8849B", "#D96B52", "#E9A87C", "#C9A227", "#8A9A5B", "#5F6F65",
-    "#6FBF9B", "#5B9BC9", "#3F5C74", "#8E7CC3", "#8C7B6B", "#3A3A3E"];
+  var OWNER_COLORS = ["#9E636B", "#BD6C48", "#A68C53", "#5B7048", "#537B67",
+    "#3D5C82", "#625A7F", "#745A4A", "#9B816C", "#4A4A4C"];
   function inkOn(hex) {
     var h = String(hex || "").replace("#", "");
     if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
@@ -2453,8 +2463,8 @@
     return {
       couple: {
         me: "소영", you: "준영", since: today, fmt: "D", phrase: "함께한 지",
-        colors: { me: "#F7C6D4", you: "#BCE0F7" },
-        sched: { me: "#F7C6D4", you: "#BCE0F7", both: "#D6C5F7" }
+        colors: { me: "#9E636B", you: "#3D5C82" },
+        sched: { me: "#9E636B", you: "#3D5C82", both: "#625A7F" }
       },
       link: { code: String(Math.floor(100000 + Math.random() * 900000)), connected: false, partnerCode: "" },
       auth: { out: false, email: "" },
