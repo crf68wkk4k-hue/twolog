@@ -228,7 +228,7 @@
     var youSched = sched.you || "#BCE0F7";
     var bothSched = sched.both || "#D6C5F7";
     var meName = coupleRow.me || "소영";
-    var youName = coupleRow.you || "민준";
+    var youName = coupleRow.you || "준영";
     if (swap) {
       var tn = meName; meName = youName; youName = tn;
       var tc = meColor; meColor = youColor; youColor = tc;

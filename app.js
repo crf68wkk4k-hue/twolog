@@ -63,7 +63,7 @@
   function seed() {
     var t = today;
     return {
-      couple: { me: "소영", you: "민준", since: addDays(t, -365), fmt: "D", phrase: "함께한 지", colors: { me: "#F7C6D4", you: "#BCE0F7" }, sched: { me: "#F7C6D4", you: "#BCE0F7", both: "#D6C5F7" } },
+      couple: { me: "소영", you: "준영", since: addDays(t, -365), fmt: "D", phrase: "함께한 지", colors: { me: "#F7C6D4", you: "#BCE0F7" }, sched: { me: "#F7C6D4", you: "#BCE0F7", both: "#D6C5F7" } },
       link: { code: "371502", connected: true, partnerCode: "" },
       auth: { out: false },
       events: [
@@ -71,10 +71,10 @@
         { id: uid(), date: t, time: "12:30", title: "치과 예약", type: "etc", memo: "오후 1시까지", who: "me" },
         { id: uid(), date: t, time: "20:30", title: "청모모임!", type: "etc", memo: "성수", who: "me" },
         { id: uid(), date: addDays(t, 3), time: "", title: "휴가가는 날", type: "trip", memo: "", who: "both" },
-        { id: uid(), date: addDays(t, 8), time: "18:00", title: "민준 회식", type: "etc", memo: "", who: "you" },
+        { id: uid(), date: addDays(t, 8), time: "18:00", title: "준영 회식", type: "etc", memo: "", who: "you" },
         { id: uid(), date: t, time: "", title: "만난 지 1주년", type: "anni", memo: "", who: "both" },
         { id: uid(), date: addDays(t, 6), time: "15:00", title: "영화 보는 날", type: "date", memo: "용산 CGV", who: "both" },
-        { id: uid(), date: addDays(t, 11), time: "", title: "민준 생일", type: "anni", memo: "", who: "you" },
+        { id: uid(), date: addDays(t, 11), time: "", title: "준영 생일", type: "anni", memo: "", who: "you" },
         { id: uid(), date: addDays(t, -3), time: "13:00", title: "북한산 산행", type: "trip", memo: "우이신설역 10시", who: "both" },
         { id: uid(), date: addDays(t, 24), time: "", title: "제주 여행 예약", type: "trip", memo: "숙소 결제", who: "both" }
       ],
@@ -82,7 +82,7 @@
         { id: uid(), text: "주말 장보기", done: true, who: "함께" },
         { id: uid(), text: "12월 여행 항공권 예약", done: false, who: "함께" },
         { id: uid(), text: "침구 세탁", done: false, who: "나" },
-        { id: uid(), text: "민준 자전거 수리 맡기기", done: false, who: "민준" },
+        { id: uid(), text: "준영 자전거 수리 맡기기", done: false, who: "준영" },
         { id: uid(), text: "냉장고 정리", done: true, who: "나" },
         { id: uid(), text: "커플 사진 인화", done: false, who: "함께" }
       ],
@@ -99,9 +99,9 @@
         { id: uid(), kind: "movie", title: "그대들은 어떻게 살 것인가", rating: 5, date: addDays(t, -20), review: "같이 보고 한참 얘기했다." }
       ],
       expenses: [
-        { id: uid(), date: addDays(t, -3), amount: 38000, cat: "식비", memo: "성수 파스타", payer: "민준" },
+        { id: uid(), date: addDays(t, -3), amount: 38000, cat: "식비", memo: "성수 파스타", payer: "준영" },
         { id: uid(), date: addDays(t, -7), amount: 54000, cat: "데이트", memo: "영화 + 팝콘", payer: "나" },
-        { id: uid(), date: addDays(t, -7), amount: 12400, cat: "교통", memo: "택시", payer: "민준" },
+        { id: uid(), date: addDays(t, -7), amount: 12400, cat: "교통", memo: "택시", payer: "준영" },
         { id: uid(), date: addDays(t, -10), amount: 89000, cat: "생활", memo: "침구 세트", payer: "나" },
         { id: uid(), date: addDays(t, -12), amount: 26500, cat: "식비", memo: "장보기", payer: "함께" },
         { id: uid(), date: addDays(t, -5), amount: 120000, cat: "기타", memo: "콘서트 예매", payer: "함께" }
@@ -146,6 +146,13 @@
 
   function normalizeState(s) {
   S = s;
+  /* 이전 초기값(상대 이름 "민준")을 저장해 둔 기기는 한 번만 "준영"으로 바꿉니다.
+     이후에 설정에서 직접 고친 이름은 mig 표시 덕분에 건드리지 않아요. */
+  if (!S.mig || typeof S.mig !== "object") S.mig = {};
+  if (!S.mig.you) {
+    if (S.couple && S.couple.you === "민준") S.couple.you = "준영";
+    S.mig.you = 1;
+  }
   if (!S.ui) S.ui = { seg: "todo", expMonth: today.slice(0, 7), calMonth: today.slice(0, 7), selDate: today };
   if (!S.theme || typeof S.theme !== "object") S.theme = { name: null, log: null };
   if (!("name" in S.theme)) S.theme.name = null;
@@ -461,13 +468,13 @@
       '<button class="icon-btn pal" data-act="openTheme" aria-label="컬러 설정">' + IC.palette + "</button></div>";
 
     /* ---- 1. D-day ---- */
-    html += '<div class="dday" data-act="editDday"><div class="dday-top"><span class="eyebrow">TOGETHER SINCE ' + c.since.replace(/-/g, ".") + "</span>" +
+    /* 위 라벨: 「소영과 준영이 함께한 지」 — 날짜 없이 두 이름과 문구만 */
+    html += '<div class="dday" data-act="editDday"><div class="dday-top"><span class="eyebrow">' +
+      '<em class="nm">' + esc(c.me) + "</em>" + josa(c.me, "과", "와") + ' <em class="nm">' + esc(c.you) + "</em>" + josa(c.you, "이", "가") + " " + esc(c.phrase || "함께한 지") + "</span>" +
       '<button class="icon-btn" data-act="editDday" aria-label="기념일 수정">' + IC.pencil + "</button></div>" +
       '<div class="dday-num' + (dl.compact ? " compact" : "") + '">' + dl.text + "</div>" +
-      '<div class="dday-line"><em class="nm">' + esc(c.me) + "</em>" + josa(c.me, "과", "와") + ' <em class="nm">' + esc(c.you) + "</em>" + josa(c.you, "이", "가") + " " + esc(c.phrase || "함께한 지") + " " + dday + "일</div>" +
-      '<div class="chip-row">' +
-      (ann ? '<span class="chip coral">' + ann.n + "주년 " + (ann.days === 0 ? "오늘" : "D-" + ann.days) + "</span>" : "") +
-      '<span class="chip plain">' + esc(c.since.replace(/-/g, ".")) + " 시작</span></div></div>";
+      (ann ? '<div class="chip-row"><span class="chip coral">' + ann.n + "주년 " + (ann.days === 0 ? "오늘" : "D-" + ann.days) + "</span></div>" : "") +
+      "</div>";
 
     /* ---- 3. {month}월의 우리 dashboard ---- */
     html += '<div class="sec"><h2>🗓️ ' + monthNo + '월의 우리</h2><span class="more">' + ym.replace("-", ".") + "</span></div>";
@@ -1375,7 +1382,7 @@
   }
 
   function renderLogin() {
-    var c = S.couple || { me: "소영", you: "민준" };
+    var c = S.couple || { me: "소영", you: "준영" };
     var remote = !!(Store && Store.mode === "remote");
 
     /* remote: 진짜 계정 로그인 */
@@ -2007,7 +2014,7 @@
   function emptyState() {
     return {
       couple: {
-        me: "소영", you: "민준", since: today, fmt: "D", phrase: "함께한 지",
+        me: "소영", you: "준영", since: today, fmt: "D", phrase: "함께한 지",
         colors: { me: "#F7C6D4", you: "#BCE0F7" },
         sched: { me: "#F7C6D4", you: "#BCE0F7", both: "#D6C5F7" }
       },
