@@ -170,6 +170,8 @@ h1,h2,h3,p{margin:0}
   color:#111111; padding:0 4px 0 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   letter-spacing:-.03em; text-align:left
 }
+/* 여러 칸에 걸친 막대는 제목을 막대 가운데에 */
+.ebar.mid{text-align:center; padding:0 6px}
 .day{
   position:relative; height:66px; display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start;
   gap:3px; padding:5px 3px; border-radius:0; overflow:hidden
@@ -207,14 +209,14 @@ h1,h2,h3,p{margin:0}
 
 /* ---------- calendar: 선택한 날 일정 목록 (박스 없이 크게) ---------- */
 .daylist{margin:0}
-.daylist .ev{padding:15px 0; border-bottom:1px solid var(--line-2); gap:13px; align-items:flex-start}
+.daylist .ev{padding:13px 0; border-bottom:1px solid var(--line-2); gap:9px; align-items:center}
 .daylist .ev:last-child{border-bottom:0}
-.daylist .ev .bar{width:3px; height:100%; min-height:52px; margin-top:2px}
-.daylist .who-row{gap:7px; margin-bottom:8px}
-.daylist .av{width:38px; height:38px; flex:0 0 38px; font-size:15px}
-.daylist .wname{font-size:12.5px; font-weight:700; color:var(--ink-2); letter-spacing:-.01em; margin-left:2px}
-.daylist .ev .t{font-size:16px;font-weight:700; letter-spacing:-.02em; white-space:normal; overflow:visible; line-height:1.35}
-.daylist .ev .m{font-size:12px; margin-top:5px; gap:5px}
+.daylist .ev .bar{width:3px; height:22px; min-height:0; margin-top:0; flex:0 0 3px}
+.daylist .who-row{gap:4px; margin-bottom:0; flex:0 0 auto}
+.daylist .av{width:24px; height:24px; flex:0 0 24px; font-size:10.5px}
+.daylist .wname{font-size:11.5px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em; margin-left:2px; white-space:nowrap; max-width:76px; overflow:hidden; text-overflow:ellipsis}
+.daylist .ev .t{flex:1 1 auto; min-width:0; font-size:14px; font-weight:600; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.daylist .ev .m{flex:0 0 auto; font-size:10.5px; font-weight:600; color:var(--ink-3); margin-top:0; gap:4px; white-space:nowrap; font-variant-numeric:tabular-nums}
 .daylist .ev .x{align-self:center}
 .daylist .empty{padding:18px 0}
 
@@ -246,6 +248,19 @@ h1,h2,h3,p{margin:0}
 .who{font-size:10.5px; font-weight:600; color:var(--ink-2); background:var(--surface-2); padding:3px 7px; border-radius:0; flex:0 0 auto}
 .who.me{color:#9A6A5C; background:var(--accent-soft)}
 .who.you{color:var(--sage); background:var(--sage-soft)}
+
+/* note: 체크리스트 한 줄 */
+.row .sub{display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-3); line-height:1.5; margin-top:5px; white-space:normal}
+.row .t.tw{white-space:normal; overflow:visible; overflow-wrap:anywhere; line-height:1.45}
+.row .subtx{min-width:0; flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.tagchip{font-size:9.5px; font-weight:700; letter-spacing:-.01em; color:var(--ink-2); background:var(--surface-2); padding:2px 6px; flex:0 0 auto}
+.row .lrow{display:flex; align-items:center; gap:7px; min-width:0}
+.row .lrow .t{flex:1 1 auto; min-width:0}
+.row .meta{display:flex; align-items:center; gap:6px; margin-top:6px; font-size:10.5px; color:var(--ink-3); font-variant-numeric:tabular-nums}
+.addrow{display:flex; align-items:center; gap:9px; width:100%; padding:13px 15px; border-top:1px solid var(--line-2); color:var(--ink-2); font-size:12.5px; font-weight:600; letter-spacing:-.01em; background:var(--surface); text-align:left}
+.addrow:active{background:var(--surface-2)}
+.addrow .ap{width:20px; height:20px; flex:0 0 20px; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--ink-2)}
+.addrow .ap svg{width:11px; height:11px}
 
 /* bucket */
 .bkt{display:flex; align-items:flex-start; gap:12px; padding:14px 15px}
@@ -328,7 +343,7 @@ h1,h2,h3,p{margin:0}
 .cp-hd{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px}
 .cp-hd span:first-child{font-size:12.5px; font-weight:700; letter-spacing:-.02em}
 .cp-val{font-size:11px; color:var(--ink-3); letter-spacing:.03em; font-variant-numeric:tabular-nums}
-.sw-grid{display:grid; grid-template-columns:repeat(8,1fr); gap:6px}
+.sw-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:6px}
 .sw{position:relative; aspect-ratio:1/1; border-radius:0; border:1px solid rgba(28,28,30,.10); padding:0}
 .sw.sel{box-shadow:inset 0 0 0 2px #fff, 0 0 0 1px var(--ink)}
 .sw-grid[data-sw="cap"] .sw.sel{box-shadow:inset 0 0 0 2px #FFFFFF, 0 0 0 1.5px #111111}
@@ -661,7 +676,7 @@ svg [rx]{rx:0}
 .lstbar .seg-add{height:32px}
 
 /* ---------- 페이지 캡션 띠: 바탕색만 바뀌고 글씨는 항상 검정 ---------- */
-.brand.cap-tint,.hdr.cap-tint{background:var(--cap); box-shadow:inset 0 0 0 1px rgba(28,28,30,.07)}
+.brand.cap-tint,.hdr.cap-tint{background:var(--cap); border:0; box-shadow:none; border-radius:10px !important}
 .brand.cap-tint{margin:10px 20px 0; padding:11px 16px}
 .hdr.cap-tint{margin:10px 20px 0; padding:14px 16px 13px}
 .brand.cap-tint b,.brand.cap-tint .who{color:#111111}
@@ -734,3 +749,80 @@ body{overscroll-behavior-y:contain}
   .statusbar{display:none}
   .hdr{padding-top:22px}
 }
+
+/* ==========================================================================
+   2026-11-16 개편 — 캘린더 이름표/외 N, 홈 카드, My, 캡션 둥글게, 완료 정리
+   ========================================================================== */
+
+/* --- 페이지 캡션: 테두리 없이 둥글게 (글씨는 늘 #111111) --- */
+.brand.cap-tint,.hdr.cap-tint{border:0; border-radius:10px !important; box-shadow:none}
+.brand.cap-tint{margin:10px 20px 0}
+.hdr.cap-tint{margin:10px 20px 0}
+
+/* --- 홈: 브랜드 줄 (이름 없이 로고 + 버튼) --- */
+.brand .pal.first{margin-left:auto}
+
+/* --- 홈: D-day 히어로 여백 --- */
+.dday{margin:16px 20px 0; padding:30px 20px 26px; text-align:center; display:flex; flex-direction:column; align-items:center}
+.dday-edit{position:absolute; top:12px; right:12px; color:var(--ink-3)}
+.dday-avs{display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:14px}
+.dday-avs .av{width:46px; height:46px; flex:0 0 46px; font-size:17px; box-shadow:0 0 0 2px var(--bg), 0 0 0 3px var(--line)}
+.dday .eyebrow{display:block; line-height:1.4; font-size:16px}
+.dday-num{margin-top:14px}
+.dday .chip-row{margin-top:18px; justify-content:center}
+
+/* --- 홈: 카드형 요약 (버튼) --- */
+.bcard{text-align:left; font:inherit; color:inherit; cursor:pointer; transition:background .15s ease, border-color .15s ease}
+.bcard:active{background:var(--surface-2)}
+.bcard .lb{letter-spacing:.06em}
+html[data-mode="dark"] .bcard:active{background:#1A1A1C}
+
+/* --- 홈: 다가오는 일정 (프사 + 이름 + 일정) --- */
+.row.sched{gap:8px; padding:13px 15px}
+.row.sched .who-row{margin-bottom:0; flex:0 0 auto; gap:4px}
+.row.sched .av{width:24px; height:24px; flex:0 0 24px; font-size:10.5px}
+.row.sched .wname{font-size:11.5px; font-weight:600; color:var(--ink-3); margin-left:2px; max-width:74px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.row.sched .t{flex:1 1 auto; min-width:0; font-size:13.5px; font-weight:600; letter-spacing:-.02em}
+.row.sched .m{flex:0 0 auto; margin-top:0; font-size:11px; font-weight:700; color:var(--ink-3); font-variant-numeric:tabular-nums}
+
+/* --- 캘린더: 공휴일 이름 + 넘친 일정 표시 --- */
+.day .dhol{display:block; font-size:8px; font-weight:600; line-height:1.1; color:#B4735F; letter-spacing:-.02em; padding-left:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px}
+.day.hol .dnum{color:#B4735F}
+.day .dovf{position:absolute; right:4px; bottom:3px; font-size:8.5px; font-weight:700; color:var(--ink-3); letter-spacing:-.02em; background:var(--bg); padding-left:3px}
+.day.blank .dovf{display:none}
+
+/* --- 캘린더: 아래 일정 추가 크게 --- */
+.ghost.add-big{height:52px; font-size:14.5px; font-weight:700; letter-spacing:-.02em; border-style:solid; border-color:var(--line); color:var(--ink); gap:8px}
+.ghost.add-big svg{width:20px; height:20px}
+
+/* --- 노트: 완료 숨기기 토글 --- */
+.donebar{display:flex; justify-content:flex-end; margin:0 20px 9px}
+.dtgl{font-size:11.5px; font-weight:600; color:var(--ink-3); padding:5px 9px; border:1px solid var(--line-2); letter-spacing:-.01em}
+.dtgl:active{background:var(--surface-2)}
+.todo.done .t{text-decoration-thickness:1.5px; opacity:.55}
+.todo.done .sub{opacity:.55}
+
+/* --- My: 섹션 사이 여백 --- */
+.my-gap{height:30px}
+
+/* --- My: 폰트 고르기 --- */
+.font-list{display:flex; flex-direction:column}
+.font-row{display:flex; align-items:center; gap:10px; width:100%; padding:11px 0; border-bottom:1px solid var(--line-2); text-align:left; cursor:pointer}
+.font-row:last-child{border-bottom:0}
+.font-row .fn{font-size:13px; font-weight:600; letter-spacing:-.02em; flex:0 0 auto}
+.font-row .fx{font-size:12px; color:var(--ink-3); margin-left:auto; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.font-row .fk{width:16px; flex:0 0 16px; text-align:right; font-size:12px; font-weight:700; color:var(--accent)}
+.font-row.on .fn{color:var(--ink)}
+.font-row:active{background:var(--surface-2)}
+
+/* --- My: 알림 토글 --- */
+.tgl{width:38px; height:22px; flex:0 0 38px; position:relative; background:var(--surface-2); border:1px solid var(--line)}
+.tgl i{position:absolute; top:2px; left:2px; width:16px; height:16px; display:block; background:var(--ink-3); transition:left .15s ease, background .15s ease}
+.tgl.on{background:var(--accent-soft); border-color:var(--accent-soft)}
+.tgl.on i{left:18px; background:var(--accent)}
+.notif .t{font-size:13px; font-weight:600}
+.notif .m{white-space:normal; line-height:1.45}
+
+/* --- My: 페이지 캡션 색 (한 번에) --- */
+.cap-all{display:flex; align-items:center; gap:8px}
+.cap-all .sw{width:24px; height:24px; flex:0 0 24px}

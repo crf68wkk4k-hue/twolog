@@ -100,10 +100,14 @@ with sync_playwright() as p:
 
     page.locator("#tabbar .tab").nth(2).click()
     page.wait_for_timeout(250)
-    page.fill("#qaddInput", "스모크 할일")
-    page.press("#qaddInput", "Enter")
+    page.locator('#s-diary .addrow[data-act="addTodo"]').click()
+    page.wait_for_timeout(250)
+    page.fill('#sheetForm input[name="text"]', "스모크 할일")
+    page.fill('#sheetForm textarea[name="memo"]', "스모크 상세")
+    page.click('#sheetForm button[type="submit"]')
     page.wait_for_timeout(300)
     check("할 일 추가", page.locator("#s-diary .todo .t", has_text="스모크 할일").count() == 1)
+    check("할 일 상세", page.locator("#s-diary .todo .sub", has_text="스모크 상세").count() == 1)
 
     page.locator("#tabbar .tab").nth(3).click()
     page.wait_for_timeout(250)

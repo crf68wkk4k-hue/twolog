@@ -50,7 +50,8 @@
     right: svg('<path d="M9.5 6l6 6-6 6"/>', 18),
     check: svg('<path d="M5 12.6l4.2 4.2L19 7"/>', 13),
     palette: svg('<path d="M12 3.4a8.6 8.6 0 1 0 0 17.2c1.1 0 1.9-.8 1.9-1.8 0-.9-.6-1.4-.6-2.1 0-.8.7-1.4 1.5-1.4h1.4a4.3 4.3 0 0 0 4.3-4.3c0-4.2-3.7-7.6-8.5-7.6z"/><circle cx="8.3" cy="9.8" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.8" r="1" fill="currentColor" stroke="none"/><circle cx="15.7" cy="9.7" r="1" fill="currentColor" stroke="none"/>', 17),
-    gear: svg('<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="1.9"/><circle cx="9" cy="12" r="1.9"/><circle cx="17.5" cy="17" r="1.9"/>', 21)
+    gear: svg('<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="1.9"/><circle cx="9" cy="12" r="1.9"/><circle cx="17.5" cy="17" r="1.9"/>', 21),
+    person: svg('<circle cx="12" cy="8.3" r="3.5"/><path d="M5.2 20c0-3.4 3.1-5.7 6.8-5.7s6.8 2.3 6.8 5.7"/>', 21)
   };
   var STAR = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.8l2.86 5.94 6.54.9-4.77 4.55 1.18 6.5L12 17.6l-5.81 3.09 1.18-6.5L2.6 9.64l6.54-.9z"/></svg>';
 
@@ -94,9 +95,9 @@
         { id: uid(), title: "도자기 원데이 클래스", cat: "취미", done: true }
       ],
       logs: [
-        { id: uid(), kind: "movie", title: "화양연화", rating: 4.5, date: addDays(t, -7), review: "다시 봐도 여운이 오래 남는 색감." },
-        { id: uid(), kind: "food", title: "성수 파스타", rating: 4, date: addDays(t, -3), review: "트러플 크림은 꼭. 웨이팅 30분." },
-        { id: uid(), kind: "movie", title: "그대들은 어떻게 살 것인가", rating: 5, date: addDays(t, -20), review: "같이 보고 한참 얘기했다." }
+        { id: uid(), kind: "movie", title: "화양연화", rating: 4.5, date: addDays(t, -7), review: "다시 봐도 여운이 오래 남는 색감.", done: true },
+        { id: uid(), kind: "food", title: "성수 파스타", rating: 4, date: addDays(t, -3), review: "트러플 크림은 꼭. 웨이팅 30분.", done: true },
+        { id: uid(), kind: "movie", title: "그대들은 어떻게 살 것인가", rating: 5, date: addDays(t, -20), review: "같이 보고 한참 얘기했다.", done: true }
       ],
       expenses: [
         { id: uid(), date: addDays(t, -3), amount: 38000, cat: "식비", memo: "성수 파스타", payer: "준영" },
@@ -194,6 +195,11 @@
   if (!("connected" in S.link)) S.link.connected = true;
   if (!S.auth || typeof S.auth !== "object") S.auth = { out: false };
   if (!Array.isArray(S.lists)) S.lists = [];
+  if (!S.theme || typeof S.theme !== "object") S.theme = { mode: "light", name: null, log: null };
+  if (!S.notif || typeof S.notif !== "object") S.notif = {};
+  ["anni", "today", "dday"].forEach(function (k) {
+    if (typeof S.notif[k] !== "boolean") S.notif[k] = k !== "dday";
+  });
   S.events.forEach(function (e) {
     if (e.who !== "me" && e.who !== "you" && e.who !== "both") e.who = "both";
     /* 예전 한 칸짜리 일정은 종료일 = 시작일 */
@@ -225,9 +231,11 @@
   }
 
   /* ------------------------------------------------------------------ color theme */
+  /* 팔레트 버튼에서 고르는 차분한 10색 (일정 색과 같은 톤) */
   var PALETTE = [
-    { n: "코랄", c: "#D96B52" }, { n: "세이지", c: "#5F6F65" }, { n: "잉크", c: "#1C1C1E" }, { n: "코코아", c: "#8C7B6B" },
-    { n: "네이비", c: "#3F5C74" }, { n: "플럼", c: "#7A5A72" }, { n: "머스터드", c: "#B08341" }, { n: "로즈", c: "#C4737F" }
+    { n: "로즈브라운", c: "#9E636B" }, { n: "테라코타", c: "#BD6C48" }, { n: "머스터드", c: "#A68C53" },
+    { n: "올리브", c: "#5B7048" }, { n: "세이지", c: "#537B67" }, { n: "네이비", c: "#3D5C82" },
+    { n: "플럼", c: "#625A7F" }, { n: "코코아", c: "#745A4A" }, { n: "샌드", c: "#9B816C" }, { n: "차콜", c: "#4A4A4C" }
   ];
   var SOFT = [
     { n: "핑크", c: "#F7C6D4" }, { n: "스카이", c: "#BCE0F7" }, { n: "라벤더", c: "#D6C5F7" }, { n: "민트", c: "#C8E9D5" },
@@ -312,10 +320,28 @@
     { k: "photo", n: "사진첩" }, { k: "set", n: "설정" }
   ];
   var CAP_BG = ["#FAEDE8", "#EDF1EC", "#ECF2F7", "#F8EBEE", "#FBF3DE", "#F4F4F4"];
+  /* 앱 전체 글꼴 — index.html 에서 Google Fonts 로 불러옵니다 */
+  var FONTS = [
+    { k: "base", n: "기본 고딕", s: "'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" },
+    { k: "noto", n: "노토 산스", s: "'Noto Sans KR', 'Pretendard', sans-serif" },
+    { k: "nanum", n: "나눔고딕", s: "'Nanum Gothic', 'Pretendard', sans-serif" },
+    { k: "dodum", n: "고운돋움", s: "'Gowun Dodum', 'Pretendard', sans-serif" },
+    { k: "batang", n: "고운바탕", s: "'Gowun Batang', 'Nanum Myeongjo', serif" },
+    { k: "myeongjo", n: "마루부리 명조", s: "'Noto Serif KR', 'Nanum Myeongjo', serif" },
+    { k: "plex", n: "IBM 플렉스", s: "'IBM Plex Sans KR', 'Pretendard', sans-serif" },
+    { k: "pen", n: "나눔손글씨 펜", s: "'Nanum Pen Script', 'Gowun Dodum', cursive" }
+  ];
+  function fontOf(k) {
+    for (var i = 0; i < FONTS.length; i++) if (FONTS[i].k === k) return FONTS[i];
+    return FONTS[0];
+  }
   /* 노트 기본 탭 이름 — 설정에서 바꿀 수 있어요 */
   var NOTE_DEF = { todo: { e: "📝", n: "메모" }, bucket: { e: "🎯", n: "버킷리스트" }, log: { e: "🎬", n: "영화·먹방" } };
   function pageCap(page) {
-    var v = ((S.theme || {}).pages || {})[page];
+    var t = S.theme || {};
+    /* 모든 페이지에 한 번에 쓰는 캡션 색(theme.cap)이 먼저, 예전 페이지별 설정은 그다음 */
+    if (typeof t.cap === "string" && /^#[0-9a-fA-F]{6}$/.test(t.cap)) return t.cap.toUpperCase();
+    var v = (t.pages || {})[page];
     return typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v : "";
   }
   function capCls(page) { return pageCap(page) ? " cap-tint" : ""; }
@@ -331,6 +357,7 @@
     var cc = S.couple.colors || {};
     root.style.setProperty("--me", cc.me || "#D96B52");
     root.style.setProperty("--you", cc.you || "#5F6F65");
+    root.style.setProperty("--font", fontOf((S.theme || {}).font).s);
     var mt = document.querySelector('meta[name="theme-color"]');
     if (mt) mt.setAttribute("content", dark ? "#111111" : "#FFFFFF");
     if (t.name) {
@@ -577,79 +604,30 @@
     var html = "";
     var nmOn = S.theme && S.theme.name;
     html += '<div class="brand' + capCls("home") + '"' + capStyle("home") + ' data-pg="home"><span class="mark"><i></i><i></i></span><b>투로그</b><span class="bw">(twolog)</span>' +
-      '<span class="who' + (nmOn ? " tinted" : "") + '">' + esc(c.me) + " · " + esc(c.you) + "</span>" +
-      '<button class="icon-btn pal" data-act="toggleMode" aria-label="' + modeLabel() + '" title="' + modeLabel() + '">' + modeIcon() + "</button>" +
-      '<button class="icon-btn pal" data-act="openTheme" aria-label="컬러 설정">' + IC.palette + "</button></div>";
+      '<button class="icon-btn pal first" data-act="toggleMode" aria-label="' + modeLabel() + '" title="' + modeLabel() + '">' + modeIcon() + "</button>" +
+      '<button class="icon-btn pal" data-act="openTheme" aria-label="컬러 설정" title="색 고르기">' + IC.palette + "</button></div>";
 
     /* ---- 1. D-day ---- */
     /* 위 라벨: 「소영과 준영이 함께한 지」 — 날짜 없이 두 이름과 문구만 */
-    html += '<div class="dday" data-act="editDday"><div class="dday-top"><span class="eyebrow">' +
-      esc(ddayPhrase()) + "</span>" +
-      '<button class="icon-btn" data-act="editDday" aria-label="기념일 수정">' + IC.pencil + "</button></div>" +
+    html += '<div class="dday" data-act="editDday">' +
+      '<button class="icon-btn dday-edit" data-act="editDday" aria-label="기념일 수정">' + IC.pencil + "</button>" +
+      '<div class="dday-avs">' + avSpan("me", "hero") + avSpan("you", "hero") + "</div>" +
+      '<div class="eyebrow">' + esc(ddayPhrase()) + "</div>" +
       '<div class="dday-num' + (dl.compact ? " compact" : "") + '">' + dl.text + "</div>" +
       (ann ? '<div class="chip-row"><span class="chip coral">' + ann.n + "주년 " + (ann.days === 0 ? "오늘" : "D-" + ann.days) + "</span></div>" : "") +
       "</div>";
 
-    /* ---- 3. {month}월의 우리 dashboard ---- */
-    html += '<div class="sec"><h2>🗓️ ' + monthNo + '월의 우리</h2><span class="more">' + ym.replace("-", ".") + "</span></div>";
-    html += '<div class="pad">';
-    html += '<div class="bento">';
-
-    html += '<div class="bcard"><div class="bcard-hd"><span class="bi">' + BI.todo + '</span><span class="lb">TO-DO</span></div>' +
-      '<div class="bm">' + todoDone + " / " + todoTotal + "</div>" +
-      '<div class="bs">' + esc(noteTab("todo").n) + " 완료</div>" +
-      '<div class="bbar"><i style="width:' + todoPct + '%"></i></div></div>';
-
-    html += '<div class="bcard"><div class="bcard-hd"><span class="bi">' + BI.cal + '</span><span class="lb">SCHEDULE</span></div>' +
-      '<div class="bm">' + monthEvents.length + "<em>개</em></div>" +
-      '<div class="bs">이번 달 일정</div>' +
-      (typeLine ? '<div class="bx">' + esc(typeLine) + "</div>" : "") + "</div>";
-
-    html += '<div class="bcard"><div class="bcard-hd"><span class="bi">' + BI.photo + '</span><span class="lb">PHOTO</span></div>' +
-      '<div class="bm">' + monthPhotos + "<em>장</em></div>" +
-      '<div class="bs">이번 달 사진</div></div>';
-
-    html += '<div class="bcard"><div class="bcard-hd"><span class="bi">' + BI.heart + '</span><span class="lb">MEMORY</span></div>' +
-      '<div class="bm">' + memories + "<em>개</em></div>" +
-      '<div class="bs">함께한 추억</div></div>';
-
-    html += "</div>";
-
-    html += '<div class="mblocks">';
-
-    html += '<div class="mblock"><h3>🎯 이번 달 버킷리스트</h3>';
-    if (bktTop.length) {
-      bktTop.forEach(function (b) {
-        var st = bktStatus(b);
-        html += '<div class="bitem"><span class="t">' + esc(b.title) + '</span><span class="btag ' + st.k + '">' + st.t + "</span></div>";
-      });
-    } else {
-      html += '<div class="empty" style="padding:14px 0 0;text-align:left">아직 담은 버킷이 없어요.</div>';
-    }
-    html += "</div>";
-
-    html += '<div class="mblock"><div class="mbhd"><h3 class="tint-h">' + esc(noteLabel("log")) + "</h3>" +
-      '<button class="sw-btn" data-act="openTheme" aria-label="최근 기록 색 선택"></button></div>';
-    if (logs.length) {
-      logs.forEach(function (l) {
-        html += '<div class="lrow"><div class="lbody">' +
-          '<div class="lt"><span class="tag ' + l.kind + '">' + (l.kind === "movie" ? "영화" : "먹방") + "</span>" + esc(l.title) + "</div>" +
-          '<div class="lm">' + l.date.replace(/-/g, ".") + (l.review ? " · " + esc(l.review) : "") + "</div></div>" +
-          '<div class="lstar">' + stars(l.rating) + "</div></div>";
-      });
-    } else { html += '<div class="empty" style="padding:14px 0 0;text-align:left">아직 기록이 없어요.</div>'; }
-    html += '<div class="wrap20" style="padding:12px 0 0"><button class="ghost" data-act="navSeg" data-screen="diary" data-seg="log">' + esc(noteLabel("log")) + " 전체 보기</button></div></div>";
-
-    html += "</div></div>";
-
-    /* ---- 4. upcoming ---- */
+    /* ---- 2. 다가오는 일정 ---- */
     var sched = [];
     todayEvents.slice(0, 2).forEach(function (e) {
       sched.push({ e: e, left: "오늘", meta: (TYPE[e.type] || TYPE.etc).label + (evRange(e) ? " · " + evRange(e) : "") });
     });
     upcoming.slice(0, 3).forEach(function (e) {
       var d = parse(evStart(e));
-      sched.push({ e: e, left: (d.getMonth() + 1) + "/" + d.getDate(), meta: (TYPE[e.type] || TYPE.etc).label + (evRange(e) ? " · " + evRange(e) : "") + " · D-" + diffDays(today, evStart(e)) });
+      sched.push({
+        e: e, left: "D-" + diffDays(today, evStart(e)),
+        meta: (d.getMonth() + 1) + "/" + d.getDate() + " · " + (TYPE[e.type] || TYPE.etc).label + (evRange(e) ? " · " + evRange(e) : "")
+      });
     });
     sched = sched.slice(0, 4);
 
@@ -657,11 +635,40 @@
     html += '<div class="pad"><div class="list">';
     if (sched.length) {
       sched.forEach(function (s) {
-        html += '<div class="row"><span class="sched-d">' + s.left + "</span>" +
-          '<div class="body"><div class="t">' + esc(s.e.title) + "</div>" +
-          '<div class="m"><span class="dot-type t-' + s.e.type + '"></span>' + s.meta + "</div></div></div>";
+        html += '<div class="row sched">' + whoRow(s.e) +
+          '<div class="t" title="' + esc(s.e.title) + '">' + esc(s.e.title) + "</div>" +
+          '<div class="m">' + esc(s.left) + "</div></div>";
       });
     } else { html += '<div class="empty">예정된 일정이 없어요.</div>'; }
+    html += "</div></div>";
+
+    /* ---- 3. {month}월의 우리 dashboard ---- */
+    html += '<div class="sec"><h2>🗓️ ' + monthNo + '월의 우리</h2><span class="more">' + ym.replace("-", ".") + "</span></div>";
+    html += '<div class="pad">';
+    html += '<div class="bento">';
+
+    html += '<button type="button" class="bcard" data-act="nav" data-screen="diary" aria-label="메모 열기">' +
+      '<div class="bcard-hd"><span class="bi">' + BI.todo + '</span><span class="lb">메모</span></div>' +
+      '<div class="bm">' + todoDone + " / " + todoTotal + "</div>" +
+      '<div class="bs">' + esc(noteTab("todo").n) + " 완료</div>" +
+      '<div class="bbar"><i style="width:' + todoPct + '%"></i></div></button>';
+
+    html += '<button type="button" class="bcard" data-act="nav" data-screen="cal" aria-label="캘린더 열기">' +
+      '<div class="bcard-hd"><span class="bi">' + BI.cal + '</span><span class="lb">캘린더</span></div>' +
+      '<div class="bm">' + monthEvents.length + "<em>개</em></div>" +
+      '<div class="bs">이번 달 일정</div>' +
+      (typeLine ? '<div class="bx">' + esc(typeLine) + "</div>" : "") + "</button>";
+
+    html += '<button type="button" class="bcard" data-act="nav" data-screen="photo" aria-label="사진첩 열기">' +
+      '<div class="bcard-hd"><span class="bi">' + BI.photo + '</span><span class="lb">사진</span></div>' +
+      '<div class="bm">' + monthPhotos + "<em>장</em></div>" +
+      '<div class="bs">이번 달 사진</div></button>';
+
+    html += '<button type="button" class="bcard" data-act="nav" data-screen="photo" aria-label="추억 열기">' +
+      '<div class="bcard-hd"><span class="bi">' + BI.heart + '</span><span class="lb">추억</span></div>' +
+      '<div class="bm">' + memories + "<em>개</em></div>" +
+      '<div class="bs">함께한 추억</div></button>';
+
     html += "</div></div>";
 
     html += '<div style="height:18px"></div>';
@@ -725,8 +732,7 @@
     var monthStart = cur + "-01", monthEnd = ymd(y, m, daysIn);
 
     var html = "";
-    html += '<header class="hdr' + capCls("cal") + '"' + capStyle("cal") + ' data-pg="cal"><div><h1><span class="eh">🗓️</span> 캘린더</h1></div>' +
-      '<button class="round-btn" data-act="addEvent" aria-label="일정 추가">' + IC.plus + "</button></header>";
+    html += '<header class="hdr' + capCls("cal") + '"' + capStyle("cal") + ' data-pg="cal"><div><h1><span class="eh">🗓️</span> 캘린더</h1></div></header>';
 
     html += '<div class="cal"><div class="cal-head"><div class="cal-month">' + y + "년 " + (m + 1) + "월</div>" +
       '<div class="cal-nav"><button data-act="calPrev" aria-label="이전 달">' + IC.left + "</button>" +
@@ -744,7 +750,7 @@
       return evEnd(e) >= monthStart && evStart(e) <= monthEnd;
     });
 
-    var LANE_H = 17, TOP_H = 26, ROW_MIN = 62;
+    var LANE_H = 17, TOP_H = 26, ROW_MIN = 62, MAX_LANE = 2;
     html += '<div class="cal-grid">';
     for (var w = 0; w < cells.length / 7; w++) {
       var wk = cells.slice(w * 7, w * 7 + 7);
@@ -771,7 +777,16 @@
         (lanes[li] = lanes[li] || []).push(b);
         b.lane = li;
       });
-      var rowsH = Math.max(ROW_MIN, TOP_H + lanes.length * LANE_H + 8);
+      /* 한 주에 보이는 막대는 두 줄까지 — 넘치는 일정은 날짜 칸에 '외 N' 으로 알려 줍니다 */
+      var shown = bars.filter(function (b) { return b.lane < MAX_LANE; });
+      var ovf = {};
+      bars.forEach(function (b) {
+        if (b.lane < MAX_LANE) return;
+        var ovDs = wk[b.sCol] || "";
+        if (ovDs) ovf[ovDs] = (ovf[ovDs] || 0) + 1;
+      });
+      var ovfCount = Object.keys(ovf).length ? ovf : null;
+      var rowsH = Math.max(ROW_MIN, TOP_H + Math.min(lanes.length, MAX_LANE) * LANE_H + 8 + (ovfCount ? 12 : 0));
 
       html += '<div class="cal-row" style="height:' + rowsH + 'px"><div class="cal-daygrid">';
       for (var ci2 = 0; ci2 < 7; ci2++) {
@@ -784,17 +799,22 @@
         if (ds2 === today) cls += " today";
         if (ds2 === sel) cls += " sel";
         if (holName(ds2)) cls += " hol";
+        var hol2 = holName(ds2);
         html += '<button class="' + cls + '" data-act="pickDay" data-date="' + ds2 + '"><span class="dnum">' +
-          Number(ds2.slice(8, 10)) + "</span></button>";
+          Number(ds2.slice(8, 10)) + "</span>" +
+          (hol2 ? '<span class="dhol">' + esc(hol2) + "</span>" : "") +
+          (ovfCount && ovfCount[ds2] ? '<span class="dovf">외 ' + ovfCount[ds2] + "</span>" : "") + "</button>";
       }
       html += "</div>";
-      if (bars.length) {
+      if (shown.length) {
         html += '<div class="cal-bars">';
-        bars.forEach(function (b) {
+        shown.forEach(function (b) {
           var left = b.sCol / 7 * 100, width = (b.eCol - b.sCol + 1) / 7 * 100;
           var top = TOP_H + b.lane * LANE_H;
           var edge = sched(evWho(b.e));
-          html += '<span class="ebar' + (b.openL ? " openl" : "") + (b.openR ? " openr" : "") +
+          /* 여러 칸에 걸친 일정은 막대 전체 폭의 가운데에 제목을 놓습니다 */
+          var mid = b.eCol > b.sCol ? " mid" : "";
+          html += '<span class="ebar' + (b.openL ? " openl" : "") + (b.openR ? " openr" : "") + mid +
             '" style="left:' + left + "%; width:" + width + "%; top:" + top + "px; background:" + edge +
             "; color:" + inkOn(edge) + '">' + esc(b.e.title) + "</span>";
         });
@@ -819,16 +839,18 @@
       selEvents.forEach(function (e) {
         var rng = evRange(e);
         var t = TYPE[e.type] || TYPE.etc;
+        /* (프사) 이름 일정 — 한 줄로 나란히 */
         html += '<div class="ev"><span class="bar" style="background:' + sched(evWho(e)) + '"></span>' +
-          '<div class="body">' + whoRow(e) + '<div class="t">' + esc(e.title) + "</div>" +
-          '<div class="m">' + (rng ? "<span>" + rng + "</span><span>·</span>" : "") + "<span>" + t.label + "</span></div></div>" +
+          whoRow(e) +
+          '<div class="t" title="' + esc(e.title) + '">' + esc(e.title) + "</div>" +
+          '<div class="m">' + (rng ? rng : t.label) + "</div>" +
           '<button class="x" data-act="delEvent" data-id="' + e.id + '" aria-label="삭제">' + IC.x + "</button></div>";
       });
     } else {
       html += '<div class="empty">이 날은 아직 비어 있어요.</div>';
     }
     html += "</div>";
-    html += '<div class="wrap20" style="padding:12px 0 0"><button class="ghost" data-act="addEvent">' + IC.plus + " 일정 추가</button></div>";
+    html += '<div style="padding:14px 0 0"><button class="ghost add-big" data-act="addEvent">' + IC.plus + " 일정 추가</button></div>";
     html += "</div>";
     html += '<div style="height:24px"></div>';
 
@@ -868,7 +890,7 @@
     S.ui.seg = seg;
 
     var html = "";
-    html += '<header class="hdr' + capCls("diary") + '"' + capStyle("diary") + ' data-pg="diary"><div><h1><span class="eh">📖</span> 노트</h1><p class="sub">함께 쌓는 우리 기록</p></div>' +
+    html += '<header class="hdr' + capCls("diary") + '"' + capStyle("diary") + ' data-pg="diary"><div><h1><span class="eh">📖</span> 노트</h1></div>' +
       '<div class="hdr-acts"><button class="round-btn" data-act="noteSettings" aria-label="노트 설정">' + IC.gear + "</button></div></header>";
     html += '<div class="seg">';
     NOTE_BASE.forEach(function (k) { html += segBtn(seg, k, noteLabel(k)); });
@@ -898,63 +920,70 @@
     }
   }
 
+  /* 노트 공통: 맨 아래 + 추가 줄 */
+  function addRow(act, attrs, label) {
+    return '<button type="button" class="addrow" data-act="' + act + '"' + (attrs || "") + ">" +
+      '<span class="ap">' + IC.plus + "</span>" +
+      '<span class="al">' + esc(label) + "</span></button>";
+  }
+
+  /* 완료된 항목은 아래로 내리고, 원하면 숨길 수 있게 */
+  function byDone(a, b) { return (a.done ? 1 : 0) - (b.done ? 1 : 0); }
+  function doneToggle(doneCount) {
+    if (!doneCount) return "";
+    var hide = !!(S.ui && S.ui.hideDone);
+    return '<div class="donebar"><button type="button" class="dtgl" data-act="toggleDone" aria-pressed="' + (hide ? "true" : "false") + '">' +
+      (hide ? "완료 " + doneCount + "개 보기" : "완료 " + doneCount + "개 숨기기") + "</button></div>";
+  }
+
   function viewList(l) {
     if (!l) return '<div class="list" style="margin:0 20px"><div class="empty">리스트를 찾을 수 없어요.</div></div>';
     var h = '<div class="note-hd"><div class="nh-l"><span class="t">' + esc((l.emoji || "📌") + " " + l.title) + "</span>" +
       '<span class="k">' + (l.kind === "memo" ? "메모" : "체크") + "</span></div></div>";
 
-    if (l.kind === "memo") {
-      h += '<div class="list" style="margin:0 20px">';
-      if (!l.items.length) h += '<div class="empty">메모를 남겨 보세요.</div>';
-      l.items.forEach(function (it) {
-        h += '<div class="memo-row"><div class="body" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '"><div class="note-memo">' + esc(it.text) + "</div></div>" +
-          '<button class="edit-ic" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="수정">' + IC.pencil + "</button>" +
-          '<button class="x" data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="삭제">' + IC.x + "</button></div>";
-      });
-      h += "</div>";
-    } else {
-      var done = l.items.filter(function (i) { return i.done; }).length;
-      var pct = l.items.length ? Math.round(done / l.items.length * 100) : 0;
-      h += '<div class="progress"><span class="n">' + done + " / " + l.items.length + ' 완료</span><span class="bar"><i style="width:' + pct + '%"></i></span></div>';
-      h += '<div class="list" style="margin:0 20px">';
-      if (!l.items.length) h += '<div class="empty">아래에 첫 항목을 적어 보세요.</div>';
-      l.items.forEach(function (it) {
-        h += '<div class="row todo' + (it.done ? " done" : "") + '">' +
-          '<button class="check" data-act="toggleListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="완료 표시">' + IC.check + "</button>" +
-          '<div class="body" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '"><div class="t">' + esc(it.text) + "</div></div>" +
-          '<button class="edit-ic" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="수정">' + IC.pencil + "</button>" +
-          '<button class="x" data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="삭제">' + IC.x + "</button></div>";
-      });
-      h += "</div>";
-    }
+    var done = l.items.filter(function (i) { return i.done; }).length;
+    var pct = l.items.length ? Math.round(done / l.items.length * 100) : 0;
+    h += '<div class="progress"><span class="n">' + done + " / " + l.items.length + ' 완료</span><span class="bar"><i style="width:' + pct + '%"></i></span></div>';
+    h += doneToggle(done);
 
-    h += '<form class="qadd" id="qaddForm" data-kind="list:' + l.id + '">' +
-      (l.kind === "memo"
-        ? '<textarea class="field qfield" name="text" id="qaddInput" rows="2" placeholder="메모를 적고 추가를 눌러 주세요"></textarea>'
-        : '<input class="field qfield" name="text" id="qaddInput" placeholder="항목을 적고 추가를 눌러 주세요" autocomplete="off">') +
-      '<button class="qbtn" type="submit" aria-label="추가">' + IC.plus + "추가</button></form>";
+    var hide = !!(S.ui && S.ui.hideDone);
+    var items = l.items.slice().sort(byDone);
+    if (hide) items = items.filter(function (i) { return !i.done; });
+    h += '<div class="list" style="margin:0 20px">';
+    if (!items.length) h += '<div class="empty">' + (l.items.length ? "완료한 항목을 숨겼어요." : "아래 <b>+</b> 로 첫 항목을 더해 보세요.") + "</div>";
+    items.forEach(function (it) {
+      h += '<div class="row todo' + (it.done ? " done" : "") + '">' +
+        '<button class="check" data-act="toggleListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="완료 표시">' + IC.check + "</button>" +
+        '<div class="body" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '"><div class="t tw">' + esc(it.text) + "</div>" +
+        (it.memo ? '<div class="sub">' + esc(it.memo) + "</div>" : "") + "</div>" +
+        '<button class="edit-ic" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="수정">' + IC.pencil + "</button>" +
+        '<button class="x" data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="삭제">' + IC.x + "</button></div>";
+    });
+    h += addRow("addListItem", ' data-list="' + l.id + '"', "항목 추가");
+    h += "</div>";
     return h;
   }
 
   function viewTodo() {
+    var T = noteTab("todo");
     var done = S.todos.filter(function (t) { return t.done; }).length;
     var pct = S.todos.length ? Math.round(done / S.todos.length * 100) : 0;
     var h = '<div class="progress"><span class="n">' + done + " / " + S.todos.length + ' 완료</span><span class="bar"><i style="width:' + pct + '%"></i></span></div>';
+    h += doneToggle(done);
+    var hide = !!(S.ui && S.ui.hideDone);
+    var rows = S.todos.slice().sort(byDone);
+    if (hide) rows = rows.filter(function (t) { return !t.done; });
     h += '<div class="list" style="margin:0 20px">';
-    if (!S.todos.length) h += '<div class="empty">' + esc(noteTab("todo").n) + "를 추가해 보세요.</div>";
-    S.todos.forEach(function (t) {
-      var whoCls = t.who === "나" ? "me" : t.who === S.couple.you ? "you" : "";
+    if (!rows.length) h += '<div class="empty">' + (S.todos.length ? "완료한 항목을 숨겼어요." : esc(T.n) + '를 더해 보세요. 아래 <b>+</b> 로 필요한 내용까지 적을 수 있어요.') + "</div>";
+    rows.forEach(function (t) {
       h += '<div class="row todo' + (t.done ? " done" : "") + '">' +
         '<button class="check" data-act="toggleTodo" data-id="' + t.id + '" aria-label="완료 표시">' + IC.check + "</button>" +
-        '<div class="body" data-act="editTodo" data-id="' + t.id + '"><div class="t">' + esc(t.text) + "</div></div>" +
-        '<span class="who ' + whoCls + '">' + esc(t.who) + "</span>" +
+        '<div class="body" data-act="editTodo" data-id="' + t.id + '"><div class="t tw">' + esc(t.text) + "</div>" +
+        (t.memo ? '<div class="sub">' + esc(t.memo) + "</div>" : "") + "</div>" +
         '<button class="edit-ic" data-act="editTodo" data-id="' + t.id + '" aria-label="수정">' + IC.pencil + "</button></div>";
     });
+    h += addRow("addTodo", "", T.n + " 추가");
     h += "</div>";
-    h += '<form class="qadd" id="qaddForm" data-kind="todo">' +
-      '<input class="field qfield" name="text" id="qaddInput" placeholder="' + esc(noteTab("todo").n) + '를 적고 추가" autocomplete="off">' +
-      '<select class="field qsel" name="sub" aria-label="담당">' + whoOpts("함께") + "</select>" +
-      '<button class="qbtn" type="submit" aria-label="추가">' + IC.plus + "추가</button></form>";
     return h;
   }
 
@@ -962,39 +991,47 @@
     var done = S.bucket.filter(function (b) { return b.done; }).length;
     var h = '<div class="progress"><span class="n">' + done + " / " + S.bucket.length + ' 달성</span><span class="bar"><i style="width:' +
       (S.bucket.length ? Math.round(done / S.bucket.length * 100) : 0) + '%"></i></span></div>';
+    h += doneToggle(done);
+    var bks = S.bucket.slice().sort(byDone);
+    var hideB = !!(S.ui && S.ui.hideDone);
+    if (hideB) bks = bks.filter(function (b) { return !b.done; });
     h += '<div class="list" style="margin:0 20px">';
-    if (!S.bucket.length) h += '<div class="empty">버킷리스트를 추가해 보세요.</div>';
-    S.bucket.forEach(function (b) {
-      h += '<div class="bkt' + (b.done ? " done" : "") + '"><div class="body" data-act="editBucket" data-id="' + b.id + '"><div class="t">' + esc(b.title) + "</div>" +
-        '<div class="cat">' + esc(b.cat) + "</div></div>" +
-        '<button class="toggle' + (b.done ? " on" : "") + '" data-act="toggleBucket" data-id="' + b.id + '">' + (b.done ? "완료" : "예정") + "</button>" +
+    if (!bks.length) h += '<div class="empty">' + (S.bucket.length ? "완료한 버킷을 숨겼어요." : "버킷리스트를 더해 보세요. 아래 <b>+</b> 로 카테고리와 메모까지 적을 수 있어요.") + "</div>";
+    bks.forEach(function (b) {
+      h += '<div class="row todo' + (b.done ? " done" : "") + '">' +
+        '<button class="check" data-act="toggleBucket" data-id="' + b.id + '" aria-label="완료 표시">' + IC.check + "</button>" +
+        '<div class="body" data-act="editBucket" data-id="' + b.id + '"><div class="t tw">' + esc(b.title) + "</div>" +
+        '<div class="sub"><span class="tagchip">' + esc(b.cat || "기타") + "</span>" +
+        (b.memo ? '<span class="subtx">' + esc(b.memo) + "</span>" : "") + "</div></div>" +
         '<button class="edit-ic" data-act="editBucket" data-id="' + b.id + '" aria-label="수정">' + IC.pencil + "</button></div>";
     });
+    h += addRow("addBucket", "", "버킷 추가");
     h += "</div>";
-    h += '<form class="qadd" id="qaddForm" data-kind="bucket">' +
-      '<input class="field qfield" name="text" id="qaddInput" placeholder="하고 싶은 것을 적고 추가" autocomplete="off">' +
-      '<select class="field qsel" name="sub" aria-label="카테고리"><option>여행</option><option>맛집</option><option>취미</option><option>기타</option></select>' +
-      '<button class="qbtn" type="submit" aria-label="추가">' + IC.plus + "추가</button></form>";
     return h;
   }
 
   function viewLog() {
-    var items = S.logs.slice().sort(byDateDesc);
-    var h = '<div class="list" style="margin:0 20px">';
-    if (!items.length) h += '<div class="empty">영화나 맛집 기록을 남겨 보세요.</div>';
+    var items = S.logs.slice().sort(byDateDesc).sort(byDone);
+    var done = S.logs.filter(function (l) { return l.done; }).length;
+    var h = '<div class="progress"><span class="n">' + done + " / " + S.logs.length + ' 완료</span><span class="bar"><i style="width:' +
+      (S.logs.length ? Math.round(done / S.logs.length * 100) : 0) + '%"></i></span></div>';
+    h += '<div class="list" style="margin:0 20px">';
+    if (!items.length) h += '<div class="empty">영화나 맛집을 더해 보세요. 아래 <b>+</b> 로 별점과 한 줄 평까지 남길 수 있어요.</div>';
     items.forEach(function (l) {
-      h += '<div class="log"><div class="body" data-act="editLog" data-id="' + l.id + '"><div class="top"><span class="tag ' + l.kind + '">' + (l.kind === "movie" ? "영화" : "먹방") + "</span>" +
-        '<span class="t">' + esc(l.title) + "</span></div>" +
-        '<div class="rev">' + esc(l.review || "") + "</div>" +
-        '<div class="meta">' + stars(l.rating) + "<span>" + Number(l.rating).toFixed(1) + "</span><span>·</span><span>" + l.date.replace(/-/g, ".") + "</span></div></div>" +
+      h += '<div class="row todo' + (l.done ? " done" : "") + '">' +
+        '<button class="check" data-act="toggleLog" data-id="' + l.id + '" aria-label="완료 표시">' + IC.check + "</button>" +
+        '<div class="body" data-act="editLog" data-id="' + l.id + '">' +
+        '<div class="lrow"><span class="tag ' + l.kind + '">' + (l.kind === "movie" ? "영화" : "먹방") +
+        '</span><span class="t">' + esc(l.title) + "</span></div>" +
+        (l.review ? '<div class="sub">' + esc(l.review) + "</div>" : "") +
+        '<div class="meta">' + stars(l.rating) + "<span>" + Number(l.rating).toFixed(1) +
+        '</span><span>·</span><span>' + l.date.replace(/-/g, ".") + "</span>" +
+        (l.place ? "<span>·</span><span>" + esc(l.place) + "</span>" : "") + "</div></div>" +
         '<button class="edit-ic" data-act="editLog" data-id="' + l.id + '" aria-label="수정">' + IC.pencil + "</button>" +
-        '<button class="x" data-act="delLog" data-id="' + l.id + '" aria-label="삭제" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:#CFCFCA">' + IC.x + "</button></div>";
+        '<button class="x" data-act="delLog" data-id="' + l.id + '" aria-label="삭제">' + IC.x + "</button></div>";
     });
+    h += addRow("addLog", "", "영화·먹방 추가");
     h += "</div>";
-    h += '<form class="qadd" id="qaddForm" data-kind="log">' +
-      '<input class="field qfield" name="text" id="qaddInput" placeholder="영화·맛집 이름을 적고 추가" autocomplete="off">' +
-      '<select class="field qsel" name="sub" aria-label="종류"><option value="movie">영화</option><option value="food">먹방</option></select>' +
-      '<button class="qbtn" type="submit" aria-label="추가">' + IC.plus + "추가</button></form>";
     return h;
   }
 
@@ -1128,15 +1165,18 @@
   function openNoteSettings() { openSheet(formNoteSettings()); }
 
   function formListItem(l, it) {
+    var isEdit = !!it;
     var memo = !!l && l.kind === "memo";
-    return sheetHead(memo ? "메모 수정" : "항목 수정") +
+    return sheetHead(isEdit ? "항목 수정" : "항목 추가") +
       '<form class="form" id="sheetForm">' +
       '<div class="f"><label>' + (memo ? "메모" : "항목") + "</label>" +
       (memo
-        ? '<textarea class="field" name="text" rows="4" style="height:auto;padding:11px 12px;line-height:1.6;resize:none">' + esc(it.text) + "</textarea>"
-        : '<input class="field" name="text" value="' + esc(it.text) + '" required autocomplete="off">') + "</div>" +
-      '<button type="button" class="btn-del" data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '">삭제</button>' +
-      '<button class="btn-primary" type="submit">저장하기</button></form>';
+        ? '<textarea class="field" name="text" rows="3" required placeholder="예) 기념일 선물 아이디어">' + (it ? esc(it.text) : "") + "</textarea>"
+        : '<input class="field" name="text" value="' + (it ? esc(it.text) : "") + '" placeholder="예) 우산 챙기기" required autocomplete="off">') +
+      "</div>" +
+      '<div class="f"><label>상세 메모</label><textarea class="field" name="memo" rows="3" placeholder="선택 · 더 자세히 적어 두세요">' + (it ? esc(it.memo || "") : "") + "</textarea></div>" +
+      (isEdit ? '<button type="button" class="btn-del" data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '">삭제</button>' : "") +
+      '<button class="btn-primary" type="submit">' + (isEdit ? "저장하기" : "추가하기") + "</button></form>";
   }
 
   function askConfirm(msg, label, onYes, title) {
@@ -1182,7 +1222,7 @@
     return sheetHead(t ? noteTab("todo").n + " 수정" : noteTab("todo").n + " 추가") +
       '<form class="form" id="sheetForm">' +
       '<div class="f"><label>' + esc(noteTab("todo").n) + '</label><input class="field" name="text" value="' + (t ? esc(t.text) : "") + '" placeholder="예) 주말 장보기" required autocomplete="off"></div>' +
-      '<div class="f"><label>담당</label><select class="field" name="who">' + whoOpts(t ? t.who : "함께") + "</select></div>" +
+      '<div class="f"><label>상세 메모</label><textarea class="field" name="memo" rows="3" placeholder="선택 · 필요한 내용을 더 적어 두세요">' + (t ? esc(t.memo || "") : "") + "</textarea></div>" +
       (t ? '<button type="button" class="btn-del" data-act="delTodo" data-id="' + t.id + '">' + esc(noteTab("todo").n) + " 삭제</button>" : "") +
       '<button class="btn-primary" type="submit">' + (t ? "저장하기" : "추가하기") + "</button></form>";
   }
@@ -1196,7 +1236,8 @@
       '<form class="form" id="sheetForm">' +
       '<div class="f"><label>하고 싶은 것</label><input class="field" name="title" value="' + (b ? esc(b.title) : "") + '" placeholder="예) 제주도 3박 4일" required autocomplete="off"></div>' +
       '<div class="f"><label>카테고리</label><select class="field" name="cat">' + opts + "</select></div>" +
-      '<div class="f"><label>상태</label><select class="field" name="done"><option value="">예정</option><option value="1"' + (b && b.done ? " selected" : "") + ">달성</option></select></div>" +
+      '<div class="f"><label>상세 메모</label><textarea class="field" name="memo" rows="3" placeholder="선택 · 언제, 누구와, 어떻게 할지">' + (b ? esc(b.memo || "") : "") + "</textarea></div>" +
+      (b ? '<div class="f"><label>상태</label><select class="field" name="done"><option value="">예정</option><option value="1"' + (b.done ? " selected" : "") + ">달성</option></select></div>" : "") +
       (b ? '<button type="button" class="btn-del" data-act="delBucket" data-id="' + b.id + '">버킷 삭제</button>' : "") +
       '<button class="btn-primary" type="submit">' + (b ? "저장하기" : "추가하기") + "</button></form>";
   }
@@ -1270,21 +1311,7 @@
     return h;
   }
 
-  function capPickRows() {
-    return PAGES.map(function (p) {
-      var cur = pageCap(p.k);
-      var h = '<div class="cap-row" data-caprow="' + p.k + '"><span class="cap-nm">' + p.n + '</span><div class="cap-sws">';
-      h += '<button type="button" class="sw none' + (!cur ? " sel" : "") + '" data-act="pickCap" data-page="' + p.k +
-        '" data-color="" aria-label="' + p.n + ' 기본"></button>';
-      CAP_BG.forEach(function (c) {
-        h += '<button type="button" class="sw' + (cur && cur.toUpperCase() === c ? " sel" : "") + '" data-act="pickCap" data-page="' + p.k +
-          '" data-color="' + c + '" style="background:' + c + '" aria-label="' + p.n + " " + c + '"></button>';
-      });
-      h += '</div><input type="color" class="cap-pick js-page" data-page="' + p.k + '" value="' + (cur || "#FFFFFF") +
-        '" aria-label="' + p.n + ' 캡션 색 직접 고르기"></div>';
-      return h;
-    }).join("");
-  }
+
 
   function swRow(target, cur) {
     var h = '<div class="sw-grid" data-sw="' + target + '">';
@@ -1299,7 +1326,7 @@
     return '<div class="cp"><div class="cp-hd"><span>' + title + '</span><span class="cp-val" data-val="' + target + '">' +
       (cur ? cur.toUpperCase() : "기본") + "</span></div>" + swRow(target, cur) +
       '<div class="cp-foot"><label class="cp-pick"><input type="color" class="js-color" data-target="' + target + '" value="' +
-      (cur || "#D96B52") + '"><span>직접 고르기</span></label>' +
+      (cur || "#9E636B") + '"><span>직접 고르기</span></label>' +
       '<button class="cp-reset' + (cur ? "" : " on") + '" data-act="pickColor" data-target="' + target + '" data-color="">기본</button></div></div>';
   }
 
@@ -1648,14 +1675,85 @@
     return "두 대 실시간 동기화 중";
   }
 
+  /* ---- My (설정) 화면 ---- */
+
+  /* 페이지 캡션 색: 다섯 페이지에 한 번에 쓰는 하나의 색 */
+  function capPickAll() {
+    var cur = String((S.theme || {}).cap || "").toUpperCase();
+    var h = '<div class="cap-all"><div class="cap-sws">';
+    h += '<button type="button" class="sw none' + (!cur ? " sel" : "") + '" data-act="pickCapAll" data-color="" aria-label="캡션 색 기본"></button>';
+    CAP_BG.forEach(function (c) {
+      h += '<button type="button" class="sw' + (cur === c.toUpperCase() ? " sel" : "") + '" data-act="pickCapAll" data-color="' + c +
+        '" style="background:' + c + '" aria-label="캡션 ' + c + '"></button>';
+    });
+    h += '</div><input type="color" class="cap-pick js-capall" value="' + (cur || "#FFFFFF") + '" aria-label="캡션 색 직접 고르기"></div>';
+    return h;
+  }
+
+  function setCapAll(color) {
+    var v = String(color || "").trim();
+    if (v && !/^#[0-9a-fA-F]{6}$/.test(v)) return;
+    S.theme = S.theme || {};
+    if (v) S.theme.cap = v.toUpperCase(); else delete S.theme.cap;
+    S.theme.pages = {};                    /* 예전 페이지별 설정은 한 색으로 합칩니다 */
+    save();
+    var val = v ? v.toUpperCase() : "";
+    document.querySelectorAll("[data-pg]").forEach(function (el) {
+      el.classList.toggle("cap-tint", !!val);
+      if (val) el.style.setProperty("--cap", val); else el.style.removeProperty("--cap");
+    });
+    document.querySelectorAll(".cap-all .sw").forEach(function (b) {
+      b.classList.toggle("sel", String(b.getAttribute("data-color") || "").toUpperCase() === val);
+    });
+    var inp = document.querySelector(".js-capall");
+    if (inp && val) inp.value = val;
+  }
+
+  function fontRows() {
+    var cur = fontOf((S.theme || {}).font).k;
+    return FONTS.map(function (f) {
+      return '<button type="button" class="font-row' + (f.k === cur ? " on" : "") + '" data-act="pickFont" data-font="' + f.k + '">' +
+        '<span class="fn" style="font-family:' + f.s + '">' + esc(f.n) + "</span>" +
+        '<span class="fx" style="font-family:' + f.s + '">우리의 기록 Aa</span>' +
+        '<span class="fk">' + (f.k === cur ? "✓" : "") + "</span></button>";
+    }).join("");
+  }
+
+  var NOTIFS = [
+    { k: "anni", n: "기념일 알림", d: "생일과 기념일 하루 전에 알려드려요" },
+    { k: "today", n: "오늘의 일정 알림", d: "그날 아침, 오늘 일정을 모아 알려드려요" },
+    { k: "dday", n: "D-Day 리마인드", d: "매달 같은 날, 함께한 날을 세어 알려드려요" }
+  ];
+  function notifOn(k) {
+    var n = S.notif || {};
+    return typeof n[k] === "boolean" ? n[k] : k !== "dday";
+  }
+  function notifRows() {
+    return NOTIFS.map(function (n) {
+      var on = notifOn(n.k);
+      return '<button type="button" class="row tap notif" data-act="toggleNotif" data-key="' + n.k + '" aria-pressed="' + (on ? "true" : "false") + '">' +
+        '<div class="body"><div class="t">' + esc(n.n) + "</div><div class=\"m\">" + esc(n.d) + "</div></div>" +
+        '<span class="tgl' + (on ? " on" : "") + '"><i></i></span></button>';
+    }).join("");
+  }
+  function askNotifyPermission(cb) {
+    try {
+      if (typeof Notification === "undefined") { cb(false); return; }
+      if (Notification.permission === "granted") { cb(true); return; }
+      if (Notification.permission === "denied") { cb(false); return; }
+      var res = Notification.requestPermission(function (r) { cb(r === "granted"); });
+      if (res && typeof res.then === "function") res.then(function (r) { cb(r === "granted"); });
+    } catch (e) { cb(false); }
+  }
+
   function renderSet() {
     var c = S.couple, t = S.theme || {}, li = S.link || {}, dark = t.mode === "dark";
     var remote = !!(Store && Store.mode === "remote");
     var acct = (S.auth || {});
-    var h = '<header class="hdr' + capCls("set") + '"' + capStyle("set") + ' data-pg="set"><div><h1><span class="eh">⚙️</span> 설정</h1><p class="sub">계정·연결·화면을 내 방식으로</p></div></header>';
+    var h = '<header class="hdr' + capCls("set") + '"' + capStyle("set") + ' data-pg="set"><div><h1>My</h1></div></header>';
 
-    /* ---- 계정 및 커플 연결 ---- */
-    h += '<div class="sec"><h2>👤 계정 및 커플 연결</h2><span class="more">' + (li.connected ? "연결됨" : "미연결") + "</span></div>";
+    /* ---- 1. 계정 및 커플 연결 ---- */
+    h += '<div class="sec"><h2>계정 및 커플 연결</h2><span class="more">' + (li.connected ? "연결됨" : "미연결") + "</span></div>";
     h += '<div class="list">';
     h += '<div class="row tap" data-act="personSheet" data-who="me"><button type="button" class="set-av pick' + (avPic("me") ? " pic" : "") + '" data-act="pickPic" data-who="me" style="background:' + avColor("me") + '" aria-label="' + esc(c.me) + ' 프로필 사진 선택">' + avInner("me") + "</button>" +
       '<div class="body" style="flex:1 1 auto;min-width:0"><div class="t" style="font-size:13.5px;font-weight:600;letter-spacing:-.02em">' + esc(c.me) + "</div>" +
@@ -1679,18 +1777,25 @@
 
     h += '<div style="margin:14px 20px 0"><button class="set-btn warn" data-act="logout" style="width:100%;height:46px">로그아웃</button></div>';
 
-    /* ---- 화면 및 꾸미기 ---- */
-    h += '<div class="sec"><h2>🎛️ 화면 및 꾸미기</h2></div>';
+    /* ---- 2. 꾸미기 ---- */
+    h += '<div class="my-gap"></div>';
+    h += '<div class="sec"><h2>꾸미기</h2></div>';
     h += '<div class="list">';
-    h += '<div class="set-block"><span class="set-lbl">화면</span><div class="seg seg-sm" data-group="mode">' +
-      '<button type="button" class="seg-btn' + (dark ? "" : " active") + '" data-act="mode" data-mode="light">라이트</button>' +
-      '<button type="button" class="seg-btn' + (dark ? " active" : "") + '" data-act="mode" data-mode="dark">다크</button></div></div>';
-    h += '<div class="set-block"><span class="set-lbl">페이지 캡션 색</span>' + capPickRows() +
-      '<div class="set-hint">페이지마다 제목 줄의 바탕색을 고를 수 있어요. 글씨는 라이트·다크 모두 검정으로 또렷하게 보여요.</div></div>';
-    h += '<div class="set-block"><span class="set-lbl">일정 색 · 캘린더</span>' +
+    h += '<div class="set-block"><span class="set-lbl">테마</span><div class="seg seg-sm" data-group="mode">' +
+      '<button type="button" class="seg-btn' + (dark ? "" : " active") + '" data-act="mode" data-mode="light">라이트 모드</button>' +
+      '<button type="button" class="seg-btn' + (dark ? " active" : "") + '" data-act="mode" data-mode="dark">다크 모드</button></div></div>';
+    h += '<div class="set-block"><span class="set-lbl">화면 및 꾸미기 · 페이지 캡션 색</span>' + capPickAll() +
+      '<div class="set-hint" style="margin-top:12px">홈·캘린더·노트·사진첩·My 제목 줄에 한 번에 적용돼요. 제목 글씨는 어떤 색 위에서도 검정으로 또렷하게 보여요.</div></div>';
+    h += '<div class="set-block"><span class="set-lbl">일정 색 꾸미기</span>' +
       colorPickRow("me") + colorPickRow("you") + colorPickRow("both") + "</div>";
-    h += '<div class="set-block"><div class="set-hint" style="margin-top:0">이름과 프로필 사진은 위 계정 줄을 눌러 바꿔요. 처음 만난 날 · 문구 · 표기 방식은 홈 D-day 카드를 눌러 바꿀 수 있어요.</div></div>';
+    h += '<div class="set-block"><span class="set-lbl">폰트</span><div class="font-list">' + fontRows() + "</div></div>";
     h += "</div>";
+
+    /* ---- 3. 알림 설정 ---- */
+    h += '<div class="my-gap"></div>';
+    h += '<div class="sec"><h2>알림 설정</h2></div>';
+    h += '<div class="list">' + notifRows() + "</div>";
+    h += '<div class="set-hint" style="margin:10px 20px 0">알림 설정은 이 기기에 저장돼요. 브라우저 알림을 허용해 두면 다음 업데이트에서 그대로 이어서 쓸 수 있어요.</div>';
 
     h += '<div style="height:26px"></div>';
     h += '<p class="cp-note" style="text-align:center;padding:0 24px">' + installHint() + "</p>";
@@ -1773,7 +1878,7 @@
       ["cal", "캘린더", IC.cal],
       ["diary", "노트", IC.diary],
       ["photo", "사진첩", IC.photo],
-      ["set", "설정", IC.gear]
+      ["set", "My", IC.person]
     ];
     $("#tabbar").innerHTML = tabs.map(function (t) {
       return '<button class="tab' + (current === t[0] ? " active" : "") + '" data-act="nav" data-screen="' + t[0] + '">' +
@@ -1950,7 +2055,22 @@
         var txt = String(fd.get("text") || "").trim();
         if (!txt) { toast("내용을 적어 주세요"); return; }
         I2.text = txt;
+        I2.memo = String(fd.get("memo") || "").trim();
         save(); closeSheet(); renderDiary(); toast("저장했어요");
+      });
+      return;
+    }
+
+    if (act === "addListItem") {
+      var alL = findList(el.getAttribute("data-list"));
+      if (!alL) return;
+      openSheet(formListItem(alL, null), function (fd) {
+        var L0 = findList(alL.id);
+        if (!L0) return;
+        var txt0 = String(fd.get("text") || "").trim();
+        if (!txt0) { toast("항목을 적어 주세요"); return; }
+        L0.items.push({ id: uid(), text: txt0, memo: String(fd.get("memo") || "").trim(), done: false });
+        save(); closeSheet(); renderDiary(); toast("추가했어요");
       });
       return;
     }
@@ -1982,7 +2102,7 @@
         var txt = String(fd.get("text") || "").trim();
         if (!txt) { toast(noteTab("todo").n + "를 적어 주세요"); return; }
         t2.text = txt;
-        t2.who = String(fd.get("who") || "함께");
+        t2.memo = String(fd.get("memo") || "").trim();
         save(); closeSheet(); renderDiary(); toast("저장했어요");
       });
       return;
@@ -2005,6 +2125,7 @@
         if (!title) { toast("내용을 적어 주세요"); return; }
         b2.title = title;
         b2.cat = fd.get("cat") || "기타";
+        b2.memo = String(fd.get("memo") || "").trim();
         b2.done = !!fd.get("done");
         if (b2.done) delete b2.status;
         save(); closeSheet(); renderDiary(); toast("버킷을 저장했어요");
@@ -2038,15 +2159,28 @@
       return;
     }
 
+    if (act === "toggleDone") {
+      S.ui.hideDone = !(S.ui && S.ui.hideDone);
+      save(); renderDiary(); return;
+    }
+
     if (act === "toggleTodo") {
       var tid = el.getAttribute("data-id");
       S.todos.forEach(function (t) { if (t.id === tid) t.done = !t.done; });
       save(); renderDiary(); return;
     }
 
+    if (act === "toggleLog") {
+      var lgid = el.getAttribute("data-id");
+      S.logs.forEach(function (x) { if (x.id === lgid) x.done = !x.done; });
+      save(); renderDiary(); return;
+    }
+
     if (act === "addTodo") {
       openSheet(formTodo(), function (fd) {
-        S.todos.push({ id: uid(), text: fd.get("text"), done: false, who: fd.get("who") || "함께" });
+        var at = String(fd.get("text") || "").trim();
+        if (!at) { toast("내용을 적어 주세요"); return; }
+        S.todos.push({ id: uid(), text: at, memo: String(fd.get("memo") || "").trim(), done: false, who: "함께" });
         save(); closeSheet(); renderDiary(); toast("추가했어요");
       });
       return;
@@ -2060,7 +2194,9 @@
 
     if (act === "addBucket") {
       openSheet(formBucket(), function (fd) {
-        S.bucket.push({ id: uid(), title: fd.get("title"), cat: fd.get("cat") || "기타", done: false });
+        var bt = String(fd.get("title") || "").trim();
+        if (!bt) { toast("내용을 적어 주세요"); return; }
+        S.bucket.push({ id: uid(), title: bt, cat: fd.get("cat") || "기타", memo: String(fd.get("memo") || "").trim(), done: false });
         save(); closeSheet(); renderDiary(); toast("버킷리스트에 담았어요");
       });
       return;
@@ -2071,7 +2207,7 @@
         S.logs.push({
           id: uid(), kind: fd.get("kind"), title: fd.get("title"),
           rating: Number(fd.get("rating") || 4), date: fd.get("date"),
-          review: fd.get("review") || "", place: fd.get("place") || ""
+          review: fd.get("review") || "", place: fd.get("place") || "", done: true
         });
         save(); closeSheet(); renderDiary(); toast("기록을 저장했어요");
       });
@@ -2162,6 +2298,39 @@
       var pgCol = el.getAttribute("data-color") || "";
       setPageCap(pg, pgCol);
       toast(pgCol ? "캡션 색을 바꿨어요" : "기본 캡션으로 돌렸어요");
+      return;
+    }
+
+    if (act === "pickCapAll") {
+      var allCol = el.getAttribute("data-color") || "";
+      setCapAll(allCol);
+      toast(allCol ? "페이지 캡션 색을 바꿨어요" : "캡션 색을 기본으로 돌렸어요");
+      return;
+    }
+
+    if (act === "pickFont") {
+      S.theme = S.theme || {};
+      S.theme.font = fontOf(el.getAttribute("data-font") || "base").k;
+      save(); applyTheme();
+      if (current === "set") renderSet();
+      return;
+    }
+
+    if (act === "toggleNotif") {
+      var nk = el.getAttribute("data-key") || "";
+      if (!nk) return;
+      var non = !notifOn(nk);
+      S.notif = S.notif || {};
+      S.notif[nk] = non;
+      save();
+      if (current === "set") renderSet();
+      if (non) {
+        askNotifyPermission(function (granted) {
+          toast(granted ? "알림을 켰어요" : "알림을 켰어요 · 브라우저 알림은 꺼져 있어요");
+        });
+      } else {
+        toast("알림을 껐어요");
+      }
       return;
     }
 
@@ -2276,32 +2445,6 @@
   });
 
   document.addEventListener("submit", function (ev) {
-    if (ev.target.id === "qaddForm") {
-      ev.preventDefault();
-      var form = ev.target;
-      var inp = form.querySelector('[name="text"]');
-      var text = inp ? String(inp.value || "").trim() : "";
-      if (!text) { if (inp) inp.focus(); return; }
-      var kind = form.getAttribute("data-kind") || "";
-      var selEl = form.querySelector('[name="sub"]');
-      var sub = selEl ? String(selEl.value || "") : "";
-      if (kind.indexOf("list:") === 0) {
-        var l0 = findList(kind.slice(5));
-        if (!l0) return;
-        l0.items.push({ id: uid(), text: text, done: false });
-      } else if (kind === "todo") {
-        S.todos.push({ id: uid(), text: text, done: false, who: sub || "함께" });
-      } else if (kind === "bucket") {
-        S.bucket.push({ id: uid(), title: text, cat: sub || "기타", done: false });
-      } else if (kind === "log") {
-        S.logs.push({ id: uid(), kind: sub === "food" ? "food" : "movie", title: text, rating: 4, date: today, review: "", place: "" });
-      } else { return; }
-      save(); renderDiary();
-      var nx = $("#qaddInput");
-      if (nx) { nx.value = ""; nx.focus(); }
-      return;
-    }
-
     if (ev.target.id === "personForm") {
       ev.preventDefault();
       var pfWho = ev.target.getAttribute("data-who") === "you" ? "you" : "me";
@@ -2423,6 +2566,7 @@
     if (t && t.classList && t.classList.contains("js-color")) setThemeColor(t.getAttribute("data-target"), t.value);
     if (t && t.classList && t.classList.contains("js-cap")) setCapColor(t.getAttribute("data-id"), t.value);
     if (t && t.classList && t.classList.contains("js-page")) setPageCap(t.getAttribute("data-page"), t.value);
+    if (t && t.classList && t.classList.contains("js-capall")) setCapAll(t.value);
     if (t && t.classList && t.classList.contains("js-own")) setOwnerColor(t.getAttribute("data-who") || "me", t.value);
   });
 
