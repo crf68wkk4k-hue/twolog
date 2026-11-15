@@ -159,6 +159,12 @@
   if (!("log" in S.theme)) S.theme.log = null;
   if (S.theme.mode !== "dark") S.theme.mode = "light";
   if (!S.theme.pages || typeof S.theme.pages !== "object") S.theme.pages = {};
+  if (!S.note || typeof S.note !== "object") S.note = {};
+  ["todo", "bucket", "log"].forEach(function (k) {
+    if (!S.note[k] || typeof S.note[k] !== "object") S.note[k] = {};
+    if (typeof S.note[k].e !== "string" || !S.note[k].e) S.note[k].e = NOTE_DEF[k].e;
+    if (typeof S.note[k].n !== "string" || !S.note[k].n) S.note[k].n = NOTE_DEF[k].n;
+  });
   if (S.couple.fmt !== "Y") S.couple.fmt = "D";
   if (typeof S.couple.phrase !== "string") S.couple.phrase = "함께한 지";
   if (!S.couple.colors || typeof S.couple.colors !== "object") S.couple.colors = {};
@@ -240,6 +246,8 @@
     { k: "photo", n: "사진첩" }, { k: "set", n: "설정" }
   ];
   var CAP_BG = ["#FAEDE8", "#EDF1EC", "#ECF2F7", "#F8EBEE", "#FBF3DE", "#F4F4F4"];
+  /* 노트 기본 탭 이름 — 설정에서 바꿀 수 있어요 */
+  var NOTE_DEF = { todo: { e: "📝", n: "메모" }, bucket: { e: "🎯", n: "버킷리스트" }, log: { e: "🎬", n: "영화·먹방" } };
   function pageCap(page) {
     var v = ((S.theme || {}).pages || {})[page];
     return typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v : "";
@@ -522,7 +530,7 @@
 
     html += '<div class="bcard"><div class="bcard-hd"><span class="bi">' + BI.todo + '</span><span class="lb">TO-DO</span></div>' +
       '<div class="bm">' + todoDone + " / " + todoTotal + "</div>" +
-      '<div class="bs">할 일 완료</div>' +
+      '<div class="bs">' + esc(noteTab("todo").n) + " 완료</div>" +
       '<div class="bbar"><i style="width:' + todoPct + '%"></i></div></div>';
 
     html += '<div class="bcard"><div class="bcard-hd"><span class="bi">' + BI.cal + '</span><span class="lb">SCHEDULE</span></div>' +
@@ -553,7 +561,7 @@
     }
     html += "</div>";
 
-    html += '<div class="mblock"><div class="mbhd"><h3 class="tint-h">🎬 최근 영화·먹방</h3>' +
+    html += '<div class="mblock"><div class="mbhd"><h3 class="tint-h">' + esc(noteLabel("log")) + "</h3>' +
       '<button class="sw-btn" data-act="openTheme" aria-label="최근 기록 색 선택"></button></div>';
     if (logs.length) {
       logs.forEach(function (l) {
@@ -563,7 +571,7 @@
           '<div class="lstar">' + stars(l.rating) + "</div></div>";
       });
     } else { html += '<div class="empty" style="padding:14px 0 0;text-align:left">아직 기록이 없어요.</div>'; }
-    html += '<div class="wrap20" style="padding:12px 0 0"><button class="ghost" data-act="navSeg" data-screen="diary" data-seg="log">🎬 영화·먹방 전체 보기</button></div></div>';
+    html += '<div class="wrap20" style="padding:12px 0 0"><button class="ghost" data-act="navSeg" data-screen="diary" data-seg="log">' + esc(noteLabel("log")) + " 전체 보기</button></div></div>';
 
     html += "</div></div>";
 
@@ -644,7 +652,7 @@
     });
 
     var html = "";
-    html += '<header class="hdr' + capCls("cal") + '"' + capStyle("cal") + ' data-pg="cal"><div><h1><span class="eh">🗓️</span> 캘린더</h1><p class="sub">우리 일정과 기념일</p></div>' +
+    html += '<header class="hdr' + capCls("cal") + '"' + capStyle("cal") + ' data-pg="cal"><div><h1><span class="eh">🗓️</span> 캘린더</h1></div>' +
       '<button class="round-btn" data-act="addEvent" aria-label="일정 추가">' + IC.plus + "</button></header>";
 
     html += '<div class="cal"><div class="cal-head"><div class="cal-month">' + y + "년 " + (m + 1) + "월</div>" +
@@ -677,7 +685,7 @@
     html += '<div class="daypanel"><div class="daypanel-hd"><div class="d">' + (sd.getMonth() + 1) + "월 " + sd.getDate() + "일<em>" + WD[sd.getDay()] + "요일</em>" +
       (selHol ? '<span class="hol-badge">' + esc(selHol) + "</span>" : "") + "</div>" +
       '<span class="more" style="font-size:11.5px;color:var(--ink-3)">' + selEvents.length + "개</span></div>";
-    html += '<div class="list">';
+    html += '<div class="daylist">';
     if (selEvents.length) {
       selEvents.forEach(function (e) {
         html += '<div class="ev"><span class="bar" style="background:' + sched(evWho(e)) + '"></span>' +
@@ -690,8 +698,6 @@
     }
     html += "</div>";
     html += '<div class="wrap20" style="padding:12px 0 0"><button class="ghost" data-act="addEvent">' + IC.plus + " 일정 추가</button></div>";
-    html += '<div style="display:flex;justify-content:center;gap:10px;margin-top:16px;font-size:11.5px;color:var(--ink-3)">' +
-      "<span>이번 달 일정 " + monthCount.past + "개</span><span>·</span><span>기념일 " + monthCount.anni + "개</span></div>";
     html += "</div>";
     html += '<div style="height:24px"></div>';
 
@@ -699,7 +705,17 @@
   }
 
   /* ------------------------------------------------------------------ note */
-  var NOTE_BASE = [["todo", "☑️ 할일"], ["bucket", "🎯 버킷리스트"], ["log", "🎬 영화·먹방"]];
+  var NOTE_BASE = ["todo", "bucket", "log"];
+
+  function noteTab(k) {
+    var v = (S.note || {})[k] || {};
+    var d = NOTE_DEF[k];
+    return {
+      e: typeof v.e === "string" && v.e ? v.e : d.e,
+      n: typeof v.n === "string" && v.n ? v.n : d.n
+    };
+  }
+  function noteLabel(k) { var t = noteTab(k); return t.e + " " + t.n; }
 
   function findList(id) {
     for (var i = 0; i < S.lists.length; i++) if (S.lists[i].id === id) return S.lists[i];
@@ -715,28 +731,26 @@
 
   function renderDiary() {
     var seg = S.ui.seg || "todo";
-    var known = NOTE_BASE.some(function (b) { return b[0] === seg; });
+    var known = NOTE_BASE.some(function (b) { return b === seg; });
     var custom = seg.indexOf("list:") === 0 && !!findList(seg.slice(5));
     if (!known && !custom) seg = "todo";
     S.ui.seg = seg;
 
     var html = "";
-    html += '<header class="hdr' + capCls("diary") + '"' + capStyle("diary") + ' data-pg="diary"><div><h1><span class="eh">📖</span> 노트</h1><p class="sub">함께 쌓는 우리 기록</p></div></header>';
+    html += '<header class="hdr' + capCls("diary") + '"' + capStyle("diary") + ' data-pg="diary"><div><h1><span class="eh">📖</span> 노트</h1><p class="sub">함께 쌓는 우리 기록</p></div>' +
+      '<div class="hdr-acts"><button class="round-btn" data-act="noteSettings" aria-label="노트 설정">' + IC.gear + "</button></div></header>";
     html += '<div class="seg">';
-    NOTE_BASE.forEach(function (s) { html += segBtn(seg, s[0], s[1]); });
+    NOTE_BASE.forEach(function (k) { html += segBtn(seg, k, noteLabel(k)); });
     html += "</div>";
-    html += '<div class="lstbar">';
     if (S.lists.length) {
-      html += '<div class="lst-scroll">';
+      html += '<div class="lstbar"><div class="lst-scroll">';
       S.lists.forEach(function (l) {
         var on = seg === "list:" + l.id;
         html += '<button class="lchip' + (on ? " active" : "") + '" data-act="seg" data-seg="list:' + l.id + '" aria-label="' + esc(l.title) + '">' +
           '<span class="le">' + esc(l.emoji || "📌") + "</span><span>" + esc(l.title) + "</span></button>";
       });
-      html += "</div>";
+      html += "</div></div>";
     }
-    html += '<button class="seg-add" data-act="newList" aria-label="새 리스트 추가">+ 추가</button></div>';
-
     var body;
     if (seg === "todo") body = viewTodo();
     else if (seg === "bucket") body = viewBucket();
@@ -756,9 +770,7 @@
   function viewList(l) {
     if (!l) return '<div class="list" style="margin:0 20px"><div class="empty">리스트를 찾을 수 없어요.</div></div>';
     var h = '<div class="note-hd"><div class="nh-l"><span class="t">' + esc((l.emoji || "📌") + " " + l.title) + "</span>" +
-      '<span class="k">' + (l.kind === "memo" ? "메모" : "체크") + "</span></div>" +
-      '<div class="nh-act"><button class="note-edit" data-act="editList" data-id="' + l.id + '">수정</button>' +
-      '<button class="note-del" data-act="delList" data-id="' + l.id + '">삭제</button></div></div>';
+      '<span class="k">' + (l.kind === "memo" ? "메모" : "체크") + "</span></div></div>';
 
     if (l.kind === "memo") {
       h += '<div class="list" style="margin:0 20px">';
@@ -798,7 +810,7 @@
     var pct = S.todos.length ? Math.round(done / S.todos.length * 100) : 0;
     var h = '<div class="progress"><span class="n">' + done + " / " + S.todos.length + ' 완료</span><span class="bar"><i style="width:' + pct + '%"></i></span></div>';
     h += '<div class="list" style="margin:0 20px">';
-    if (!S.todos.length) h += '<div class="empty">할 일을 추가해 보세요.</div>';
+    if (!S.todos.length) h += '<div class="empty">' + esc(noteTab("todo").n) + "를 추가해 보세요.</div>";
     S.todos.forEach(function (t) {
       var whoCls = t.who === "나" ? "me" : t.who === S.couple.you ? "you" : "";
       h += '<div class="row todo' + (t.done ? " done" : "") + '">' +
@@ -809,7 +821,7 @@
     });
     h += "</div>";
     h += '<form class="qadd" id="qaddForm" data-kind="todo">' +
-      '<input class="field qfield" name="text" id="qaddInput" placeholder="할 일을 적고 추가" autocomplete="off">' +
+      '<input class="field qfield" name="text" id="qaddInput" placeholder="' + esc(noteTab("todo").n) + '를 적고 추가" autocomplete="off">' +
       '<select class="field qsel" name="sub" aria-label="담당">' + whoOpts("함께") + "</select>" +
       '<button class="qbtn" type="submit" aria-label="추가">' + IC.plus + "추가</button></form>";
     return h;
@@ -949,6 +961,39 @@
       '<button class="btn-primary" type="submit">' + (l ? "저장하기" : "만들기") + "</button></form>";
   }
 
+  function formNoteSettings() {
+    var h = sheetHead("노트 설정");
+    h += '<p class="sheet-sub">탭 이름과 내 리스트를 여기서 정리해요.</p>';
+    h += '<form class="form" id="noteForm" style="margin-top:12px">';
+    h += '<div class="set-lbl">탭 이름</div>';
+    NOTE_BASE.forEach(function (k) {
+      var t = noteTab(k);
+      h += '<div class="nt-row">' +
+        '<input class="field nt-emo" name="t_' + k + '_e" value="' + esc(t.e) + '" maxlength="4" aria-label="' + esc(t.n) + ' 이모지" autocomplete="off">' +
+        '<input class="field nt-nm" name="t_' + k + '_n" value="' + esc(t.n) + '" aria-label="탭 이름" autocomplete="off">' +
+        "</div>";
+    });
+    h += '<div class="set-lbl" style="margin-top:20px">내 리스트</div>';
+    if (!S.lists.length) h += '<div class="set-hint" style="margin-top:0">아직 만든 리스트가 없어요. 아래에서 새로 만들 수 있어요.</div>';
+    S.lists.forEach(function (l) {
+      h += '<div class="nt-row">' +
+        '<input class="field nt-emo" name="l_' + l.id + '_e" value="' + esc(l.emoji || "📌") + '" maxlength="4" aria-label="' + esc(l.title) + ' 이모지" autocomplete="off">' +
+        '<input class="field nt-nm" name="l_' + l.id + '_n" value="' + esc(l.title) + '" aria-label="리스트 이름" autocomplete="off">' +
+        '<button type="button" class="nt-del" data-act="delListFromNote" data-id="' + l.id + '">삭제</button></div>';
+    });
+    h += '<div class="nt-new"><div class="set-lbl">새 리스트</div>' +
+      '<div class="nt-row">' +
+      '<input class="field nt-emo" name="new_e" value="📌" maxlength="4" aria-label="새 리스트 이모지" autocomplete="off">' +
+      '<input class="field nt-nm" name="new_n" placeholder="예) 여행 준비물" aria-label="새 리스트 이름" autocomplete="off">' +
+      '<select class="field nt-kind" name="new_kind" aria-label="새 리스트 형식"><option value="check">체크</option><option value="memo">메모</option></select>' +
+      "</div></div>";
+    h += '<div style="height:14px"></div><button class="btn-primary" type="submit">저장하기</button></form>';
+    h += '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
+    return h;
+  }
+
+  function openNoteSettings() { openSheet(formNoteSettings()); }
+
   function formListItem(l, it) {
     var memo = !!l && l.kind === "memo";
     return sheetHead(memo ? "메모 수정" : "항목 수정") +
@@ -1001,11 +1046,11 @@
   }
 
   function formTodo(t) {
-    return sheetHead(t ? "할 일 수정" : "할 일 추가") +
+    return sheetHead(t ? noteTab("todo").n + " 수정" : noteTab("todo").n + " 추가") +
       '<form class="form" id="sheetForm">' +
-      '<div class="f"><label>할 일</label><input class="field" name="text" value="' + (t ? esc(t.text) : "") + '" placeholder="예) 주말 장보기" required autocomplete="off"></div>' +
+      '<div class="f"><label>' + esc(noteTab("todo").n) + '</label><input class="field" name="text" value="' + (t ? esc(t.text) : "") + '" placeholder="예) 주말 장보기" required autocomplete="off"></div>' +
       '<div class="f"><label>담당</label><select class="field" name="who">' + whoOpts(t ? t.who : "함께") + "</select></div>" +
-      (t ? '<button type="button" class="btn-del" data-act="delTodo" data-id="' + t.id + '">할 일 삭제</button>' : "") +
+      (t ? '<button type="button" class="btn-del" data-act="delTodo" data-id="' + t.id + '">' + esc(noteTab("todo").n) + " 삭제</button>" : "") +
       '<button class="btn-primary" type="submit">' + (t ? "저장하기" : "추가하기") + "</button></form>";
   }
 
@@ -1661,6 +1706,19 @@
       S.ui.seg = el.getAttribute("data-seg"); save(); renderDiary(); return;
     }
 
+    if (act === "noteSettings") { openNoteSettings(); return; }
+
+    if (act === "delListFromNote") {
+      var nDelId = el.getAttribute("data-id");
+      var nDel = findList(nDelId);
+      askConfirm("‘" + esc(nDel ? nDel.title : "이") + "’ 리스트를 지울까요? 안에 적어 둔 항목도 함께 사라져요.", "지우기", function () {
+        S.lists = S.lists.filter(function (x) { return x.id !== nDelId; });
+        if (S.ui.seg === "list:" + nDelId) S.ui.seg = "todo";
+        save(); renderDiary(); openNoteSettings(); toast("리스트를 지웠어요");
+      });
+      return;
+    }
+
     if (act === "newList") {
       openSheet(formNewList(), function (fd) {
         var title = String(fd.get("title") || "").trim();
@@ -1765,10 +1823,10 @@
         var t2 = S.todos.filter(function (x) { return x.id === etId; })[0];
         if (!t2) return;
         var txt = String(fd.get("text") || "").trim();
-        if (!txt) { toast("할 일을 적어 주세요"); return; }
+        if (!txt) { toast(noteTab("todo").n + "를 적어 주세요"); return; }
         t2.text = txt;
         t2.who = String(fd.get("who") || "함께");
-        save(); closeSheet(); renderDiary(); toast("할 일을 저장했어요");
+        save(); closeSheet(); renderDiary(); toast("저장했어요");
       });
       return;
     }
@@ -1776,7 +1834,7 @@
     if (act === "delTodo") {
       var dtId = el.getAttribute("data-id");
       S.todos = S.todos.filter(function (x) { return x.id !== dtId; });
-      save(); closeSheet(); renderDiary(); toast("할 일을 삭제했어요"); return;
+      save(); closeSheet(); renderDiary(); toast("지웠어요"); return;
     }
 
     if (act === "editBucket") {
@@ -1832,7 +1890,7 @@
     if (act === "addTodo") {
       openSheet(formTodo(), function (fd) {
         S.todos.push({ id: uid(), text: fd.get("text"), done: false, who: fd.get("who") || "함께" });
-        save(); closeSheet(); renderDiary(); toast("할 일을 추가했어요");
+        save(); closeSheet(); renderDiary(); toast("추가했어요");
       });
       return;
     }
@@ -2071,6 +2129,34 @@
       save(); renderDiary();
       var nx = $("#qaddInput");
       if (nx) { nx.value = ""; nx.focus(); }
+      return;
+    }
+
+    if (ev.target.id === "noteForm") {
+      ev.preventDefault();
+      var nf = new FormData(ev.target);
+      NOTE_BASE.forEach(function (k) {
+        S.note[k] = {
+          e: String(nf.get("t_" + k + "_e") || "").trim() || NOTE_DEF[k].e,
+          n: String(nf.get("t_" + k + "_n") || "").trim() || NOTE_DEF[k].n
+        };
+      });
+      S.lists.forEach(function (l) {
+        l.emoji = String(nf.get("l_" + l.id + "_e") || "").trim() || "📌";
+        l.title = String(nf.get("l_" + l.id + "_n") || "").trim() || l.title;
+      });
+      var newName = String(nf.get("new_n") || "").trim();
+      if (newName) {
+        var newList = {
+          id: uid(), title: newName,
+          emoji: String(nf.get("new_e") || "").trim() || "📌",
+          kind: nf.get("new_kind") === "memo" ? "memo" : "check", items: []
+        };
+        S.lists.push(newList);
+        S.ui.seg = "list:" + newList.id;
+      }
+      save(); closeSheet(); renderDiary();
+      toast("노트 설정을 저장했어요");
       return;
     }
 

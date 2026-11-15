@@ -149,22 +149,22 @@ h1,h2,h3,p{margin:0}
 .wrap20{padding:10px 20px 0}
 
 /* ---------- calendar ---------- */
-.cal{margin:14px 20px 0; background:var(--surface); border:1px solid var(--line); border-radius:0; padding:16px 14px 12px}
-.cal-head{display:flex; align-items:center; justify-content:space-between; padding:0 4px 12px}
-.cal-month{font-size:15.5px; font-weight:700; letter-spacing:-.03em; font-variant-numeric:tabular-nums}
+.cal{margin:14px 20px 0; background:var(--surface); border:1px solid var(--line); border-radius:0; padding:18px 12px 14px}
+.cal-head{display:flex; align-items:center; justify-content:space-between; padding:0 4px 14px}
+.cal-month{font-size:16.5px; font-weight:700; letter-spacing:-.03em; font-variant-numeric:tabular-nums}
 .cal-nav{display:flex; gap:2px}
 .cal-nav button{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:0;color:var(--ink-2)}
 .cal-nav button:active{background:var(--surface-2)}
 .cal-week{display:grid; grid-template-columns:repeat(7,1fr); padding-bottom:6px}
-.cal-week span{text-align:center; font-size:10.5px; font-weight:600; color:var(--ink-3); letter-spacing:0}
+.cal-week span{text-align:center; font-size:11px; font-weight:600; color:var(--ink-3); letter-spacing:0}
 .cal-week span:first-child{color:#B08A7F}
 .cal-week span:last-child{color:#8FA0A8}
-.cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:2px 0}
+.cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:3px 0}
 .day{
-  position:relative; height:56px; display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start;
-  gap:2px; padding:3px 2px; border-radius:0; overflow:hidden
+  position:relative; height:66px; display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start;
+  gap:3px; padding:5px 3px; border-radius:0; overflow:hidden
 }
-.day .dnum{font-size:11.5px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-.01em; line-height:1.15; text-align:left; padding-left:2px}
+.day .dnum{font-size:13px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-.01em; line-height:1.15; text-align:left; padding-left:3px}
 .day.blank{visibility:hidden}
 .day.sun .dnum{color:#B4735F}
 .day.sat .dnum{color:#7B8F98}
@@ -172,9 +172,9 @@ h1,h2,h3,p{margin:0}
 .day.sel .dnum{color:var(--ink)}
 .day.today:not(.sel) .dnum{color:var(--accent); font-weight:700}
 .day.today:not(.sel)::after{content:""; position:absolute; inset:2px; border:1px solid var(--accent-soft); border-radius:0; pointer-events:none}
-.evbars{display:flex; flex-direction:column; gap:2px; min-height:0; overflow:hidden}
-.evbar{display:block; height:10px; line-height:10px; font-size:7.5px; font-weight:600; color:#111111; font-style:normal; padding:0 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-.03em; text-align:left}
-.evmore{font-size:7.5px; font-weight:700; color:var(--ink-3); padding-left:3px; line-height:1.3; text-align:left}
+.evbars{display:flex; flex-direction:column; gap:3px; min-height:0; overflow:hidden}
+.evbar{display:block; height:12px; line-height:12px; font-size:8.5px; font-weight:600; color:#111111; font-style:normal; padding:0 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-.03em; text-align:left}
+.evmore{font-size:8px; font-weight:700; color:var(--ink-3); padding-left:3px; line-height:1.3; text-align:left}
 .dots{display:flex; gap:3px; height:5px; align-items:center}
 .dots i{width:5px; height:5px; border-radius:0; display:block}
 .day.sel .dots i{opacity:1; box-shadow:0 0 0 1.5px rgba(255,255,255,.55)}
@@ -194,6 +194,19 @@ h1,h2,h3,p{margin:0}
 .ev .t{font-size:13.5px; font-weight:600; letter-spacing:-.015em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .ev .m{font-size:11.5px; color:var(--ink-3); margin-top:2px; display:flex; align-items:center; gap:6px}
 .ev .x{width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:var(--ink-3);border-radius:0;flex:0 0 26px}
+
+/* ---------- calendar: 선택한 날 일정 목록 (박스 없이 크게) ---------- */
+.daylist{margin:0}
+.daylist .ev{padding:15px 0; border-bottom:1px solid var(--line-2); gap:13px; align-items:flex-start}
+.daylist .ev:last-child{border-bottom:0}
+.daylist .ev .bar{width:3px; height:100%; min-height:52px; margin-top:2px}
+.daylist .who-row{gap:7px; margin-bottom:8px}
+.daylist .av{width:38px; height:38px; flex:0 0 38px; font-size:15px}
+.daylist .wname{font-size:12.5px; font-weight:700; color:var(--ink-2); letter-spacing:-.01em; margin-left:2px}
+.daylist .ev .t{font-size:16px;font-weight:700; letter-spacing:-.02em; white-space:normal; overflow:visible; line-height:1.35}
+.daylist .ev .m{font-size:12px; margin-top:5px; gap:5px}
+.daylist .ev .x{align-self:center}
+.daylist .empty{padding:18px 0}
 
 /* ---------- note: built-in views ---------- */
 .seg{
@@ -627,6 +640,16 @@ svg [rx]{rx:0}
 .cap-pick{-webkit-appearance:none; appearance:none; width:26px; height:26px; flex:0 0 26px; padding:0; border:1px solid var(--line); background:var(--surface); cursor:pointer}
 .cap-pick::-webkit-color-swatch-wrapper{padding:0}
 .cap-pick::-webkit-color-swatch{border:0}
+
+/* 노트 설정 시트 */
+.nt-row{display:flex; align-items:center; gap:7px; margin-top:8px}
+.nt-row .field{height:42px}
+.nt-emo{flex:0 0 48px; width:48px; text-align:center; padding:0 4px; font-size:16px}
+.nt-nm{flex:1 1 auto; min-width:0}
+.nt-kind{flex:0 0 74px; width:74px; padding:0 6px; font-size:12px}
+.nt-del{flex:0 0 auto; height:42px; padding:0 10px; border:1px solid var(--line); font-size:11.5px; font-weight:600; color:var(--accent-deep); background:var(--surface); white-space:nowrap}
+.nt-new{margin-top:18px; padding-top:14px; border-top:1px solid var(--line-2)}
+.nt-new .set-lbl{display:block; margin-bottom:2px}
 
 /* ==========================================================================
    photos: real uploads (file input → compressed blob)
