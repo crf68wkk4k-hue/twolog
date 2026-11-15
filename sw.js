@@ -4,7 +4,7 @@
    홈 화면에서 열 때 바로 뜨고, 비행기 모드에서도 열리게 합니다.
    기록 자체는 sync.js 가 localStorage / IndexedDB / Supabase 에 보관합니다.
    ========================================================================= */
-const VERSION = "twolog-v3";
+const VERSION = "twolog-v4";
 const SHELL = "shell-" + VERSION;
 
 const ASSETS = [
@@ -30,7 +30,8 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(SHELL).then((cache) =>
       // 한 파일이 실패해도 설치는 계속되도록 개별 add
-      Promise.all(ASSETS.map((url) => cache.add(url).catch(() => null)))
+      // cache:"reload" — GitHub Pages 의 10분 HTTP 캐시를 건너뛰고 항상 새 파일을 담습니다
+      Promise.all(ASSETS.map((url) => cache.add(new Request(url, { cache: "reload" })).catch(() => null)))
     ).then(() => self.skipWaiting())
   );
 });
