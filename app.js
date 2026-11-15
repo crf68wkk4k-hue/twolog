@@ -184,7 +184,13 @@
   if (!("connected" in S.link)) S.link.connected = true;
   if (!S.auth || typeof S.auth !== "object") S.auth = { out: false };
   if (!Array.isArray(S.lists)) S.lists = [];
-  S.events.forEach(function (e) { if (e.who !== "me" && e.who !== "you" && e.who !== "both") e.who = "both"; });
+  S.events.forEach(function (e) {
+    if (e.who !== "me" && e.who !== "you" && e.who !== "both") e.who = "both";
+    /* 예전 한 칸짜리 일정은 종료일 = 시작일 */
+    var st = String(e.date || "").slice(0, 10);
+    if (!e.date || !/^\d{4}-\d{2}-\d{2}$/.test(st)) e.date = today;
+    if (!e.endDate || !/^\d{4}-\d{2}-\d{2}$/.test(String(e.endDate)) || String(e.endDate) < String(e.date)) e.endDate = e.date;
+  });
   if (!Array.isArray(S.photos)) S.photos = [];
   S.photos.forEach(function (p) {
     if (!p || typeof p !== "object") return;
@@ -218,6 +224,41 @@
     { n: "버터", c: "#F8E6A8" }, { n: "피치", c: "#FAD4C0" }, { n: "라임", c: "#DDEBC0" }, { n: "로즈", c: "#EFD3DC" }
   ];
   var SCHED_DEFAULT = { me: "#F7C6D4", you: "#BCE0F7", both: "#D6C5F7" };
+  /* 일정·프로필 색 팔레트 (12색) */
+  var OWNER_COLORS = ["#E8849B", "#D96B52", "#E9A87C", "#C9A227", "#8A9A5B", "#5F6F65",
+    "#6FBF9B", "#5B9BC9", "#3F5C74", "#8E7CC3", "#8C7B6B", "#3A3A3E"];
+  function inkOn(hex) {
+    var h = String(hex || "").replace("#", "");
+    if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+    if (!/^[0-9a-fA-F]{6}$/.test(h)) return "#111111";
+    var n = parseInt(h, 16);
+    var lin = function (c) { return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    var L = 0.2126 * lin(((n >> 16) & 255) / 255) + 0.7152 * lin(((n >> 8) & 255) / 255) + 0.0722 * lin((n & 255) / 255);
+    return L > 0.5 ? "#111111" : "#FFFFFF";
+  }
+  function setOwnerColor(who, hex) {
+    var v = String(hex || "").toUpperCase();
+    if (!/^#[0-9A-F]{6}$/.test(v)) return;
+    S.couple.colors = S.couple.colors || {};
+    S.couple.sched = S.couple.sched || {};
+    S.couple.colors[who] = v;
+    S.couple.sched[who] = v;
+    save(); applyTheme(); renderAll();
+    if (personSheetWho) openPersonSheet(personSheetWho);
+  }
+  function colorPickRow(who) {
+    var cur = String(sched(who) || "").toUpperCase();
+    var h = '<div class="own-block"><div class="own-hd"><span class="own-nm">' + esc(schedName(who)) + "</span>" +
+      '<span class="own-chip" style="background:' + cur + '"></span>' +
+      '<label class="own-pick"><input type="color" class="js-own" data-who="' + who + '" value="' + (cur || "#D96B52") + '"><span>직접 고르기</span></label></div>';
+    h += '<div class="own-sws">';
+    OWNER_COLORS.forEach(function (c) {
+      h += '<button type="button" class="sw osw' + (cur === c ? " sel" : "") + '" data-act="pickOwner" data-who="' + who +
+        '" data-color="' + c + '" style="background:' + c + '" aria-label="' + esc(schedName(who)) + " " + c + '"></button>';
+    });
+    h += "</div></div>";
+    return h;
+  }
   function sched(w) {
     var c = (S.couple.sched || {})[w];
     return c || SCHED_DEFAULT[w] || SCHED_DEFAULT.both;
@@ -344,11 +385,12 @@
 
   /* ------------------------------------------------------------------ types */
   var TYPE = {
-    date: { label: "데이트", color: "#D96B52" },
-    anni: { label: "기념일", color: "#5F6F65" },
     trip: { label: "여행", color: "#8C7B6B" },
-    etc: { label: "기타", color: "#C3C3BE" }
+    date: { label: "데이트", color: "#D96B52" },
+    etc: { label: "개인일정", color: "#8A8A8F" },
+    anni: { label: "기념일", color: "#5F6F65" }
   };
+  var TYPE_ORDER = ["trip", "date", "etc"];
   /* 가계부(지출)는 이번 버전에서 화면에서 빼 두었습니다.
      데이터(expenses)와 카테고리 색은 다음 단계에서 화면만 다시 붙이면 되도록 남겨 둡니다. */
   var CAT = [
@@ -489,8 +531,8 @@
     var dday = Math.max(0, diffDays(c.since, today));
     var dl = ddayLabel(dday);
     var ann = nextAnniversary();
-    var todayEvents = S.events.filter(function (e) { return e.date === today; }).sort(byTimeAsc);
-    var upcoming = S.events.filter(function (e) { return e.date > today; }).sort(byDateAsc).slice(0, 3);
+    var todayEvents = S.events.filter(function (e) { return evCovers(e, today); }).sort(byTimeAsc);
+    var upcoming = S.events.filter(function (e) { return evStart(e) > today; }).sort(byDateAsc).slice(0, 3);
     var ym = today.slice(0, 7);
     var monthNo = Number(ym.slice(5, 7));
     var logs = S.logs.slice().sort(byDateDesc).slice(0, 2);
@@ -593,11 +635,11 @@
     /* ---- 4. upcoming ---- */
     var sched = [];
     todayEvents.slice(0, 2).forEach(function (e) {
-      sched.push({ e: e, left: "오늘", meta: (e.time || "종일") + " · " + TYPE[e.type].label + (e.memo ? " · " + esc(e.memo) : "") });
+      sched.push({ e: e, left: "오늘", meta: (TYPE[e.type] || TYPE.etc).label + (evRange(e) ? " · " + evRange(e) : "") });
     });
     upcoming.slice(0, 3).forEach(function (e) {
-      var d = parse(e.date);
-      sched.push({ e: e, left: (d.getMonth() + 1) + "/" + d.getDate(), meta: TYPE[e.type].label + (e.time ? " · " + e.time : "") + " · D-" + diffDays(today, e.date) });
+      var d = parse(evStart(e));
+      sched.push({ e: e, left: (d.getMonth() + 1) + "/" + d.getDate(), meta: (TYPE[e.type] || TYPE.etc).label + (evRange(e) ? " · " + evRange(e) : "") + " · D-" + diffDays(today, evStart(e)) });
     });
     sched = sched.slice(0, 4);
 
@@ -651,20 +693,26 @@
   }
 
 
+  function evStart(e) { return String((e && e.date) || "").slice(0, 10); }
+  function evEnd(e) {
+    var st = evStart(e);
+    var en = String((e && e.endDate) || "").slice(0, 10);
+    return en && en > st ? en : st;
+  }
+  function evCovers(e, ds) { return !!ds && ds >= evStart(e) && ds <= evEnd(e); }
+  function evRange(e) {
+    var st = evStart(e), en = evEnd(e);
+    if (st === en) return "";
+    var f = function (x) { return Number(x.slice(5, 7)) + "." + Number(x.slice(8, 10)); };
+    return f(st) + " ~ " + f(en);
+  }
+
   function renderCal() {
     var cur = S.ui.calMonth || today.slice(0, 7);
     var y = Number(cur.slice(0, 4)), m = Number(cur.slice(5, 7)) - 1;
     var first = new Date(y, m, 1), startDow = first.getDay(), daysIn = new Date(y, m + 1, 0).getDate();
     var sel = S.ui.selDate || today;
-
-    var byDate = {};
-    S.events.forEach(function (e) { (byDate[e.date] = byDate[e.date] || []).push(e); });
-    var monthCount = { past: 0, anni: 0 };
-    S.events.forEach(function (e) {
-      if (e.date.slice(0, 7) !== cur) return;
-      monthCount.past++;
-      if (e.type === "anni") monthCount.anni++;
-    });
+    var monthStart = cur + "-01", monthEnd = ymd(y, m, daysIn);
 
     var html = "";
     html += '<header class="hdr' + capCls("cal") + '"' + capStyle("cal") + ' data-pg="cal"><div><h1><span class="eh">🗓️</span> 캘린더</h1></div>' +
@@ -674,27 +722,83 @@
       '<div class="cal-nav"><button data-act="calPrev" aria-label="이전 달">' + IC.left + "</button>" +
       '<button data-act="calNext" aria-label="다음 달">' + IC.right + "</button></div></div>";
 
-    html += '<div class="cal-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div><div class="cal-grid">';
-    for (var i = 0; i < startDow; i++) html += '<div class="day blank"></div>';
-    for (var d = 1; d <= daysIn; d++) {
-      var ds = ymd(y, m, d), dow = new Date(y, m, d).getDay();
-      var evs = (byDate[ds] || []).slice().sort(byTimeAsc);
-      var shown = evs.slice(0, 2);
-      var cls = "day";
-      if (dow === 0) cls += " sun";
-      if (dow === 6) cls += " sat";
-      if (ds === today) cls += " today";
-      if (ds === sel) cls += " sel";
-      if (holName(ds)) cls += " hol";
-      html += '<button class="' + cls + '" data-act="pickDay" data-date="' + ds + '"><span class="dnum">' + d + "</span>" +
-        (shown.length ? '<span class="evbars">' + shown.map(function (e) {
-          return '<i class="evbar" style="background:' + sched(evWho(e)) + '">' + esc(e.title) + "</i>";
-        }).join("") + (evs.length > shown.length ? '<span class="evmore">+' + (evs.length - shown.length) + "</span>" : "") + "</span>" : "") +
-        "</button>";
+    html += '<div class="cal-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>';
+
+    /* 날짜 칸을 7일씩 주 단위로 나눕니다 */
+    var cells = [];
+    for (var i0 = 0; i0 < startDow; i0++) cells.push("");
+    for (var d = 1; d <= daysIn; d++) cells.push(ymd(y, m, d));
+    while (cells.length % 7) cells.push("");
+
+    var monthEvents = S.events.filter(function (e) {
+      return evEnd(e) >= monthStart && evStart(e) <= monthEnd;
+    });
+
+    var LANE_H = 17, TOP_H = 26, ROW_MIN = 62;
+    html += '<div class="cal-grid">';
+    for (var w = 0; w < cells.length / 7; w++) {
+      var wk = cells.slice(w * 7, w * 7 + 7);
+
+      /* 이 주에 걸치는 일정 → 시작/끝 칸과 줄(lane) 계산 */
+      var bars = [];
+      monthEvents.forEach(function (e) {
+        var s = evStart(e), en = evEnd(e);
+        var sCol = -1, eCol = -1;
+        for (var ci = 0; ci < 7; ci++) {
+          var ds = wk[ci];
+          if (!ds || ds < s || ds > en) continue;
+          if (sCol < 0) sCol = ci;
+          eCol = ci;
+        }
+        if (sCol < 0) return;
+        bars.push({ e: e, sCol: sCol, eCol: eCol, openL: s < wk[sCol], openR: en > wk[eCol] });
+      });
+      bars.sort(function (a, b) { return a.sCol - b.sCol || (b.eCol - b.sCol) - (a.eCol - a.sCol); });
+      var lanes = [];
+      bars.forEach(function (b) {
+        var li = 0;
+        while (lanes[li] && lanes[li].some(function (x) { return !(b.eCol < x.sCol || b.sCol > x.eCol); })) li++;
+        (lanes[li] = lanes[li] || []).push(b);
+        b.lane = li;
+      });
+      var rowsH = Math.max(ROW_MIN, TOP_H + lanes.length * LANE_H + 8);
+
+      html += '<div class="cal-row" style="height:' + rowsH + 'px"><div class="cal-daygrid">';
+      for (var ci2 = 0; ci2 < 7; ci2++) {
+        var ds2 = wk[ci2];
+        if (!ds2) { html += '<div class="day blank"></div>'; continue; }
+        var dow2 = new Date(Number(ds2.slice(0, 4)), Number(ds2.slice(5, 7)) - 1, Number(ds2.slice(8, 10))).getDay();
+        var cls = "day";
+        if (dow2 === 0) cls += " sun";
+        if (dow2 === 6) cls += " sat";
+        if (ds2 === today) cls += " today";
+        if (ds2 === sel) cls += " sel";
+        if (holName(ds2)) cls += " hol";
+        html += '<button class="' + cls + '" data-act="pickDay" data-date="' + ds2 + '"><span class="dnum">' +
+          Number(ds2.slice(8, 10)) + "</span></button>";
+      }
+      html += "</div>";
+      if (bars.length) {
+        html += '<div class="cal-bars">';
+        bars.forEach(function (b) {
+          var left = b.sCol / 7 * 100, width = (b.eCol - b.sCol + 1) / 7 * 100;
+          var top = TOP_H + b.lane * LANE_H;
+          var edge = sched(evWho(b.e));
+          html += '<span class="ebar' + (b.openL ? " openl" : "") + (b.openR ? " openr" : "") +
+            '" style="left:' + left + "%; width:" + width + "%; top:" + top + "px; background:" + edge +
+            "; color:" + inkOn(edge) + '">' + esc(b.e.title) + "</span>";
+        });
+        html += "</div>";
+      }
+      html += "</div>";
     }
     html += "</div></div>";
 
-    var selEvents = (byDate[sel] || []).slice().sort(byTimeAsc);
+    /* 선택한 날: 기간이 걸치는 일정 모두 */
+    var selEvents = S.events.filter(function (e) { return evCovers(e, sel); })
+      .sort(function (a, b) {
+        return evStart(a) < evStart(b) ? -1 : evStart(a) > evStart(b) ? 1 : (a.title < b.title ? -1 : 1);
+      });
     var sd = parse(sel);
     var selHol = holName(sel);
     html += '<div class="daypanel"><div class="daypanel-hd"><div class="d">' + (sd.getMonth() + 1) + "월 " + sd.getDate() + "일<em>" + WD[sd.getDay()] + "요일</em>" +
@@ -703,9 +807,11 @@
     html += '<div class="daylist">';
     if (selEvents.length) {
       selEvents.forEach(function (e) {
+        var rng = evRange(e);
+        var t = TYPE[e.type] || TYPE.etc;
         html += '<div class="ev"><span class="bar" style="background:' + sched(evWho(e)) + '"></span>' +
           '<div class="body">' + whoRow(e) + '<div class="t">' + esc(e.title) + "</div>" +
-          '<div class="m"><span>' + (e.time || "종일") + "</span><span>·</span><span>" + TYPE[e.type].label + (e.memo ? " · " + esc(e.memo) : "") + "</span></div></div>" +
+          '<div class="m">' + (rng ? "<span>" + rng + "</span><span>·</span>" : "") + "<span>" + t.label + "</span></div></div>" +
           '<button class="x" data-act="delEvent" data-id="' + e.id + '" aria-label="삭제">' + IC.x + "</button></div>";
       });
     } else {
@@ -1031,7 +1137,7 @@
   }
 
   function formEvent(dateStr) {
-    var opts = Object.keys(TYPE).map(function (k) {
+    var opts = TYPE_ORDER.map(function (k) {
       return '<option value="' + k + '">' + TYPE[k].label + "</option>";
     }).join("");
     var wopts = '<button type="button" class="wopt active" data-act="who" data-who="both">' + avSpan("me") + avSpan("you") + "함께</button>" +
@@ -1040,12 +1146,12 @@
     return sheetHead("일정 추가") +
       '<form class="form" id="sheetForm">' +
       '<div class="f"><label>제목</label><input class="field" name="title" placeholder="예) 성수 데이트" required autocomplete="off"></div>' +
-      '<div class="two"><div class="f"><label>날짜</label><input class="field" type="date" name="date" value="' + (dateStr || today) + '" required></div>' +
-      '<div class="f"><label>시간</label><input class="field" type="time" name="time"></div></div>' +
+      '<div class="two"><div class="f"><label>시작일</label><input class="field" type="date" name="start" value="' + (dateStr || today) + '" required></div>' +
+      '<div class="f"><label>종료일</label><input class="field" type="date" name="end" value="' + (dateStr || today) + '" required></div></div>' +
+      '<p class="sheet-sub" style="margin-top:-2px">여러 날이면 종료일까지 달력에 색으로 이어져요.</p>' +
       '<div class="f"><label>종류</label><select class="field" name="type">' + opts + "</select></div>" +
       '<div class="f"><label>담당</label><div class="wsel" data-group="who">' + wopts + "</div>" +
       '<input type="hidden" name="who" value="both"></div>' +
-      '<div class="f"><label>메모</label><input class="field" name="memo" placeholder="선택" autocomplete="off"></div>' +
       '<button class="btn-primary" type="submit">추가하기</button>' +
       "</form>";
   }
@@ -1446,6 +1552,7 @@
       '<button type="button" class="set-btn" data-act="pickPic" data-who="' + who + '">사진첩에서 선택</button>' +
       (pic ? '<button type="button" class="set-btn ghost" data-act="clearPic" data-who="' + who + '">사진 지우기</button>' : "") +
       "</div></div>";
+    h += '<div class="pr-color"><span class="set-lbl">색</span>' + colorPickRow(who) + "</div>";
     h += '<form class="form" id="personForm" data-who="' + who + '" style="margin-top:16px">' +
       '<div class="f"><label>이름</label><input class="field" name="name" value="' + esc(nm) + '" placeholder="이름" required autocomplete="off"></div>' +
       '<button class="btn-primary" type="submit">저장</button></form>';
@@ -1570,8 +1677,8 @@
       '<button type="button" class="seg-btn' + (dark ? " active" : "") + '" data-act="mode" data-mode="dark">다크</button></div></div>';
     h += '<div class="set-block"><span class="set-lbl">페이지 캡션 색</span>' + capPickRows() +
       '<div class="set-hint">페이지마다 제목 줄의 바탕색을 고를 수 있어요. 글씨는 라이트·다크 모두 검정으로 또렷하게 보여요.</div></div>';
-    h += '<div class="set-block"><span class="set-lbl">프로필 색</span>' + avatarPick("me", c.me) + avatarPick("you", c.you) + "</div>";
-    h += '<div class="set-block"><span class="set-lbl">일정 색 · 캘린더</span>' + schedPick("me") + schedPick("you") + schedPick("both") + "</div>";
+    h += '<div class="set-block"><span class="set-lbl">일정 색 · 캘린더</span>' +
+      colorPickRow("me") + colorPickRow("you") + colorPickRow("both") + "</div>";
     h += '<div class="set-block"><div class="set-hint" style="margin-top:0">이름과 프로필 사진은 위 계정 줄을 눌러 바꿔요. 처음 만난 날 · 문구 · 표기 방식은 홈 D-day 카드를 눌러 바꿀 수 있어요.</div></div>';
     h += "</div>";
 
@@ -1721,14 +1828,16 @@
 
     if (act === "addEvent") {
       openSheet(formEvent(S.ui.selDate || today), function (fd) {
+        var st = String(fd.get("start") || today).slice(0, 10);
+        var en = String(fd.get("end") || st).slice(0, 10);
+        if (en < st) en = st;
         S.events.push({
-          id: uid(), date: fd.get("date"), time: fd.get("time") || "",
-          title: fd.get("title"), type: fd.get("type") || "date", memo: fd.get("memo") || "",
+          id: uid(), date: st, endDate: en, time: "",
+          title: String(fd.get("title") || "").trim(), type: fd.get("type") || "date", memo: "",
           who: fd.get("who") || "both"
         });
-        var d = parse(fd.get("date"));
-        S.ui.calMonth = fd.get("date").slice(0, 7);
-        S.ui.selDate = fd.get("date");
+        S.ui.calMonth = st.slice(0, 7);
+        S.ui.selDate = st;
         save(); closeSheet(); renderAll(); toast("일정을 추가했어요");
       });
       return;
@@ -2024,6 +2133,12 @@
       save(); closeSheet(); renderAll(); toast("커플 연결을 해제했어요"); return;
     }
 
+    if (act === "pickOwner") {
+      setOwnerColor(el.getAttribute("data-who") || "me", el.getAttribute("data-color") || "");
+      toast("색을 바꿨어요");
+      return;
+    }
+
     if (act === "pickSched") {
       var sWho = el.getAttribute("data-who");
       var sCol = el.getAttribute("data-color") || "";
@@ -2298,6 +2413,7 @@
     if (t && t.classList && t.classList.contains("js-color")) setThemeColor(t.getAttribute("data-target"), t.value);
     if (t && t.classList && t.classList.contains("js-cap")) setCapColor(t.getAttribute("data-id"), t.value);
     if (t && t.classList && t.classList.contains("js-page")) setPageCap(t.getAttribute("data-page"), t.value);
+    if (t && t.classList && t.classList.contains("js-own")) setOwnerColor(t.getAttribute("data-who") || "me", t.value);
   });
 
   /* 파일 선택 → 프로필 사진 (동그란 아바타) */

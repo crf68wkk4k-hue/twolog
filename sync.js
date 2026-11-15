@@ -183,7 +183,8 @@
       rows.events.push({
         id: String(e.id), couple_id: coupleId,
         title: e.title || "", date: e.date || nowIso(), time: e.time || "",
-        type: e.type || "date", memo: e.memo || "", who: flip(e.who)
+        /* 여러 날 일정의 종료일은 memo 칸에 담아 둡니다 (스키마 변경 없이 동기화) */
+        type: e.type || "date", memo: e.endDate && e.endDate > e.date ? e.endDate : "", who: flip(e.who)
       });
     });
     var push = function (kind, obj, sort, payload) {
@@ -256,7 +257,9 @@
     };
 
     (eventRows || []).forEach(function (r) {
-      doc.events.push({ id: r.id, date: r.date, time: r.time || "", title: r.title || "", type: r.type || "date", memo: r.memo || "", who: flip(r.who) });
+      var rMemo = String(r.memo || "");
+      var rEnd = /^\d{4}-\d{2}-\d{2}$/.test(rMemo) && rMemo > String(r.date || "") ? rMemo : String(r.date || "");
+      doc.events.push({ id: r.id, date: r.date, endDate: rEnd, time: r.time || "", title: r.title || "", type: r.type || "date", memo: "", who: flip(r.who) });
     });
     (noteRows || []).filter(function (r) { return !r.deleted; }).sort(function (a, b) { return (a.sort || 0) - (b.sort || 0); })
       .forEach(function (r) {
