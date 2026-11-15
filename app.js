@@ -927,6 +927,7 @@
   /* ------------------------------------------------------------------ sheet */
   var sheetWrap = $("#sheetWrap"), sheet = $("#sheet"), sheetSubmit = null;
   function openSheet(html, onSubmit) {
+    personSheetWho = null;
     sheet.innerHTML = '<div class="grab"></div>' + html;
     sheetSubmit = onSubmit || null;
     sheetWrap.classList.add("open");
@@ -934,6 +935,7 @@
     sheet.scrollTop = 0;
   }
   function closeSheet() {
+    personSheetWho = null;
     sheetWrap.classList.remove("open");
     sheetWrap.setAttribute("aria-hidden", "true");
     sheetSubmit = null;
@@ -1431,6 +1433,29 @@
       reader.readAsDataURL(file);
     });
   }
+  var personSheetWho = null;
+
+  function formPerson(who) {
+    var nm = who === "me" ? S.couple.me : S.couple.you;
+    var pic = avPic(who);
+    var h = sheetHead(nm + " 프로필");
+    h += '<div class="pr-top">' +
+      '<span class="pr-av' + (pic ? " pic" : "") + '" style="background:' + avColor(who) + '">' + avInner(who) + "</span>" +
+      '<div class="pr-acts">' +
+      '<button type="button" class="set-btn" data-act="pickPic" data-who="' + who + '">사진첩에서 선택</button>' +
+      (pic ? '<button type="button" class="set-btn ghost" data-act="clearPic" data-who="' + who + '">사진 지우기</button>' : "") +
+      "</div></div>";
+    h += '<form class="form" id="personForm" data-who="' + who + '" style="margin-top:16px">' +
+      '<div class="f"><label>이름</label><input class="field" name="name" value="' + esc(nm) + '" placeholder="이름" required autocomplete="off"></div>' +
+      '<button class="btn-primary" type="submit">저장</button></form>';
+    h += '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
+    return h;
+  }
+  function openPersonSheet(who) {
+    openSheet(formPerson(who));
+    personSheetWho = who;
+  }
+
   function avatarPickRow(who) {
     var nm = who === "me" ? S.couple.me : S.couple.you;
     var has = !!avPic(who);
@@ -1514,21 +1539,15 @@
     /* ---- 계정 및 커플 연결 ---- */
     h += '<div class="sec"><h2>👤 계정 및 커플 연결</h2><span class="more">' + (li.connected ? "연결됨" : "미연결") + "</span></div>";
     h += '<div class="list">';
-    h += '<div class="row"><button type="button" class="set-av pick' + (avPic("me") ? " pic" : "") + '" data-act="pickPic" data-who="me" style="background:' + avColor("me") + '" aria-label="' + esc(c.me) + ' 프로필 사진 선택">' + avInner("me") + "</button>" +
+    h += '<div class="row tap" data-act="personSheet" data-who="me"><button type="button" class="set-av pick' + (avPic("me") ? " pic" : "") + '" data-act="pickPic" data-who="me" style="background:' + avColor("me") + '" aria-label="' + esc(c.me) + ' 프로필 사진 선택">' + avInner("me") + "</button>" +
       '<div class="body" style="flex:1 1 auto;min-width:0"><div class="t" style="font-size:13.5px;font-weight:600;letter-spacing:-.02em">' + esc(c.me) + "</div>" +
       '<div style="font-size:11px;color:var(--ink-3);margin-top:2px">' + (remote && acct.email ? esc(acct.email) : "내 계정 · 로그인됨") + "</div></div>" +
       '<span class="chip plain">나</span></div>';
-    h += '<div class="row"><button type="button" class="set-av pick' + (avPic("you") ? " pic" : "") + '" data-act="pickPic" data-who="you" style="background:' + avColor("you") + '" aria-label="' + esc(c.you) + ' 프로필 사진 선택">' + avInner("you") + "</button>" +
+    h += '<div class="row tap" data-act="personSheet" data-who="you"><button type="button" class="set-av pick' + (avPic("you") ? " pic" : "") + '" data-act="pickPic" data-who="you" style="background:' + avColor("you") + '" aria-label="' + esc(c.you) + ' 프로필 사진 선택">' + avInner("you") + "</button>" +
       '<div class="body" style="flex:1 1 auto;min-width:0"><div class="t" style="font-size:13.5px;font-weight:600;letter-spacing:-.02em">' + esc(c.you) + "</div>" +
       '<div style="font-size:11px;color:var(--ink-3);margin-top:2px">' + (li.connected ? "커플 연결됨 · 함께 기록 중" : "초대 코드로 연결할 수 있어요") + "</div></div>" +
       '<button class="chip ' + (li.connected ? "coral" : "plain") + '" data-act="linkSheet" aria-label="커플 연결 설정">' + (li.connected ? "연결됨" : "미연결") + "</button></div>";
     h += "</div>";
-
-    h += '<div class="set-card"><div class="set-lbl">이름</div>' +
-      '<form class="set-form" id="nameForm" style="margin-top:10px">' +
-      '<input class="field" name="me" value="' + esc(c.me) + '" aria-label="나" placeholder="나" autocomplete="off">' +
-      '<input class="field" name="you" value="' + esc(c.you) + '" aria-label="상대" placeholder="상대" autocomplete="off">' +
-      '<button class="set-btn on" type="submit">저장</button></form></div>';
 
     h += '<div class="set-card"><div class="set-lbl">동기화</div>' +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px">' +
@@ -1550,11 +1569,9 @@
       '<button type="button" class="seg-btn' + (dark ? " active" : "") + '" data-act="mode" data-mode="dark">다크</button></div></div>';
     h += '<div class="set-block"><span class="set-lbl">페이지 캡션 색</span>' + capPickRows() +
       '<div class="set-hint">페이지마다 제목 줄의 바탕색을 고를 수 있어요. 글씨는 라이트·다크 모두 검정으로 또렷하게 보여요.</div></div>';
-    h += '<div class="set-block"><span class="set-lbl">프로필 사진</span>' + avatarPickRow("me") + avatarPickRow("you") +
-      '<div class="set-hint" style="margin-top:10px">동그란 사진을 눌러 앨범에서 고르면 돼요. 사진이 없으면 이름 첫 글자로 보여요.</div></div>';
     h += '<div class="set-block"><span class="set-lbl">프로필 색</span>' + avatarPick("me", c.me) + avatarPick("you", c.you) + "</div>";
     h += '<div class="set-block"><span class="set-lbl">일정 색 · 캘린더</span>' + schedPick("me") + schedPick("you") + schedPick("both") + "</div>";
-    h += '<div class="set-block"><div class="set-hint" style="margin-top:0">이름 · 처음 만난 날 · 표기 방식은 홈의 D-day 카드를 눌러 바꿀 수 있어요.</div></div>';
+    h += '<div class="set-block"><div class="set-hint" style="margin-top:0">이름과 프로필 사진은 위 계정 줄을 눌러 바꿔요. 처음 만난 날 · 문구 · 표기 방식은 홈 D-day 카드를 눌러 바꿀 수 있어요.</div></div>';
     h += "</div>";
 
     h += '<div style="height:26px"></div>';
@@ -2030,6 +2047,11 @@
       save(); applyTheme(); renderAll(); toast("프로필 색을 바꿨어요"); return;
     }
 
+    if (act === "personSheet") {
+      openPersonSheet(el.getAttribute("data-who") === "you" ? "you" : "me");
+      return;
+    }
+
     if (act === "pickPic") {
       var pWho = el.getAttribute("data-who") === "you" ? "you" : "me";
       var ai = $("#avatarInput");
@@ -2043,7 +2065,9 @@
     if (act === "clearPic") {
       var cWho = el.getAttribute("data-who") === "you" ? "you" : "me";
       if (S.couple.pics) delete S.couple.pics[cWho];
-      save(); renderAll(); toast("프로필 사진을 지웠어요"); return;
+      save(); renderAll();
+      if (personSheetWho) openPersonSheet(personSheetWho);
+      toast("프로필 사진을 지웠어요"); return;
     }
 
     if (act === "openPhoto") { openPhoto(el.getAttribute("data-id")); return; }
@@ -2152,14 +2176,16 @@
       return;
     }
 
-    if (ev.target.id === "nameForm") {
+    if (ev.target.id === "personForm") {
       ev.preventDefault();
-      var nmf = new FormData(ev.target);
-      var nMe = String(nmf.get("me") || "").trim(), nYou = String(nmf.get("you") || "").trim();
-      if (!nMe || !nYou) { toast("두 이름을 모두 적어 주세요"); return; }
-      S.couple.me = nMe;
-      S.couple.you = nYou;
-      save(); renderAll(); toast("이름을 저장했어요");
+      var pfWho = ev.target.getAttribute("data-who") === "you" ? "you" : "me";
+      var pfName = String(new FormData(ev.target).get("name") || "").trim();
+      if (!pfName) { toast("이름을 적어 주세요"); return; }
+      var beforeDef = defaultPhrase();
+      if (pfWho === "me") S.couple.me = pfName; else S.couple.you = pfName;
+      /* 문구를 기본값 그대로 두고 있었다면 새 이름에 맞춰 같이 바꿔 줍니다 */
+      if (S.couple.phrase === beforeDef) S.couple.phrase = defaultPhrase();
+      save(); closeSheet(); renderAll(); toast("저장했어요");
       return;
     }
 
@@ -2283,6 +2309,7 @@
       S.couple.pics = S.couple.pics || {};
       S.couple.pics[w] = url;
       save(); renderAll();
+      if (personSheetWho) openPersonSheet(personSheetWho);
       toast("프로필 사진을 바꿨어요");
     }).catch(function () { toast("사진을 불러오지 못했어요. 다른 사진으로 해볼까요?"); });
   });
