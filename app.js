@@ -1391,8 +1391,9 @@
   }
   function avInner(who) {
     var pic = avPic(who);
+    /* 사진이 없으면 글자 없이 색만 있는 빈 동그라미로 보여 줍니다 */
     if (pic) return '<img class="av-img" src="' + pic + '" alt="">';
-    return initials(who === "me" ? S.couple.me : S.couple.you);
+    return "";
   }
   function avSpan(who, extra) {
     var nm = who === "me" ? S.couple.me : S.couple.you;
