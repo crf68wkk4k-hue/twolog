@@ -166,7 +166,11 @@
     if (typeof S.note[k].n !== "string" || !S.note[k].n) S.note[k].n = NOTE_DEF[k].n;
   });
   if (S.couple.fmt !== "Y") S.couple.fmt = "D";
-  if (typeof S.couple.phrase !== "string") S.couple.phrase = "함께한 지";
+  if (typeof S.couple.phrase !== "string" || !S.couple.phrase.trim()) S.couple.phrase = defaultPhrase();
+  if (!S.mig.phrase) {
+    if (S.couple.phrase === "함께한 지") S.couple.phrase = defaultPhrase();
+    S.mig.phrase = 1;
+  }
   if (!S.couple.colors || typeof S.couple.colors !== "object") S.couple.colors = {};
   if (!S.couple.pics || typeof S.couple.pics !== "object") S.couple.pics = {};
   if (!("me" in S.couple.colors)) S.couple.colors.me = "#F7C6D4";
@@ -239,6 +243,17 @@
       '<rect x="12" y="3.6" width="8.4" height="16.8" fill="currentColor" stroke="none" style="opacity:' + (dark ? 1 : 0) + '"/></svg>';
   }
   function modeLabel() { return (S.theme || {}).mode === "dark" ? "라이트 모드로 바꾸기" : "다크 모드로 바꾸기"; }
+
+  /* 홈 D-day 위에 그대로 보이는 기념일 문구 (자유 입력) */
+  function defaultPhrase() {
+    var c = S.couple || {};
+    return String(c.me || "소영") + josa(c.me || "소영", "과", "와") + " " +
+      String(c.you || "준영") + josa(c.you || "준영", "이", "가") + " 함께한 지";
+  }
+  function ddayPhrase() {
+    var v = (S.couple || {}).phrase;
+    return typeof v === "string" && v.trim() ? v : defaultPhrase();
+  }
 
   /* 페이지 캡션(제목 줄) 바탕색 — 글씨는 항상 #111111 */
   var PAGES = [
@@ -509,7 +524,7 @@
 
     var html = "";
     var nmOn = S.theme && S.theme.name;
-    html += '<div class="brand' + capCls("home") + '"' + capStyle("home") + ' data-pg="home"><span class="mark"><i></i><i></i></span><b>투로그</b>' +
+    html += '<div class="brand' + capCls("home") + '"' + capStyle("home") + ' data-pg="home"><span class="mark"><i></i><i></i></span><b>투로그</b><span class="bw">(twolog)</span>' +
       '<span class="who' + (nmOn ? " tinted" : "") + '">' + esc(c.me) + " · " + esc(c.you) + "</span>" +
       '<button class="icon-btn pal" data-act="toggleMode" aria-label="' + modeLabel() + '" title="' + modeLabel() + '">' + modeIcon() + "</button>" +
       '<button class="icon-btn pal" data-act="openTheme" aria-label="컬러 설정">' + IC.palette + "</button></div>";
@@ -517,7 +532,7 @@
     /* ---- 1. D-day ---- */
     /* 위 라벨: 「소영과 준영이 함께한 지」 — 날짜 없이 두 이름과 문구만 */
     html += '<div class="dday" data-act="editDday"><div class="dday-top"><span class="eyebrow">' +
-      '<em class="nm">' + esc(c.me) + "</em>" + josa(c.me, "과", "와") + ' <em class="nm">' + esc(c.you) + "</em>" + josa(c.you, "이", "가") + " " + esc(c.phrase || "함께한 지") + "</span>" +
+      esc(ddayPhrase()) + "</span>" +
       '<button class="icon-btn" data-act="editDday" aria-label="기념일 수정">' + IC.pencil + "</button></div>" +
       '<div class="dday-num' + (dl.compact ? " compact" : "") + '">' + dl.text + "</div>" +
       (ann ? '<div class="chip-row"><span class="chip coral">' + ann.n + "주년 " + (ann.days === 0 ? "오늘" : "D-" + ann.days) + "</span></div>" : "") +
@@ -561,7 +576,7 @@
     }
     html += "</div>";
 
-    html += '<div class="mblock"><div class="mbhd"><h3 class="tint-h">' + esc(noteLabel("log")) + "</h3>' +
+    html += '<div class="mblock"><div class="mbhd"><h3 class="tint-h">' + esc(noteLabel("log")) + "</h3>" +
       '<button class="sw-btn" data-act="openTheme" aria-label="최근 기록 색 선택"></button></div>';
     if (logs.length) {
       logs.forEach(function (l) {
@@ -571,7 +586,7 @@
           '<div class="lstar">' + stars(l.rating) + "</div></div>";
       });
     } else { html += '<div class="empty" style="padding:14px 0 0;text-align:left">아직 기록이 없어요.</div>'; }
-    html += '<div class="wrap20" style="padding:12px 0 0"><button class="ghost" data-act="navSeg" data-screen="diary" data-seg="log">' + esc(noteLabel("log")) + " 전체 보기</button></div></div>';
+    html += '<div class="wrap20" style="padding:12px 0 0"><button class="ghost" data-act="navSeg" data-screen="diary" data-seg="log">' + esc(noteLabel("log")) + " 전체 보기</button></div></div>";
 
     html += "</div></div>";
 
@@ -770,7 +785,7 @@
   function viewList(l) {
     if (!l) return '<div class="list" style="margin:0 20px"><div class="empty">리스트를 찾을 수 없어요.</div></div>';
     var h = '<div class="note-hd"><div class="nh-l"><span class="t">' + esc((l.emoji || "📌") + " " + l.title) + "</span>" +
-      '<span class="k">' + (l.kind === "memo" ? "메모" : "체크") + "</span></div></div>';
+      '<span class="k">' + (l.kind === "memo" ? "메모" : "체크") + "</span></div></div>";
 
     if (l.kind === "memo") {
       h += '<div class="list" style="margin:0 20px">';
@@ -1093,10 +1108,9 @@
     var c = S.couple;
     return sheetHead("기념일 설정") +
       '<form class="form" id="sheetForm">' +
-      '<div class="two"><div class="f"><label>나</label><input class="field" name="me" value="' + esc(c.me) + '"></div>' +
-      '<div class="f"><label>상대</label><input class="field" name="you" value="' + esc(c.you) + '"></div></div>' +
-      '<div class="f"><label>처음 만난 날</label><input class="field" type="date" name="since" value="' + c.since + '" required></div>' +
-      '<div class="f"><label>기념일 문구</label><input class="field" name="phrase" value="' + esc(c.phrase || "함께한 지") + '" placeholder="함께한 지" autocomplete="off"></div>' +
+      '<div class="f"><label>기념일 문구</label><input class="field" name="phrase" value="' + esc(ddayPhrase()) + '" placeholder="소영과 준영이 함께한 지" autocomplete="off"></div>' +
+      '<p class="sheet-sub" style="margin-top:-2px">홈 D-day 위에 이 문구가 그대로 보여요. 자유롭게 적어 주세요.</p>' +
+      '<div class="f" style="margin-top:2px"><label>처음 만난 날</label><input class="field" type="date" name="since" value="' + c.since + '" required></div>' +
       '<div class="f"><label>D-day 표기</label><div class="seg seg-sm" data-group="fmt">' +
       '<button type="button" class="seg-btn' + (c.fmt === "Y" ? "" : " active") + '" data-act="fmt" data-fmt="D">일수로 · D+365일</button>' +
       '<button type="button" class="seg-btn' + (c.fmt === "Y" ? " active" : "") + '" data-act="fmt" data-fmt="Y">연·일로 · 1년 4일째</button>' +
@@ -1395,13 +1409,16 @@
         img.onload = function () {
           try {
             var SIDE = 256;
+            var iw = img.naturalWidth || img.width || 0;
+            var ih = img.naturalHeight || img.height || 0;
+            if (!iw || !ih) { reject(new Error("empty image")); return; }
             var cv = document.createElement("canvas");
             cv.width = SIDE; cv.height = SIDE;
             var ctx = cv.getContext("2d");
-            var m = Math.min(img.width, img.height) || 1;
-            var sx = (img.width - m) / 2, sy = (img.height - m) / 2;
-            ctx.fillStyle = "#FFFFFF";
-            ctx.fillRect(0, 0, SIDE, SIDE);
+            var m = Math.min(iw, ih);
+            var sx = Math.floor((iw - m) / 2), sy = Math.floor((ih - m) / 2);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
             ctx.drawImage(img, sx, sy, m, m, 0, 0, SIDE, SIDE);
             var url = cv.toDataURL("image/jpeg", 0.82);
             if (url.length > 180000) url = cv.toDataURL("image/jpeg", 0.62);
@@ -1506,6 +1523,12 @@
       '<div style="font-size:11px;color:var(--ink-3);margin-top:2px">' + (li.connected ? "커플 연결됨 · 함께 기록 중" : "초대 코드로 연결할 수 있어요") + "</div></div>" +
       '<button class="chip ' + (li.connected ? "coral" : "plain") + '" data-act="linkSheet" aria-label="커플 연결 설정">' + (li.connected ? "연결됨" : "미연결") + "</button></div>";
     h += "</div>";
+
+    h += '<div class="set-card"><div class="set-lbl">이름</div>' +
+      '<form class="set-form" id="nameForm" style="margin-top:10px">' +
+      '<input class="field" name="me" value="' + esc(c.me) + '" aria-label="나" placeholder="나" autocomplete="off">' +
+      '<input class="field" name="you" value="' + esc(c.you) + '" aria-label="상대" placeholder="상대" autocomplete="off">' +
+      '<button class="set-btn on" type="submit">저장</button></form></div>';
 
     h += '<div class="set-card"><div class="set-lbl">동기화</div>' +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px">' +
@@ -1651,11 +1674,8 @@
 
     if (act === "editDday") {
       openSheet(formDday(), function (fd) {
-        var me = String(fd.get("me") || "").trim(), you = String(fd.get("you") || "").trim();
-        if (me) S.couple.me = me;
-        if (you) S.couple.you = you;
+        S.couple.phrase = String(fd.get("phrase") || "").trim() || defaultPhrase();
         if (fd.get("since")) S.couple.since = fd.get("since");
-        S.couple.phrase = String(fd.get("phrase") || "").trim() || "함께한 지";
         S.couple.fmt = fd.get("fmt") === "Y" ? "Y" : "D";
         save(); closeSheet(); renderAll(); toast("기념일을 저장했어요");
       });
@@ -2129,6 +2149,17 @@
       save(); renderDiary();
       var nx = $("#qaddInput");
       if (nx) { nx.value = ""; nx.focus(); }
+      return;
+    }
+
+    if (ev.target.id === "nameForm") {
+      ev.preventDefault();
+      var nmf = new FormData(ev.target);
+      var nMe = String(nmf.get("me") || "").trim(), nYou = String(nmf.get("you") || "").trim();
+      if (!nMe || !nYou) { toast("두 이름을 모두 적어 주세요"); return; }
+      S.couple.me = nMe;
+      S.couple.you = nYou;
+      save(); renderAll(); toast("이름을 저장했어요");
       return;
     }
 

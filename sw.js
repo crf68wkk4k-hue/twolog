@@ -4,7 +4,7 @@
    홈 화면에서 열 때 바로 뜨고, 비행기 모드에서도 열리게 합니다.
    기록 자체는 sync.js 가 localStorage / IndexedDB / Supabase 에 보관합니다.
    ========================================================================= */
-const VERSION = "twolog-v5";
+const VERSION = "twolog-v6";
 const SHELL = "shell-" + VERSION;
 
 const ASSETS = [
