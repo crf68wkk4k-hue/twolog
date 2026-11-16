@@ -192,11 +192,11 @@ with sync_playwright() as p:
     page.locator("#s-diary .ncard.new").click()
     page.wait_for_timeout(350)
     page.fill('#sheetForm input[name="title"]', "장보기")
-    page.fill('#sheetForm input[name="caption"]', "이번 주말에 사 올 것")
     page.click('#sheetForm button[type="submit"]')
     page.wait_for_timeout(450)
     check("새 리스트 추가", page.locator("#s-diary .ncard").count() == 3, page.locator("#s-diary .ncard").count())
-    check("리스트 캡션", "이번 주말에 사 올 것" in page.locator("#s-diary").inner_text())
+    # v16: 한 줄 메모(캡션) 칸은 없어졌어요 — 카드는 주제·제목·항목만 보여 줍니다
+    check("새 리스트 제목", "장보기" in page.locator("#s-diary").inner_text())
     shot(page, "note-v13.png")
     # 다크 모드도 같은 화면으로 확인
     page.evaluate("document.documentElement.setAttribute('data-mode','dark')")

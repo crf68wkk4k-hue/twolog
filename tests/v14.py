@@ -226,7 +226,8 @@ with sync_playwright() as p:
     grid = page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ngrid')).gridTemplateColumns")
     check("두 열", len(grid.split(" ")) == 2, grid)
     first = page.locator("#s-diary .ncard").first
-    check("카드 프사+주제", page.locator("#s-diary .ncard .nc-av").count() >= 1 and
+    # v16: 프사 동그라미를 빼고 주제 한 줄만
+    check("카드 주제만(프사 없음)", page.locator("#s-diary .ncard .nc-av").count() == 0 and
           page.locator("#s-diary .ncard .nc-topic").first.inner_text().strip() in ("주제", "이번 주"),
           page.locator("#s-diary .ncard .nc-topic").first.inner_text())
     check("카드 제목", page.locator("#s-diary .ncard .nc-t").first.inner_text().strip() == "메모",
@@ -267,15 +268,13 @@ with sync_playwright() as p:
     page.locator("#s-diary .ncard .nc-t").first.click()
     page.wait_for_timeout(400)
     check("카드 다시 열림", page.locator("#sheetWrap.open").count() == 1)
-    page.fill('#sheetForm input[name="caption"]', "이번 주말에 사 올 것")
-    page.locator('#sheetForm .seg-btn[data-who="you"]').click()
+    page.fill('#sheetForm input[name="topic"]', "이번 주말")
     page.click('#sheetForm button[type="submit"]')
     page.wait_for_timeout(700)
     check("카드 저장 후 닫힘", page.locator("#sheetWrap.open").count() == 0)
-    check("카드 캡션 반영", "이번 주말에 사 올 것" in page.locator("#s-diary .ncard").first.inner_text(),
+    # v16: 한 줄 메모·누구 입력은 없어졌어요
+    check("카드 주제 반영", "이번 주말" in page.locator("#s-diary .ncard").first.inner_text(),
           page.locator("#s-diary .ncard").first.inner_text()[:80])
-    check("카드 작성자 변경", page.evaluate(
-        "() => document.querySelector('#s-diary .ncard .nc-top .av').classList.contains('you')"))
     check("카드에 항목 미리보기", page.locator("#s-diary .ncard .nc-items .cti").count() >= 3,
           page.locator("#s-diary .ncard .nc-items .cti").count())
     check("완료 항목 취소선", page.evaluate(
@@ -299,7 +298,6 @@ with sync_playwright() as p:
     page.locator("#s-diary .ncard.new").click()
     page.wait_for_timeout(400)
     page.fill('#sheetForm input[name="title"]', "여행 준비물")
-    page.fill('#sheetForm input[name="caption"]', "제주도 가기 전에")
     page.click('#sheetForm button[type="submit"]')
     page.wait_for_timeout(600)
     check("새 카드 추가", page.locator("#s-diary .ncard").count() == 3, page.locator("#s-diary .ncard").count())
@@ -334,7 +332,7 @@ with sync_playwright() as p:
 
     # ---------- 8. 서비스 워커 버전 ----------
     ver = page.evaluate("fetch('sw.js').then(r => r.text()).then(t => (t.match(/twolog-v\\d+/) || [''])[0])")
-    check("sw 캐시 v15", ver == "twolog-v15", ver)
+    check("sw 캐시 v16", ver == "twolog-v16", ver)
     check("콘솔 오류 없음", len(errors) == 0, errors[:3])
     browser.close()
 

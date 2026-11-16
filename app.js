@@ -422,6 +422,14 @@
     } else {
       ["--log", "--log-soft", "--log-line", "--log-sw"].forEach(function (k) { root.style.removeProperty(k); });
     }
+    /* v16: 홈 제목 색을 골랐다면 저장·완료 같은 기본 버튼도 같은 색으로 — 글씨는 색에 맞춰 또렷하게(inkOn) */
+    var htb = String(t.homeTitleBg || "").toUpperCase();
+    if (/^#[0-9A-F]{6}$/.test(htb)) {
+      root.style.setProperty("--btn-bg", htb);
+      root.style.setProperty("--btn-ink", inkOn(htb));
+    } else {
+      ["--btn-bg", "--btn-ink"].forEach(function (k) { root.style.removeProperty(k); });
+    }
   }
   function setMode(m) {
     S.theme = S.theme || { name: null, log: null };
@@ -1099,16 +1107,13 @@
 
   function noteCard(k, g) {
     var items = itemsOf(k).filter(function (x) { return x.gid === g.id; }).sort(byDone);
-    var who = g.who === "you" ? "you" : "me";
-    /* v15: 이름(준영·소영) 대신 카드마다 적는 「주제」를 맨 윗줄에 — 누구 카드인지는 프사로만 보여요 */
+    /* v16: 프사 동그라미도 지우고 맨 윗줄은 「주제」 한 줄만 — 카드는 더 심플하게 */
     var gTitle = g.title || GROUP_DEF[k];
     var gTopic = String(g.topic || "").trim();
     var h = '<div class="ncard" role="button" tabindex="0" data-act="openGroup" data-tab="' + k + '" data-gid="' + g.id +
       '" aria-label="' + esc(gTitle) + ' 열기">';
-    h += '<div class="nc-top"><span class="nc-av av ' + who + (avPic(who) ? " pic" : "") + '" aria-hidden="true">' + avInner(who) + "</span>" +
-      '<span class="nc-topic' + (gTopic ? "" : " empty") + '">' + esc(gTopic || "주제") + "</span></div>";
+    h += '<div class="nc-top"><span class="nc-topic' + (gTopic ? "" : " empty") + '">' + esc(gTopic || "주제") + "</span></div>";
     h += '<div class="nc-t">' + esc(gTitle) + "</div>";
-    if (g.caption) h += '<div class="nc-c">' + esc(g.caption) + "</div>";
     if (items.length) {
       h += '<div class="nc-items">' + items.slice(0, 4).map(function (x) { return cardItem(k, x); }).join("") +
         (items.length > 4 ? '<div class="cmore">+' + (items.length - 4) + "개</div>" : "") + "</div>";
@@ -1119,13 +1124,17 @@
     return h;
   }
 
-  /* 리스트 카드 상세 시트 — To-do 입력·토글·삭제 + 제목/메모/작성자 수정 */
+  /* 리스트 카드 상세 시트 — v16: 제목·주제가 맨 위, 그 아래 To-do (한 줄 메모·누구는 삭제) */
   function cardSheetHtml(k, g) {
     var items = itemsOf(k).filter(function (x) { return x.gid === g.id; }).sort(byDone);
-    var who = g.who === "you" ? "you" : "me";
-    var h = '<div class="sheet-hd"><h2>' + esc(g.title || GROUP_DEF[k]) + '</h2>' +
-      '<button class="icon-btn" data-close="1" aria-label="닫기">' + IC.x + "</button></div>";
-    h += '<div class="todo-label" style="margin-top:2px">To-do</div>';
+    var h = '<div class="sheet-hd card-hd"><button class="icon-btn" data-close="1" aria-label="닫기">' + IC.x + "</button></div>";
+    /* 제목을 시트 맨 위로 — 카드에서 가장 크게 보이는 값이라 먼저 고쳐요 */
+    h += '<form class="form card-meta" id="sheetForm">' +
+      '<div class="f"><label>제목</label><input class="field" name="title" value="' + esc(g.title || GROUP_DEF[k]) + '" required autocomplete="off"></div>' +
+      '<div class="f"><label>주제</label><input class="field" name="topic" value="' + esc(g.topic || "") + '" placeholder="예) 이번 주, 함께" autocomplete="off"></div>' +
+      '<p class="sheet-sub">「주제」는 카드 맨 윗줄에, 「제목」은 카드에서 가장 크고 진하게 보여요.</p>' +
+      "</form>";
+    h += '<div class="todo-label" style="margin-top:20px">To-do</div>';
     h += '<form class="todo-add" id="listAddForm" data-tab="' + k + '" data-gid="' + g.id + '">' +
       '<span class="circ" aria-hidden="true">' + CIR_OFF + "</span>" +
       '<input class="todo-in" name="text" placeholder="내용을 추가해보세요" autocomplete="off" enterkeyhint="done" aria-label="내용">' +
@@ -1134,17 +1143,10 @@
     if (!items.length) h += '<div class="empty">위 칸에 적고 Add 를 눌러 보세요.</div>';
     items.forEach(function (it) { h += diaryRow(k, it); });
     h += "</div>";
-    h += '<form class="form" id="sheetForm" style="margin-top:24px">' +
-      '<div class="f"><label>제목</label><input class="field" name="title" value="' + esc(g.title || GROUP_DEF[k]) + '" required autocomplete="off"></div>' +
-      '<div class="f"><label>주제</label><input class="field" name="topic" value="' + esc(g.topic || "") + '" placeholder="예) 이번 주, 함께" autocomplete="off"></div>' +
-      '<div class="f"><label>한 줄 메모 (선택)</label><input class="field" name="caption" value="' + esc(g.caption || "") + '" placeholder="짧게 적어 두기" autocomplete="off"></div>' +
-      '<div class="f"><label>누구</label><div class="seg seg-sm" data-group="gwho">' +
-      '<button type="button" class="seg-btn' + (who === "me" ? " active" : "") + '" data-act="gwho" data-who="me">' + esc(S.couple.me) + '</button>' +
-      '<button type="button" class="seg-btn' + (who === "you" ? " active" : "") + '" data-act="gwho" data-who="you">' + esc(S.couple.you) + "</button></div>" +
-      '<input type="hidden" name="who" value="' + who + '"></div>' +
-      '<p class="sheet-sub" style="margin-top:-4px">「주제」는 카드 맨 윗줄에, 「제목」은 카드에서 가장 크고 진하게 보여요.</p>' +
-      '<button class="btn-primary" type="submit">저장하기</button>' +
-      '<button type="button" class="btn-del" data-act="delCard" data-tab="' + k + '" data-gid="' + g.id + '">카드 삭제</button></form>';
+    /* 저장·삭제 버튼은 아래에 그대로 — 저장 버튼은 위의 제목·주제 폼(#sheetForm)을 제출해요 */
+    h += '<div class="card-acts">' +
+      '<button class="btn-primary" type="submit" form="sheetForm">저장하기</button>' +
+      '<button type="button" class="btn-del" data-act="delCard" data-tab="' + k + '" data-gid="' + g.id + '">카드 삭제</button></div>';
     return h;
   }
 
@@ -1158,8 +1160,7 @@
       if (!t) { toast("제목을 적어 주세요"); return; }
       cur.title = t;
       cur.topic = String(fd.get("topic") || "").trim();
-      cur.caption = String(fd.get("caption") || "").trim();
-      cur.who = fd.get("who") === "you" ? "you" : "me";
+      /* v16: 한 줄 메모·누구 칸은 없어졌어요 — 예전에 적어 둔 값은 건드리지 않고 그대로 둡니다 */
       openCard = null;
       save(); closeSheet(); renderDiary(); toast("저장했어요");
     });
@@ -1173,7 +1174,16 @@
     var g = groupOf(openCard.tab, openCard.gid);
     if (!g) return;
     var st = sheet.scrollTop;
+    /* 항목을 체크해도 방금 적던 제목·주제가 날아가지 않도록 값을 잠깐 들고 있어요 */
+    var keepT = sheet.querySelector('#sheetForm input[name="title"]');
+    var keepP = sheet.querySelector('#sheetForm input[name="topic"]');
+    var typedT = keepT ? keepT.value : null;
+    var typedP = keepP ? keepP.value : null;
     sheet.innerHTML = '<div class="grab"></div>' + cardSheetHtml(openCard.tab, g);
+    var t2 = sheet.querySelector('#sheetForm input[name="title"]');
+    var p2 = sheet.querySelector('#sheetForm input[name="topic"]');
+    if (t2 && typedT !== null) t2.value = typedT;
+    if (p2 && typedP !== null) p2.value = typedP;
     sheet.scrollTop = st;
   }
 
@@ -1607,21 +1617,20 @@
       '<button type="button" class="seg-btn' + (dark ? " active" : "") + '" data-act="mode" data-mode="dark">다크</button>' +
       "</div></div>" +
       cpBlock("다가오는 일정 · " + monthNo + "월의 우리", "homeTitleBg", t.homeTitleBg, MUTED, "#EDF1EC") +
-      '<p class="cp-note">고른 색은 두 섹션의 제목 줄(문구) 바탕에만 칠해지고, 일정 목록과 카드는 원래처럼 깨끗한 바탕으로 남아요. 바로 적용되고 앱을 다시 열어도 그대로 남아 있어요. ‘기본’으로 두면 원래대로 돌아가요.</p>' +
+      '<p class="cp-note">고른 색은 두 섹션의 제목 줄(문구) 바탕과 저장·완료 같은 기본 버튼에 함께 칠해지고, 글씨는 색에 맞춰 또렷하게 바뀌어요. 바로 적용되고 앱을 다시 열어도 그대로 남아 있어요. ‘기본’으로 두면 원래대로 돌아가요.</p>' +
       '<button class="btn-primary" data-close="1">완료</button>';
   }
 
+  /* 새 리스트 시트 — v16: 제목·주제만 (한 줄 메모·누구 칸 삭제) */
   function formGroup(k, g) {
     var isNew = !g;
     return sheetHead(isNew ? "새 리스트" : "리스트 수정") +
-      '<p class="sheet-sub">탭 안에 리스트를 나눠 담을 수 있어요. 이름과 짧은 캡션을 적어 주세요.</p>' +
+      '<p class="sheet-sub">탭 안에 리스트를 나눠 담을 수 있어요. 제목과 주제를 적어 주세요.</p>' +
       '<form class="form" id="sheetForm">' +
-      '<div class="f"><label>리스트 이름</label><input class="field" name="title" value="' + esc(g ? g.title : "") +
+      '<div class="f"><label>제목</label><input class="field" name="title" value="' + esc(g ? g.title : "") +
       '" placeholder="예) 장보기" autocomplete="off"></div>' +
       '<div class="f"><label>주제</label><input class="field" name="topic" value="' + esc(g ? g.topic || "" : "") +
       '" placeholder="예) 이번 주, 함께" autocomplete="off"></div>' +
-      '<div class="f"><label>추가 캡션 (선택)</label><input class="field" name="caption" value="' + esc(g ? g.caption : "") +
-      '" placeholder="예) 이번 주말에 사 올 것" autocomplete="off"></div>' +
       '<button class="btn-primary" type="submit">저장</button></form>' +
       '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
   }
@@ -2082,7 +2091,7 @@
       colorPickRow("me") + colorPickRow("you") + colorPickRow("both") + "</div>";
     h += '<div class="cp"><div class="cp-hd"><span>홈 제목 색</span><span class="cp-val">뮤트 톤</span></div>' +
       cpBlock("다가오는 일정 · " + monthNo + "월의 우리", "homeTitleBg", t.homeTitleBg, MUTED, "#EDF1EC") +
-      '<p class="cp-note" style="margin-top:10px">두 섹션의 제목 줄 바탕에만 색이 칠해지고, 목록과 카드는 흰 바탕으로 남아요.</p></div>';
+      '<p class="cp-note" style="margin-top:10px">두 섹션의 제목 줄과 저장·완료 버튼에 같은 색이 칠해져요. 일정 목록과 카드는 흰 바탕으로 남아요.</p></div>';
     h += '<div class="cp"><div class="cp-hd"><span>폰트</span><span class="cp-val">' + esc(fontOf(t.font).n) + '</span></div>' +
       '<div class="font-list">' + fontRows() + "</div></div>";
     h += '<div style="height:16px"></div><button class="btn-primary" data-close="1">완료</button>';
@@ -2424,17 +2433,6 @@
       return;
     }
 
-    if (act === "gwho") {
-      var gw = el.getAttribute("data-who") === "you" ? "you" : "me";
-      var gwhoBox = el.closest('[data-group="gwho"]');
-      if (gwhoBox) {
-        gwhoBox.querySelectorAll(".seg-btn").forEach(function (b) { b.classList.toggle("active", b === el); });
-        var gwhoIn = gwhoBox.parentNode.querySelector('input[name="who"]');
-        if (gwhoIn) gwhoIn.value = gw;
-      }
-      return;
-    }
-
     if (act === "delCard") {
       var dcK = el.getAttribute("data-tab") || "todo";
       var dcGid = el.getAttribute("data-gid");
@@ -2457,7 +2455,7 @@
         if (!gTitle) { toast("리스트 이름을 적어 주세요"); return; }
         S.groups = S.groups || {};
         S.groups[agK] = S.groups[agK] || [];
-        S.groups[agK].push({ id: uid(), title: gTitle, topic: String(fd.get("topic") || "").trim(), caption: String(fd.get("caption") || "").trim(), who: "me", date: today });
+        S.groups[agK].push({ id: uid(), title: gTitle, topic: String(fd.get("topic") || "").trim(), who: "me", date: today });
         save(); closeSheet(); renderAll(); toast("리스트를 만들었어요");
       });
       return;
@@ -2475,7 +2473,6 @@
         if (!gTitle2) { toast("리스트 이름을 적어 주세요"); return; }
         g2.title = gTitle2;
         g2.topic = String(fd.get("topic") || "").trim();
-        g2.caption = String(fd.get("caption") || "").trim();
         save(); closeSheet(); renderAll(); toast("저장했어요");
       });
       return;

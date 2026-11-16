@@ -551,7 +551,14 @@ textarea.qfield{height:auto; min-height:44px; padding:11px 12px; line-height:1.5
 .grab{width:36px; height:4px; border-radius:0; background:var(--line); margin:4px auto 0}
 .sheet-hd{display:flex; align-items:center; justify-content:space-between; padding:12px 0 4px}
 .sheet-hd h2{font-size:17px; font-weight:700; letter-spacing:-.03em}
+/* v16: 노트 카드 시트 — 머리줄은 닫기 버튼만, 제목·주제가 맨 위 */
+.sheet-hd.card-hd{justify-content:flex-end; padding:6px 0 0}
 .form{display:flex; flex-direction:column; gap:12px; margin-top:14px}
+.form.card-meta{margin-top:2px; gap:14px}
+.card-meta .sheet-sub{margin-top:-4px}
+.card-acts{display:flex; flex-direction:column; gap:10px; margin-top:24px}
+.card-acts .btn-primary{margin-top:0; width:100%}
+.card-acts .btn-del{width:100%}
 .f{display:flex; flex-direction:column; gap:7px}
 .f > label{font-size:11.5px; font-weight:600; color:var(--ink-2); letter-spacing:-.01em}
 .field{
@@ -569,10 +576,11 @@ select.field{appearance:none; background-image:url("data:image/svg+xml;charset=u
 .seg-sm{margin:0; padding:3px; background:var(--surface-2); border-radius:0; display:flex; gap:2px}
 .seg-sm .seg-btn{height:30px; font-size:12px}
 .btn-primary{
-  height:50px; border-radius:0; background:var(--accent); color:#fff; font-size:14.5px; font-weight:700;
+  height:50px; border-radius:0; background:var(--btn-bg, var(--accent)); color:var(--btn-ink, #FFFFFF);
+  font-size:14.5px; font-weight:700;
   letter-spacing:-.01em; width:100%; margin-top:4px; transition:background .15s ease, transform .12s ease
 }
-.btn-primary:active{background:var(--accent-deep); transform:scale(.995)}
+.btn-primary:active{background:var(--btn-bg, var(--accent-deep)); filter:brightness(.93); transform:scale(.995)}
 .btn-line{height:46px; border-radius:0; border:1px solid var(--line); font-size:13px; font-weight:600; color:var(--ink-2); width:100%}
 
 /* toast */
@@ -616,7 +624,7 @@ html[data-mode="dark"] .toast{background:rgba(62,62,66,.96)}
 html[data-mode="dark"] .grab{background:#3A3A3E}
 html[data-mode="dark"] .cp-pick input[type=color]::-webkit-color-swatch{border-color:rgba(255,255,255,.18)}
 html[data-mode="dark"] .sw{border-color:rgba(255,255,255,.14)}
-html[data-mode="dark"] .btn-primary{color:#141416}
+html[data-mode="dark"] .btn-primary{color:var(--btn-ink, #141416)}
 html[data-mode="dark"] .todo.done .check{color:#141416}
 html[data-mode="dark"] .lchip.active i{background:#111}
 html[data-mode="dark"] .av{color:#141416}
@@ -771,7 +779,8 @@ body{overscroll-behavior-y:contain}
 
 /* --- 홈: D-day 히어로 — 프사는 양옆에 크게, 가운데는 문구·D+N·배지 --- */
 .dday{
-  margin:34px 20px 0; padding:34px 0 22px; position:relative; display:grid;
+  /* v16: 히어로를 네 줄만큼 더 아래로 */
+  margin:94px 20px 0; padding:34px 0 22px; position:relative; display:grid;
   grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px;
   text-align:center; border:0; background:transparent; box-shadow:none; overflow:visible;
 }
@@ -795,7 +804,8 @@ body{overscroll-behavior-y:contain}
 .home-sec .sec h2{font-size:16px; letter-spacing:-.025em}
 .home-sec .sec .more{font-size:12px}
 /* v15: 제목 줄 바탕은 네모가 아니라 둥근 알약 모양 */
-.home-sec .sec-tint{padding:10px 16px; border-radius:999px !important; background:var(--sec-bg); color:var(--sec-ink); margin:0 0 12px}
+.home-sec .sec-tint{padding:10px 16px; border-radius:999px !important; background:var(--sec-bg); color:var(--sec-ink);
+  border:1px solid var(--line); margin:0 0 12px}
 .home-sec .sec-tint h2{color:var(--sec-ink)}
 .home-sec .sec-tint .more{color:var(--sec-ink); opacity:.62}
 .home-sec .pad{padding:0}
@@ -892,26 +902,23 @@ html[data-mode="dark"] .bcard:active{background:#1A1A1C}
 html[data-mode="dark"] .ncard{background:var(--surface); border-color:rgba(255,255,255,.10);
   box-shadow:0 3px 12px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.05)}
 html[data-mode="dark"] .ncard:active{box-shadow:0 1px 5px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05)}
-.nc-top{display:flex; align-items:center; gap:7px; margin-bottom:8px; min-width:0}
-.nc-av{width:20px; height:20px; flex:0 0 20px; font-size:9.5px}
-/* 주제 — 예전에 이름(준영·소영)이 있던 자리 */
-.nc-topic{font-size:13px; font-weight:600; color:var(--ink-2); letter-spacing:-.012em; line-height:1.35;
+.nc-top{display:flex; align-items:center; gap:7px; margin-bottom:6px; min-width:0}
+/* 주제 — 예전에 이름(준영·소영)이 있던 자리. v16: 프사 동그라미 없이 이 한 줄만 */
+.nc-topic{font-size:14px; font-weight:600; color:var(--ink-2); letter-spacing:-.014em; line-height:1.35;
   min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .nc-topic.empty{font-weight:500; color:var(--ink-3); opacity:.8}
-/* 카테고리명(제목) — 가장 크고 진하게 */
-.nc-t{font-size:16px; font-weight:800; letter-spacing:-.03em; line-height:1.26; word-break:keep-all; margin-top:2px}
-.nc-c{font-size:12.5px; font-weight:400; color:var(--ink-3); letter-spacing:-.01em; line-height:1.5; margin-top:5px; word-break:keep-all;
-  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
-.nc-items{display:flex; flex-direction:column; gap:4px; margin-top:10px; min-width:0}
-.nc-empty{font-size:12px; color:var(--ink-3); margin-top:10px; letter-spacing:-.01em}
+/* 카테고리명(제목) — 가장 크고 진하게 (v16: 18px) */
+.nc-t{font-size:18px; font-weight:800; letter-spacing:-.035em; line-height:1.25; word-break:keep-all; margin-top:2px}
+.nc-items{display:flex; flex-direction:column; gap:5px; margin-top:11px; min-width:0}
+.nc-empty{font-size:13px; color:var(--ink-3); margin-top:11px; letter-spacing:-.01em}
 .cti{display:flex; align-items:flex-start; gap:6px; width:100%; min-width:0; text-align:left; font:inherit; cursor:pointer;
   padding:1px 0; border:0; background:none; color:var(--ink-2)}
-.cti .cb{flex:0 0 15px; display:flex; align-items:center; justify-content:center; color:var(--ink-3); margin-top:2px}
-.cti .cb svg{width:15px; height:15px}
-.cti .cx{font-size:14px; font-weight:300; line-height:1.45; letter-spacing:-.015em; color:var(--ink-2); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.cti .cb{flex:0 0 16px; display:flex; align-items:center; justify-content:center; color:var(--ink-3); margin-top:1px}
+.cti .cb svg{width:16px; height:16px}
+.cti .cx{font-size:15px; font-weight:300; line-height:1.42; letter-spacing:-.015em; color:var(--ink-2); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .cti.on .cx{text-decoration:line-through; text-decoration-thickness:1.2px; color:var(--ink-3); opacity:.72}
 .cti .lt{flex:0 0 auto; font-size:9.5px; font-weight:700; letter-spacing:-.01em; color:var(--ink-3); border:1px solid var(--line); padding:1px 3px; margin-top:2px}
-.cmore{font-size:11.5px; color:var(--ink-3); letter-spacing:-.01em; padding-left:21px}
+.cmore{font-size:12px; color:var(--ink-3); letter-spacing:-.01em; padding-left:22px}
 .ncard.new{align-items:center; justify-content:center; gap:7px; min-height:96px; border-style:dashed; color:var(--ink-3);
   font-size:12px; font-weight:600; letter-spacing:-.01em; box-shadow:none}
 .ncard.new .ap{display:flex; align-items:center; justify-content:center; color:var(--ink-3)}

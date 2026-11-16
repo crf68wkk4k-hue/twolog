@@ -218,7 +218,7 @@ with sync_playwright() as p:
     check("카테고리명 16px", px(t_css["fs"]) >= 16, t_css["fs"])
     check("카테고리명 진하게(700 이상)", int(t_css["fw"]) >= 700, t_css["fw"])
     tp_css = page.evaluate(CSS_OF, "#s-diary .ncard .nc-topic")
-    check("주제 13px", px(tp_css["fs"]) == 13, tp_css["fs"])
+    check("주제 14px", px(tp_css["fs"]) >= 14, tp_css["fs"])
     check("빈 주제는 흐리게", int(tp_css["fw"]) <= 600, tp_css["fw"])
     check("새 리스트 카드", page.locator("#s-diary .ncard.new").count() == 1)
     check("새 리스트 카드는 그림자 없음",
@@ -281,7 +281,6 @@ with sync_playwright() as p:
     check("새 카드 시트에 주제 칸", page.locator('#sheetForm input[name="topic"]').count() == 1)
     page.fill('#sheetForm input[name="title"]', "장보기")
     page.fill('#sheetForm input[name="topic"]', "이번 주말")
-    page.fill('#sheetForm input[name="caption"]', "집 앞 마트")
     page.click('#sheetForm button[type="submit"]')
     page.wait_for_timeout(650)
     check("새 카드 추가", page.locator("#s-diary .ncard").count() == 3, page.locator("#s-diary .ncard").count())
@@ -330,7 +329,7 @@ with sync_playwright() as p:
 
     # ---------- 6. 서비스 워커 버전 ----------
     ver = page.evaluate("fetch('sw.js').then(r => r.text()).then(t => (t.match(/twolog-v\\d+/) || [''])[0])")
-    check("sw 캐시 v15", ver == "twolog-v15", ver)
+    check("sw 캐시 v16", ver == "twolog-v16", ver)
     check("콘솔 오류 없음", len(errors) == 0, errors[:3])
     browser.close()
 
