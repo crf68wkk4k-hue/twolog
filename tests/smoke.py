@@ -75,7 +75,13 @@ with open(jpg_path, "wb") as f:
     f.write(base64.b64decode(JPEG_B64))
 
 with sync_playwright() as p:
-    browser = p.chromium.launch()
+    try:
+        browser = p.chromium.launch()
+    except Exception:
+        # 이 환경에서는 headless shell 의 시스템 라이브러리가 없어 전체 크로미움으로 대신 띄웁니다.
+        browser = p.chromium.launch(
+            executable_path="/workspace/.cache/ms-playwright/chromium-1255/chrome-linux64/chrome",
+            args=["--no-sandbox"])
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
     page = ctx.new_page()
     errors = []
@@ -100,14 +106,10 @@ with sync_playwright() as p:
 
     page.locator("#tabbar .tab").nth(2).click()
     page.wait_for_timeout(250)
-    page.locator('#s-diary .addrow[data-act="addTodo"]').click()
-    page.wait_for_timeout(250)
-    page.fill('#sheetForm input[name="text"]', "스모크 할일")
-    page.fill('#sheetForm textarea[name="memo"]', "스모크 상세")
-    page.click('#sheetForm button[type="submit"]')
+    page.fill('#s-diary .todo-add input[name="text"]', "스모크 할일")
+    page.click('#s-diary .todo-add button[type="submit"]')
     page.wait_for_timeout(300)
-    check("할 일 추가", page.locator("#s-diary .todo .t", has_text="스모크 할일").count() == 1)
-    check("할 일 상세", page.locator("#s-diary .todo .sub", has_text="스모크 상세").count() == 1)
+    check("할 일 추가", page.locator("#s-diary .trow .t", has_text="스모크 할일").count() == 1)
 
     page.locator("#tabbar .tab").nth(3).click()
     page.wait_for_timeout(250)
@@ -148,7 +150,7 @@ with sync_playwright() as p:
     check("새로 열어도 사진 유지", page.locator("#s-photo .ph").count() == 1)
     page.locator("#tabbar .tab").nth(2).click()
     page.wait_for_timeout(400)
-    check("새로 열어도 할 일 유지", page.locator("#s-diary .todo .t", has_text="스모크 할일").count() == 1)
+    check("새로 열어도 할 일 유지", page.locator("#s-diary .trow .t", has_text="스모크 할일").count() == 1)
 
     check("콘솔 오류 없음", len(errors) == 0, errors[:3])
     browser.close()

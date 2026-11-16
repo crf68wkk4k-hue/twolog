@@ -11,6 +11,13 @@
 @font-face{font-family:'Pretendard';font-style:normal;font-weight:600;font-display:swap;src:url('assets/fonts/pretendard-600.woff2') format('woff2')}
 @font-face{font-family:'Pretendard';font-style:normal;font-weight:700;font-display:swap;src:url('assets/fonts/pretendard-700.woff2') format('woff2')}
 
+/* 배달의민족 무료 폰트 5종 (우아한형제들 배포 · jsDelivr) */
+@font-face{font-family:'BM Jua';font-style:normal;font-weight:400;font-display:swap;src:url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/BMJUA.woff') format('woff')}
+@font-face{font-family:'BM Dohyeon';font-style:normal;font-weight:400;font-display:swap;src:url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/BMDOHYEON.woff') format('woff')}
+@font-face{font-family:'BM Hanna Pro';font-style:normal;font-weight:400;font-display:swap;src:url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_seven@1.2/BMHANNAPro.woff') format('woff')}
+@font-face{font-family:'BM Yeonsung';font-style:normal;font-weight:400;font-display:swap;src:url('https://cdn.jsdelivr.net/gh/fonts-archive/BMYEONSUNG/BMYEONSUNG.woff2') format('woff2'),url('https://cdn.jsdelivr.net/gh/fonts-archive/BMYEONSUNG/BMYEONSUNG.woff') format('woff')}
+@font-face{font-family:'BM Euljiro';font-style:normal;font-weight:400;font-display:swap;src:url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_twelve@1.1/BMEULJIRO.woff') format('woff')}
+
 
 :root{
   --bg:#FFFFFF; --surface:#FFFFFF; --surface-2:#F4F4F4;
@@ -166,7 +173,7 @@ h1,h2,h3,p{margin:0}
 .cal-daygrid .day{height:100%}
 .cal-bars{position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none}
 .ebar{
-  position:absolute; height:13px; line-height:13px; font-size:8.5px; font-weight:700;
+  position:absolute; height:14px; line-height:14px; font-size:9.5px; font-weight:700;
   color:#111111; padding:0 4px 0 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   letter-spacing:-.03em; text-align:left
 }
@@ -377,13 +384,13 @@ h1,h2,h3,p{margin:0}
 .bcard{background:var(--surface); border:1px solid var(--line); padding:13px 14px 14px; min-width:0; display:flex; flex-direction:column}
 .bcard-hd{display:flex; align-items:center; justify-content:space-between; gap:8px}
 .bcard-hd .bi{color:var(--accent); display:flex; align-items:center}
-.bcard-hd .lb{font-size:9px; font-weight:700; letter-spacing:.15em; color:var(--ink-3)}
+.bcard-hd .lb{font-size:10.5px; font-weight:700; letter-spacing:.1em; color:var(--ink-3)}
 .bm{font-size:23px; font-weight:700; letter-spacing:-.05em; line-height:1.1; margin-top:9px; font-variant-numeric:tabular-nums; white-space:nowrap}
 .bm em{font-style:normal; font-size:14px; font-weight:700; margin-left:1px; letter-spacing:-.03em}
-.bs{font-size:11px; color:var(--ink-2); margin-top:3px; letter-spacing:-.01em}
+.bs{font-size:12px; color:var(--ink-2); margin-top:3px; letter-spacing:-.01em}
 .bbar{height:4px; margin-top:9px; background:var(--surface-2); overflow:hidden}
 .bbar i{display:block; height:100%; background:var(--accent)}
-.bx{font-size:10.5px; color:var(--ink-3); margin-top:5px; letter-spacing:-.01em; line-height:1.5; word-break:keep-all}
+.bx{font-size:11.5px; color:var(--ink-3); margin-top:5px; letter-spacing:-.01em; line-height:1.5; word-break:keep-all}
 
 .mblocks{margin-top:16px; border-top:1px solid var(--line-2)}
 .mblock{padding:15px 0 16px; border-top:1px solid var(--line-2)}
@@ -762,14 +769,49 @@ body{overscroll-behavior-y:contain}
 /* --- 홈: 브랜드 줄 (이름 없이 로고 + 버튼) --- */
 .brand .pal.first{margin-left:auto}
 
-/* --- 홈: D-day 히어로 여백 --- */
-.dday{margin:16px 20px 0; padding:30px 20px 26px; text-align:center; display:flex; flex-direction:column; align-items:center}
-.dday-edit{position:absolute; top:12px; right:12px; color:var(--ink-3)}
-.dday-avs{display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:14px}
+/* --- 홈: D-day 히어로 여백 (테두리·바탕 없이, 위로 더 내려서) --- */
+.dday{
+  margin:34px 20px 0; padding:40px 20px 26px; text-align:center; display:flex; flex-direction:column;
+  align-items:center; border:0; background:transparent; box-shadow:none; overflow:visible;
+}
+.dday-edit{position:absolute; top:8px; right:20px; color:var(--ink-3)}
+.dday-avs{display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:16px}
 .dday-avs .av{width:46px; height:46px; flex:0 0 46px; font-size:17px; box-shadow:0 0 0 2px var(--bg), 0 0 0 3px var(--line)}
 .dday .eyebrow{display:block; line-height:1.4; font-size:16px}
 .dday-num{margin-top:14px}
 .dday .chip-row{margin-top:18px; justify-content:center}
+
+/* --- 홈: 섹션 한 덩어리 (테두리 없이, 바탕색은 블록 전체에) --- */
+.home-sec{border:0; background:var(--sec-bg, transparent); color:var(--sec-ink, inherit); margin:26px 20px 0; padding:0}
+.home-sec .sec{margin:0 0 10px}
+.home-sec .sec h2{font-size:16px; letter-spacing:-.025em}
+.home-sec .sec .more{font-size:12px}
+.home-sec .pad{padding:0}
+.home-sec .list{margin:0; border:0; background:transparent}
+.home-sec .row{border-bottom:0; background:transparent}
+.home-sec .row + .row{box-shadow:inset 0 1px 0 var(--line-2)}
+.home-sec .bento{gap:9px}
+.home-sec .bcard{border:0; background:var(--surface-2)}
+.home-sec .bcard:active{background:var(--surface-2); opacity:.86}
+.home-sec.tinted{margin:26px 12px 0; padding:12px 8px 12px}
+.home-sec.tinted .sec{margin:0 2px 10px}
+.home-sec.tinted .sec h2{color:var(--sec-ink)}
+.home-sec.tinted .sec .more{color:var(--sec-ink); opacity:.6}
+.home-sec.tinted .row{box-shadow:inset 0 1px 0 var(--sec-line)}
+.home-sec.tinted .row:first-child{box-shadow:none}
+.home-sec.tinted .row .t{color:var(--sec-ink)}
+.home-sec.tinted .row .m{color:var(--sec-ink); opacity:.62}
+.home-sec.tinted .row .wname{color:var(--sec-ink); opacity:.62}
+.home-sec.tinted .row.sched .av{box-shadow:0 0 0 2px var(--sec-bg)}
+.home-sec.tinted .bcard{background:var(--sec-surf); color:var(--sec-ink)}
+.home-sec.tinted .bcard .bi{color:var(--sec-ink); opacity:.78}
+.home-sec.tinted .bcard .lb{color:var(--sec-ink); opacity:.6}
+.home-sec.tinted .bcard .bm{color:var(--sec-ink)}
+.home-sec.tinted .bcard .bs{color:var(--sec-ink); opacity:.66}
+.home-sec.tinted .bcard .bx{color:var(--sec-ink); opacity:.66}
+.home-sec.tinted .bbar{background:var(--sec-line)}
+.home-sec.tinted .bbar i{background:var(--sec-ink); opacity:.55}
+.home-sec.tinted .empty{color:var(--sec-ink); opacity:.6}
 
 /* --- 홈: 카드형 요약 (버튼) --- */
 .bcard{text-align:left; font:inherit; color:inherit; cursor:pointer; transition:background .15s ease, border-color .15s ease}
@@ -777,13 +819,19 @@ body{overscroll-behavior-y:contain}
 .bcard .lb{letter-spacing:.06em}
 html[data-mode="dark"] .bcard:active{background:#1A1A1C}
 
-/* --- 홈: 다가오는 일정 (프사 + 이름 + 일정) --- */
-.row.sched{gap:8px; padding:13px 15px}
-.row.sched .who-row{margin-bottom:0; flex:0 0 auto; gap:4px}
+/* --- 홈: 다가오는 일정 (색 띠 + 프사·이름 + 제목 + 날짜) --- */
+.row.sched{gap:10px; padding:12px 0 12px 0; align-items:stretch}
+.row.sched .bar{flex:0 0 3px; width:3px; align-self:stretch; display:block; min-height:36px}
+.row.sched .sbody{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:5px}
+.row.sched .srow1{display:flex; align-items:center; gap:8px; min-width:0}
+.row.sched .who-row{margin-bottom:0; flex:0 0 auto; gap:3px}
 .row.sched .av{width:24px; height:24px; flex:0 0 24px; font-size:10.5px}
-.row.sched .wname{font-size:11.5px; font-weight:600; color:var(--ink-3); margin-left:2px; max-width:74px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.row.sched .t{flex:1 1 auto; min-width:0; font-size:13.5px; font-weight:600; letter-spacing:-.02em}
-.row.sched .m{flex:0 0 auto; margin-top:0; font-size:11px; font-weight:700; color:var(--ink-3); font-variant-numeric:tabular-nums}
+.row.sched .wname{font-size:12px; font-weight:600; color:var(--ink-3); margin-left:1px; max-width:74px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.row.sched .t{flex:1 1 auto; min-width:0; font-size:14.5px; font-weight:600; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.row.sched .smeta{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--ink-3); letter-spacing:-.01em; min-width:0}
+.row.sched .sd{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0}
+.row.sched .sl{flex:0 0 auto; font-weight:700; color:var(--ink-2); font-variant-numeric:tabular-nums}
+.who-row.both .heart{font-size:10.5px; line-height:1; margin:0 -1px}
 
 /* --- 캘린더: 공휴일 이름 + 넘친 일정 표시 --- */
 .day .dhol{display:block; font-size:8px; font-weight:600; line-height:1.1; color:#B4735F; letter-spacing:-.02em; padding-left:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px}
@@ -794,6 +842,16 @@ html[data-mode="dark"] .bcard:active{background:#1A1A1C}
 /* --- 캘린더: 아래 일정 추가 크게 --- */
 .ghost.add-big{height:52px; font-size:14.5px; font-weight:700; letter-spacing:-.02em; border-style:solid; border-color:var(--line); color:var(--ink); gap:8px}
 .ghost.add-big svg{width:20px; height:20px}
+
+/* --- 캘린더: 맨 아래 두 사람 생일 한 줄씩 --- */
+.bday-note{display:flex; flex-direction:column; gap:7px; width:100%; margin:22px 0 0; padding:14px 16px;
+  border:0; border-radius:0; background:var(--surface-2); text-align:left; font:inherit; color:inherit; cursor:pointer}
+.bday-note:active{opacity:.86}
+.bd{display:flex; align-items:baseline; justify-content:space-between; gap:12px; min-width:0}
+.bd-nm{font-size:12.5px; font-weight:600; color:var(--ink-2); letter-spacing:-.01em}
+.bd-dt{font-size:13.5px; font-weight:700; color:var(--ink); letter-spacing:-.01em; font-variant-numeric:tabular-nums; white-space:nowrap}
+.bd-dt.empty{font-weight:600; color:var(--ink-3)}
+html[data-mode="dark"] .bday-note{background:#1E1E21}
 
 /* --- 노트: 완료 숨기기 토글 --- */
 .donebar{display:flex; justify-content:flex-end; margin:0 20px 9px}
@@ -826,3 +884,65 @@ html[data-mode="dark"] .bcard:active{background:#1A1A1C}
 /* --- My: 페이지 캡션 색 (한 번에) --- */
 .cap-all{display:flex; align-items:center; gap:8px}
 .cap-all .sw{width:24px; height:24px; flex:0 0 24px}
+
+/* --- My: 커플 이름 크게 --- */
+.set-who-nm,.row .t.set-who-nm{font-size:16px; font-weight:700; letter-spacing:-.025em; line-height:1.25}
+
+/* --- My: 메뉴 줄 (테마 관리 · 알림 설정) --- */
+.menu-row{display:flex; align-items:center; gap:12px; width:100%; padding:15px 15px; border:0; background:none; text-align:left; font:inherit; color:inherit; cursor:pointer}
+.menu-row + .menu-row{border-top:1px solid var(--line-2)}
+.menu-row:active{background:var(--surface-2)}
+.menu-row .mi{font-size:17px; flex:0 0 auto; line-height:1}
+.menu-row .mb{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px}
+.menu-row .mt{font-size:14.5px; font-weight:700; letter-spacing:-.02em}
+.menu-row .ms{font-size:11.5px; color:var(--ink-3); letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.menu-row .mc{flex:0 0 auto; font-size:19px; line-height:1; color:var(--ink-3); margin-top:-2px}
+
+/* --- My: 상대 프로필 시트의 연결 버튼 --- */
+.pr-link{margin-top:16px; padding-top:14px; border-top:1px solid var(--line-2)}
+.pr-link-hd{font-size:11.5px; font-weight:700; color:var(--ink-3); letter-spacing:-.01em; margin-bottom:9px}
+
+/* --- D-day 시트: 주년·생일 목록 --- */
+.mile{border-top:1px solid var(--line-2)}
+.mile-row{display:flex; align-items:baseline; gap:10px; padding:12px 0; border-bottom:1px solid var(--line-2)}
+.mile-n{flex:0 0 84px; font-size:13px; font-weight:700; letter-spacing:-.02em}
+.mile-d{flex:1 1 auto; min-width:0; font-size:12.5px; color:var(--ink-2); letter-spacing:-.01em; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.mile-x{flex:0 0 auto; font-size:12px; font-weight:700; color:var(--ink-3); font-variant-numeric:tabular-nums}
+.mile-x.soon{color:var(--accent)}
+
+/* --- 노트: 탭 안의 리스트(그룹) --- */
+.grp{margin:0 20px}
+.grp + .grp{margin-top:22px; padding-top:20px; border-top:1px solid var(--line)}
+.grp-hd{display:flex; align-items:flex-start; gap:8px; margin-bottom:8px}
+.grp-l{flex:1 1 auto; min-width:0}
+.grp-t{font-size:15.5px; font-weight:700; letter-spacing:-.025em; line-height:1.3}
+.grp-c{font-size:12px; color:var(--ink-3); letter-spacing:-.01em; margin-top:3px; line-height:1.45; word-break:keep-all}
+.grp-e{flex:0 0 auto; width:26px; height:26px; display:flex; align-items:center; justify-content:center; color:var(--ink-3); border:0; background:none; cursor:pointer}
+.grp-e:active{color:var(--ink)}
+
+/* 노트: ○ + 입력 + Add 한 줄 */
+.todo-block{margin:0 20px}
+.todo-label{font-size:12px; font-weight:700; letter-spacing:-.01em; color:var(--ink-2); margin:4px 0 8px}
+.todo-add{display:flex; align-items:center; gap:11px; padding:4px 0 14px; border-bottom:1px solid var(--line)}
+.todo-add .circ{color:var(--ink-2); flex:0 0 auto; display:flex; align-items:center}
+.todo-in{flex:1 1 auto; min-width:0; border:0; background:transparent; font:inherit; font-size:14.5px; color:var(--ink); padding:9px 0; letter-spacing:-.015em; outline:none}
+.todo-in::placeholder{color:var(--ink-3)}
+.todo-add-btn{flex:0 0 auto; height:38px; padding:0 17px; border:0; border-radius:0; background:var(--ink); color:var(--bg); font-size:13px; font-weight:700; letter-spacing:-.01em; cursor:pointer}
+.todo-add-btn:active{opacity:.82}
+html[data-mode="dark"] .todo-add-btn{background:#F2F2F4; color:#141416}
+
+/* 노트: 항목 줄 (○ 미완료 → ✓ 완료는 아래로) */
+.todo-items{display:flex; flex-direction:column}
+.trow{display:flex; align-items:center; gap:11px; padding:14px 0; border-bottom:1px solid var(--line-2)}
+.trow:last-child{border-bottom:0}
+.trow .circ{flex:0 0 auto; width:26px; height:26px; display:flex; align-items:center; justify-content:center; border:0; background:none; padding:0; color:var(--ink); cursor:pointer}
+.trow .body{flex:1 1 auto; min-width:0; cursor:pointer}
+.trow .t{font-size:14.5px; font-weight:500; letter-spacing:-.015em}
+.trow .x{flex:0 0 auto; width:24px; height:24px; display:flex; align-items:center; justify-content:center; color:var(--ink-3); opacity:.5; border:0; background:none; cursor:pointer}
+.trow .x:active{opacity:1}
+.trow.done .circ{color:var(--ink-3)}
+.trow.done .t{color:var(--ink-3); text-decoration:line-through; text-decoration-thickness:1.5px}
+.trow.done .sub,.trow.done .meta{opacity:.55}
+.grp-del{margin-top:10px; font-size:11.5px; font-weight:600; color:var(--ink-3); background:none; border:0; padding:6px 0; cursor:pointer; letter-spacing:-.01em}
+.grp-del:active{color:var(--accent)}
+.grp-add{margin-left:20px; margin-right:20px; width:calc(100% - 40px)}
