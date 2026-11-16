@@ -219,6 +219,7 @@
     S.groups[k].forEach(function (g) {
       if (!g.id) g.id = uid();
       if (typeof g.title !== "string") g.title = "";
+      if (typeof g.topic !== "string") g.topic = "";   /* v15: 카드 맨 윗줄에 보이는 주제 */
       if (typeof g.caption !== "string") g.caption = "";
       if (g.who !== "you") g.who = "me";
       if (!/^\d{4}-\d{2}-\d{2}$/.test(String(g.date || "")) || isNaN(parse(g.date).getTime())) g.date = today;
@@ -940,15 +941,7 @@
     }
     html += "</div></div>";
 
-    /* 달력 바로 아래: 두 사람 생일 한 줄씩 (누르면 달력에서 고치는 시트가 열려요) */
-    var bds = (S.couple && S.couple.birthdays) || {};
-    var bdMe = bdayText(bds.me), bdYou = bdayText(bds.you);
-    html += '<div class="pad"><button type="button" class="bday-note" data-act="editBirthdays" aria-label="생일 수정">' +
-      '<span class="bd"><span class="bd-nm">' + esc(S.couple.me) + '생일</span>' +
-      '<span class="bd-dt' + (bdMe ? "" : " empty") + '">' + esc(bdMe || "날짜 입력") + "</span></span>" +
-      '<span class="bd"><span class="bd-nm">' + esc(S.couple.you) + '생일</span>' +
-      '<span class="bd-dt' + (bdYou ? "" : " empty") + '">' + esc(bdYou || "날짜 입력") + "</span></span>" +
-      "</button></div>";
+    /* v15: 달력 아래 생일 줄은 지웠어요 — 생일은 홈 D-day 시트에서 고쳐요 */
 
     /* 선택한 날: 기간이 걸치는 일정 모두 */
     var selEvents = S.events.filter(function (e) { return evCovers(e, sel); })
@@ -1107,12 +1100,14 @@
   function noteCard(k, g) {
     var items = itemsOf(k).filter(function (x) { return x.gid === g.id; }).sort(byDone);
     var who = g.who === "you" ? "you" : "me";
-    var nm = who === "me" ? S.couple.me : S.couple.you;
+    /* v15: 이름(준영·소영) 대신 카드마다 적는 「주제」를 맨 윗줄에 — 누구 카드인지는 프사로만 보여요 */
+    var gTitle = g.title || GROUP_DEF[k];
+    var gTopic = String(g.topic || "").trim();
     var h = '<div class="ncard" role="button" tabindex="0" data-act="openGroup" data-tab="' + k + '" data-gid="' + g.id +
-      '" aria-label="' + esc(g.title || GROUP_DEF[k]) + ' 열기">';
+      '" aria-label="' + esc(gTitle) + ' 열기">';
     h += '<div class="nc-top"><span class="nc-av av ' + who + (avPic(who) ? " pic" : "") + '" aria-hidden="true">' + avInner(who) + "</span>" +
-      '<span class="nc-who">' + esc(nm) + "</span></div>";
-    h += '<div class="nc-t">' + esc(g.title || GROUP_DEF[k]) + "</div>";
+      '<span class="nc-topic' + (gTopic ? "" : " empty") + '">' + esc(gTopic || "주제") + "</span></div>";
+    h += '<div class="nc-t">' + esc(gTitle) + "</div>";
     if (g.caption) h += '<div class="nc-c">' + esc(g.caption) + "</div>";
     if (items.length) {
       h += '<div class="nc-items">' + items.slice(0, 4).map(function (x) { return cardItem(k, x); }).join("") +
@@ -1120,7 +1115,6 @@
     } else {
       h += '<div class="nc-empty">아직 비어 있어요</div>';
     }
-    h += '<div class="nc-d">' + esc(String(g.date || today).replace(/-/g, ". ")) + "</div>";
     h += "</div>";
     return h;
   }
@@ -1142,12 +1136,13 @@
     h += "</div>";
     h += '<form class="form" id="sheetForm" style="margin-top:24px">' +
       '<div class="f"><label>제목</label><input class="field" name="title" value="' + esc(g.title || GROUP_DEF[k]) + '" required autocomplete="off"></div>' +
+      '<div class="f"><label>주제</label><input class="field" name="topic" value="' + esc(g.topic || "") + '" placeholder="예) 이번 주, 함께" autocomplete="off"></div>' +
       '<div class="f"><label>한 줄 메모 (선택)</label><input class="field" name="caption" value="' + esc(g.caption || "") + '" placeholder="짧게 적어 두기" autocomplete="off"></div>' +
       '<div class="f"><label>누구</label><div class="seg seg-sm" data-group="gwho">' +
       '<button type="button" class="seg-btn' + (who === "me" ? " active" : "") + '" data-act="gwho" data-who="me">' + esc(S.couple.me) + '</button>' +
       '<button type="button" class="seg-btn' + (who === "you" ? " active" : "") + '" data-act="gwho" data-who="you">' + esc(S.couple.you) + "</button></div>" +
       '<input type="hidden" name="who" value="' + who + '"></div>' +
-      '<p class="sheet-sub" style="margin-top:-4px">카드에 보이는 날짜는 만든 날이에요.</p>' +
+      '<p class="sheet-sub" style="margin-top:-4px">「주제」는 카드 맨 윗줄에, 「제목」은 카드에서 가장 크고 진하게 보여요.</p>' +
       '<button class="btn-primary" type="submit">저장하기</button>' +
       '<button type="button" class="btn-del" data-act="delCard" data-tab="' + k + '" data-gid="' + g.id + '">카드 삭제</button></form>';
     return h;
@@ -1162,6 +1157,7 @@
       var t = String(fd.get("title") || "").trim();
       if (!t) { toast("제목을 적어 주세요"); return; }
       cur.title = t;
+      cur.topic = String(fd.get("topic") || "").trim();
       cur.caption = String(fd.get("caption") || "").trim();
       cur.who = fd.get("who") === "you" ? "you" : "me";
       openCard = null;
@@ -1539,7 +1535,7 @@
         "</div>";
     });
     h += "</div>";
-    h += '<p class="cp-note" style="margin-top:10px">생일은 달력에서 고르면 캘린더 아래에 「6월 26일」처럼 보여요. 연도는 표시에만 쓰이고 D-day는 월·일로 계산해요.</p>';
+    h += '<p class="cp-note" style="margin-top:10px">고른 생일은 바로 위에 「6월 26일」처럼 남아요. 연도는 표시에만 쓰이고 D-day는 월·일로 계산해요.</p>';
     h += '<button class="btn-primary" type="submit">저장하기</button></form>';
     return h;
   }
@@ -1615,18 +1611,6 @@
       '<button class="btn-primary" data-close="1">완료</button>';
   }
 
-  function formBirthdays() {
-    return sheetHead("생일") +
-      '<p class="sheet-sub">두 사람의 생일을 달력에서 고르면 캘린더 아래에 늘 보여요.</p>' +
-      '<form class="form" id="sheetForm">' +
-      '<div class="f"><label>' + esc(S.couple.me) + ' 생일</label>' +
-      '<input class="field" type="date" name="me" value="' + bdayInput("me") + '"></div>' +
-      '<div class="f"><label>' + esc(S.couple.you) + ' 생일</label>' +
-      '<input class="field" type="date" name="you" value="' + bdayInput("you") + '"></div>' +
-      '<button class="btn-primary" type="submit">저장</button></form>' +
-      '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
-  }
-
   function formGroup(k, g) {
     var isNew = !g;
     return sheetHead(isNew ? "새 리스트" : "리스트 수정") +
@@ -1634,6 +1618,8 @@
       '<form class="form" id="sheetForm">' +
       '<div class="f"><label>리스트 이름</label><input class="field" name="title" value="' + esc(g ? g.title : "") +
       '" placeholder="예) 장보기" autocomplete="off"></div>' +
+      '<div class="f"><label>주제</label><input class="field" name="topic" value="' + esc(g ? g.topic || "" : "") +
+      '" placeholder="예) 이번 주, 함께" autocomplete="off"></div>' +
       '<div class="f"><label>추가 캡션 (선택)</label><input class="field" name="caption" value="' + esc(g ? g.caption : "") +
       '" placeholder="예) 이번 주말에 사 올 것" autocomplete="off"></div>' +
       '<button class="btn-primary" type="submit">저장</button></form>' +
@@ -2471,7 +2457,7 @@
         if (!gTitle) { toast("리스트 이름을 적어 주세요"); return; }
         S.groups = S.groups || {};
         S.groups[agK] = S.groups[agK] || [];
-        S.groups[agK].push({ id: uid(), title: gTitle, caption: String(fd.get("caption") || "").trim(), who: "me", date: today });
+        S.groups[agK].push({ id: uid(), title: gTitle, topic: String(fd.get("topic") || "").trim(), caption: String(fd.get("caption") || "").trim(), who: "me", date: today });
         save(); closeSheet(); renderAll(); toast("리스트를 만들었어요");
       });
       return;
@@ -2488,6 +2474,7 @@
         var gTitle2 = String(fd.get("title") || "").trim();
         if (!gTitle2) { toast("리스트 이름을 적어 주세요"); return; }
         g2.title = gTitle2;
+        g2.topic = String(fd.get("topic") || "").trim();
         g2.caption = String(fd.get("caption") || "").trim();
         save(); closeSheet(); renderAll(); toast("저장했어요");
       });
@@ -2669,16 +2656,6 @@
     if (act === "openThemeManager") { openSheet(themeManagerHtml(), null); return; }
 
     if (act === "openNotifSheet") { openSheet(notifSheetHtml(), null); return; }
-
-    if (act === "editBirthdays") {
-      openSheet(formBirthdays(), function (fd) {
-        S.couple.birthdays = S.couple.birthdays || {};
-        S.couple.birthdays.me = String(fd.get("me") || "").trim();
-        S.couple.birthdays.you = String(fd.get("you") || "").trim();
-        save(); closeSheet(); renderAll(); toast("생일을 저장했어요");
-      });
-      return;
-    }
 
     if (act === "toggleMode") { setMode(S.theme && S.theme.mode === "dark" ? "light" : "dark"); return; }
 

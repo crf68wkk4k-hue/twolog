@@ -105,29 +105,15 @@ with sync_playwright() as p:
         page.click('#sheetForm button[type="submit"]')
         page.wait_for_timeout(450)
 
-    # ---------- 1. 캘린더: 생일 줄이 달력 바로 아래 ----------
+    # ---------- 1. 캘린더: v15 에서 생일 줄은 지웠어요 ----------
     cal_box = page.evaluate(CSS_OF, "#s-cal .cal")
-    bd = page.evaluate(CSS_OF, "#s-cal .bday-note")
     panel = page.evaluate(CSS_OF, "#s-cal .daypanel")
-    check("생일 줄 있음", bd is not None and "생일" in (bd["txt"] or ""), bd and bd["txt"].replace("\n", " / "))
-    check("생일 줄이 달력 아래", bd and cal_box and bd["y"] > cal_box["y"] + cal_box["h"] - 2,
-          (cal_box and round(cal_box["y"] + cal_box["h"]), bd and round(bd["y"])))
-    check("생일 줄이 날짜 목록 위", bd and panel and bd["y"] < panel["y"],
-          (bd and round(bd["y"]), panel and round(panel["y"])))
-    check("생일 「6월 26일」 표기", bd and "6월 26일" in bd["txt"], bd and bd["txt"])
-    page.locator(".bday-note").scroll_into_view_if_needed()
+    check("생일 줄 없음", page.locator("#s-cal .bday-note").count() == 0,
+          page.locator("#s-cal .bday-note").count())
+    check("달력 아래가 날짜 목록", cal_box and panel and panel["y"] > cal_box["y"] + cal_box["h"] - 2,
+          (cal_box and round(cal_box["y"] + cal_box["h"]), panel and round(panel["y"])))
+    page.locator("#s-cal .cal").scroll_into_view_if_needed()
     shot(page, "cal-v14.png")
-
-    # 생일 시트: 달력(input[type=date])로 고치기
-    page.locator(".bday-note").click()
-    page.wait_for_timeout(400)
-    kinds = page.evaluate("""() => Array.from(document.querySelectorAll('#sheet input[name], #sheet input'))
-      .filter(i => i.name === 'me' || i.name === 'you').map(i => i.type + ':' + i.value)""")
-    check("생일 시트 달력 입력", len(kinds) == 2 and all(k.startswith("date:") for k in kinds), kinds)
-    page.fill('#sheetForm input[name="you"]', "2000-03-14")
-    page.click('#sheetForm button[type="submit"]')
-    page.wait_for_timeout(600)
-    check("생일 저장", "3월 14일" in page.locator(".bday-note").inner_text(), page.locator(".bday-note").inner_text())
 
     # ---------- 2. 홈 D-day 히어로 ----------
     page.locator("#tabbar .tab").nth(0).click()
@@ -240,13 +226,14 @@ with sync_playwright() as p:
     grid = page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ngrid')).gridTemplateColumns")
     check("두 열", len(grid.split(" ")) == 2, grid)
     first = page.locator("#s-diary .ncard").first
-    check("카드 프사+이름", page.locator("#s-diary .ncard .nc-av").count() >= 1 and
-          page.locator("#s-diary .ncard .nc-who").first.inner_text().strip() == "소영",
-          page.locator("#s-diary .ncard .nc-who").first.inner_text())
+    check("카드 프사+주제", page.locator("#s-diary .ncard .nc-av").count() >= 1 and
+          page.locator("#s-diary .ncard .nc-topic").first.inner_text().strip() in ("주제", "이번 주"),
+          page.locator("#s-diary .ncard .nc-topic").first.inner_text())
     check("카드 제목", page.locator("#s-diary .ncard .nc-t").first.inner_text().strip() == "메모",
           page.locator("#s-diary .ncard .nc-t").first.inner_text())
-    check("카드 날짜", page.locator("#s-diary .ncard .nc-d").first.inner_text().strip().count(".") == 2,
-          page.locator("#s-diary .ncard .nc-d").first.inner_text())
+    check("카드에 날짜 없음", page.locator("#s-diary .ncard .nc-d").count() == 0)
+    check("카드 입체 그림자", page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard')).boxShadow")
+          not in ("none", ""))
     check("카드 각진 모서리", page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard')).borderTopLeftRadius")
           in ("0px", "0"), page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard')).borderTopLeftRadius"))
     check("새 리스트 카드", page.locator("#s-diary .ncard.new").count() == 1)
@@ -287,8 +274,8 @@ with sync_playwright() as p:
     check("카드 저장 후 닫힘", page.locator("#sheetWrap.open").count() == 0)
     check("카드 캡션 반영", "이번 주말에 사 올 것" in page.locator("#s-diary .ncard").first.inner_text(),
           page.locator("#s-diary .ncard").first.inner_text()[:80])
-    check("카드 작성자 변경", page.locator("#s-diary .ncard .nc-who").first.inner_text().strip() == "준영",
-          page.locator("#s-diary .ncard .nc-who").first.inner_text())
+    check("카드 작성자 변경", page.evaluate(
+        "() => document.querySelector('#s-diary .ncard .nc-top .av').classList.contains('you')"))
     check("카드에 항목 미리보기", page.locator("#s-diary .ncard .nc-items .cti").count() >= 3,
           page.locator("#s-diary .ncard .nc-items .cti").count())
     check("완료 항목 취소선", page.evaluate(
@@ -347,7 +334,7 @@ with sync_playwright() as p:
 
     # ---------- 8. 서비스 워커 버전 ----------
     ver = page.evaluate("fetch('sw.js').then(r => r.text()).then(t => (t.match(/twolog-v\\d+/) || [''])[0])")
-    check("sw 캐시 v14", ver == "twolog-v14", ver)
+    check("sw 캐시 v15", ver == "twolog-v15", ver)
     check("콘솔 오류 없음", len(errors) == 0, errors[:3])
     browser.close()
 

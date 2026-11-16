@@ -102,21 +102,14 @@ with sync_playwright() as p:
         page.click('#sheetForm button[type="submit"]')
         page.wait_for_timeout(400)
 
-    # ---------- 캘린더: 글씨 크기 + 생일 줄 ----------
+    # ---------- 캘린더: 글씨 크기 (v15 에서 생일 줄은 지웠어요) ----------
     eb = page.evaluate(CSS_OF, ".ebar")
     check("캘린더 일정 글씨 9.5px", eb and eb["fs"] == "9.5px", eb)
     check("캘린더 일정 막대 높이", eb and float(eb["h"].replace("px", "")) >= 14, eb)
-    bd_txt = page.locator(".bday-note").inner_text()
-    check("생일 줄 표시", ("생일" in bd_txt) and ("6월 26일" in bd_txt), bd_txt.replace("\n", " / "))
-    page.locator(".bday-note").scroll_into_view_if_needed()
+    check("생일 줄 없음", page.locator("#s-cal .bday-note").count() == 0,
+          page.locator("#s-cal .bday-note").count())
+    page.locator("#s-cal .cal").scroll_into_view_if_needed()
     shot(page, "cal-v13.png")
-    page.locator(".bday-note").click()
-    page.wait_for_timeout(350)
-    check("생일 시트", page.locator('#sheetForm input[name="me"]').count() == 1)
-    page.fill('#sheetForm input[name="you"]', "2000-03-14")
-    page.click('#sheetForm button[type="submit"]')
-    page.wait_for_timeout(500)
-    check("생일 저장", "3월 14일" in page.locator(".bday-note").inner_text(), page.locator(".bday-note").inner_text())
 
     # ---------- D-day 시트: 주년·생일 ----------
     page.locator("#tabbar .tab").nth(0).click()
