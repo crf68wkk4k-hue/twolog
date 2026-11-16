@@ -1314,7 +1314,7 @@
           return '<button class="pola" style="--tilt:' + POLA_TILT[i % POLA_TILT.length] + '" data-act="openPhoto" data-id="' + p.id +
             '" aria-label="' + esc(p.title || p.album || "사진") + ' 열기">' +
             '<span class="pola-pic">' + photoImg(p) + "</span>" +
-            '<span class="pola-chin"' + (p.capBg ? ' style="background:' + esc(p.capBg) + '"' : "") + ">" +
+            '<span class="pola-chin' + (p.capBg ? " tinted" : "") + '"' + (p.capBg ? ' style="background:' + esc(p.capBg) + '"' : "") + ">" +
             esc(p.title || "") + "</span></button>";
         }).join("") + "</div></div>";
     });

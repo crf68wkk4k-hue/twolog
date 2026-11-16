@@ -125,11 +125,14 @@ with sync_playwright() as p:
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
     page = ctx.new_page()
     errors = []
+    navs = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+    page.on("framenavigated", lambda f: navs.append(f.url) if f == page.main_frame else None)
 
     page.goto("http://127.0.0.1:%d/" % PORT, wait_until="networkidle")
-    page.wait_for_timeout(800)
+    page.wait_for_timeout(3000)
+    check("처음 설치 때는 새로고침 없음", len(navs) == 1, len(navs))
 
     # ==================================================================
     # 1. 노트 카드 — 「이번 주 / 주제」 윗줄이 사라지고 제목부터
@@ -521,9 +524,9 @@ with sync_playwright() as p:
     ctrl = page.evaluate("() => !!navigator.serviceWorker.controller")
     check("현재 페이지가 서비스워커 제어 중", ctrl is True, ctrl)
 
-    # 새 버전 배포 흉내: sw.js 본문이 바뀌면 controllerchange → 새로고침 한 번
+    # 새 버전 배포 흉내: VERSION 이 바뀐 sw.js 가 오면 옛 캐시를 지우고 새로고침 한 번
     marker_before = page.evaluate("() => { window.__v17mark = 1; return window.__v17mark; }")
-    SW_OVERRIDE["body"] = sw_src + "\n/* v17 test: 새 버전 */\n"
+    SW_OVERRIDE["body"] = sw_src.replace('const VERSION = "twolog-v17";', 'const VERSION = "twolog-v999";')
     page.evaluate("() => navigator.serviceWorker.getRegistration().then(r => r.update())")
     reloaded = True
     try:
@@ -540,6 +543,8 @@ with sync_playwright() as p:
     page.wait_for_timeout(2500)
     check("새로고침은 한 번만(두 번째 없음)",
           page.evaluate("() => window.__v17mark2") == 1, marker_before)
+    new_cache = page.evaluate("""() => caches.keys().then(ks => ks.filter(k => k.indexOf('shell-') === 0))""")
+    check("새 버전 캐시만 남음", new_cache == ["shell-twolog-v999"], new_cache)
     shot(page, "home-v17.png", settle=600)
 
     check("콘솔 오류 없음", len(errors) == 0, errors[:3])

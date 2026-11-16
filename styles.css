@@ -648,6 +648,8 @@ html[data-mode="dark"] .pola .pola-pic svg,html[data-mode="dark"] .pdetail svg{f
 /* 다크 모드 폴라로이드: 검은 배경 위에 떠 있는 짙은 회색 프레임 */
 html[data-mode="dark"] .pola{background:#232326; box-shadow:0 4px 12px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.07)}
 html[data-mode="dark"] .pola .pola-chin{color:#C9C9CE}
+/* 캡션 바탕색을 고른 사진은 폴라로이드 턱도 그 색 — 글씨는 늘 진하게 */
+.pola .pola-chin.tinted,html[data-mode="dark"] .pola .pola-chin.tinted{color:#111111}
 html[data-mode="dark"] .btag.doing{color:#EDA491}
 html[data-mode="dark"] .btag.done{color:#A9BCAF}
 
