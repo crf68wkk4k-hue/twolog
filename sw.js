@@ -37,19 +37,12 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
+  // v17: skipWaiting 으로 바로 활성화되고, 옛 버전 캐시는 여기서 지웁니다.
+  //      (앱 화면은 app.js 의 controllerchange 리스너가 한 번만 새로고침해요)
   event.waitUntil(
-    caches.keys().then((keys) => {
-      // v17: 옛 버전 캐시가 아직 있으면 "새 버전으로 바뀐 것" — 열린 화면을 한 번 새로 열어 줘요
-      const updating = keys.some((k) => k !== SHELL);
-      return Promise.all(keys.filter((k) => k !== SHELL).map((k) => caches.delete(k)))
-        .then(() => self.clients.claim())
-        .then(() => {
-          if (!updating) return null;
-          return self.clients.matchAll({ type: "window" }).then((list) =>
-            list.forEach((c) => { try { c.navigate(c.url); } catch (e) {} })
-          );
-        });
-    })
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== SHELL).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
 });
 

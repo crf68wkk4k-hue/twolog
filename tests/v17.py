@@ -545,6 +545,7 @@ with sync_playwright() as p:
           page.evaluate("() => window.__v17mark2") == 1, marker_before)
     new_cache = page.evaluate("""() => caches.keys().then(ks => ks.filter(k => k.indexOf('shell-') === 0))""")
     check("새 버전 캐시만 남음", new_cache == ["shell-twolog-v999"], new_cache)
+
     shot(page, "home-v17.png", settle=600)
 
     check("콘솔 오류 없음", len(errors) == 0, errors[:3])
