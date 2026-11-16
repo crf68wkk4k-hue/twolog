@@ -1,4 +1,4 @@
-"""투로그 v15 확인 — 홈 제목 줄 둥근 알약·캘린더 생일 줄 삭제·노트 카드 3D(주제·큰 글씨).
+"""투로그 v15 확인 — 홈 제목 줄 둥근 알약·캘린더 생일 줄 삭제·노트 카드 3D(큰 글씨).
 
     python3 tests/v15.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
 """
@@ -193,20 +193,19 @@ with sync_playwright() as p:
     page.keyboard.press("Escape")
     page.wait_for_timeout(300)
 
-    # ---------- 4. 노트 카드: 주제·큰 글씨·입체 ----------
+    # ---------- 4. 노트 카드: 제목·큰 글씨·입체 ----------
     page.locator("#tabbar .tab").nth(2).click()
     page.wait_for_timeout(500)
     cards = page.locator("#s-diary .ngrid .ncard")
     check("카드 그리드 있음", cards.count() >= 1, cards.count())
     grid = page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ngrid')).gridTemplateColumns")
     check("두 열", len(grid.split(" ")) == 2, grid)
-    check("카드 주제 줄 있음", page.locator("#s-diary .ncard .nc-topic").count() >= 1,
+    # v17: 「주제」 줄이 없어져 카드는 제목부터 시작해요
+    check("카드에 주제 줄 없음", page.locator("#s-diary .ncard .nc-topic").count() == 0 and
+          page.locator("#s-diary .ncard .nc-top").count() == 0,
           page.locator("#s-diary .ncard .nc-topic").count())
-    topic0 = page.locator("#s-diary .ncard .nc-topic").first.inner_text().strip()
-    check("주제 줄에 이름 대신 주제", topic0 not in ("소영", "준영"), topic0)
-    check("주제 없으면 「주제」 안내", topic0 == "주제", topic0)
-    top_txt = page.locator("#s-diary .ncard .nc-top").first.inner_text()
-    check("맨 윗줄에 이름 없음", ("소영" not in top_txt) and ("준영" not in top_txt), top_txt.replace("\n", " / "))
+    first_cls = page.evaluate("() => { const c = document.querySelector('#s-diary .ncard'); const k = c.firstElementChild; return k ? k.className : ''; }")
+    check("카드 맨 윗줄은 제목", first_cls.startswith("nc-t"), first_cls)
     card_txt = page.locator("#s-diary .ncard").first.inner_text()
     check("카드에 날짜 없음", page.locator("#s-diary .ncard .nc-d").count() == 0 and
           not re.search(r"\d{4}\.\s*\d{1,2}\.\s*\d{1,2}", card_txt), card_txt.replace("\n", " / "))
@@ -217,21 +216,24 @@ with sync_playwright() as p:
     t_css = page.evaluate(CSS_OF, "#s-diary .ncard .nc-t")
     check("카테고리명 16px", px(t_css["fs"]) >= 16, t_css["fs"])
     check("카테고리명 진하게(700 이상)", int(t_css["fw"]) >= 700, t_css["fw"])
-    tp_css = page.evaluate(CSS_OF, "#s-diary .ncard .nc-topic")
-    check("주제 14px", px(tp_css["fs"]) >= 14, tp_css["fs"])
-    check("빈 주제는 흐리게", int(tp_css["fw"]) <= 600, tp_css["fw"])
+    body_fs = page.evaluate("() => getComputedStyle(document.body).fontSize")
+    topic_fs = page.evaluate(
+        "() => { const el = document.createElement('span'); el.className = 'nc-topic';"
+        " document.querySelector('#s-diary').appendChild(el);"
+        " const fs = getComputedStyle(el).fontSize; el.remove(); return fs; }")
+    check("주제 줄 스타일 없음", topic_fs == body_fs, (topic_fs, body_fs))
     check("새 리스트 카드", page.locator("#s-diary .ncard.new").count() == 1)
     check("새 리스트 카드는 그림자 없음",
           page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard.new')).boxShadow")
           in ("none", ""), page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard.new')).boxShadow"))
 
-    # 카드 상세: 주제 입력칸에서 바로 고치기
+    # 카드 상세: 제목만 고치기
     page.locator("#s-diary .ncard .nc-t").first.click()
     page.wait_for_timeout(450)
     check("카드 상세 시트", page.locator("#sheet .card-items").count() == 1)
-    check("시트에 주제 입력칸", page.locator('#sheetForm input[name="topic"]').count() == 1)
+    check("시트에 주제 입력칸 없음", page.locator('#sheetForm input[name="topic"]').count() == 0)
     labels = page.evaluate("() => Array.from(document.querySelectorAll('#sheetForm label')).map(l => l.innerText.trim())")
-    check("주제 라벨", "주제" in labels, labels)
+    check("시트 라벨은 제목만", labels == ["제목"], labels)
     check("날짜 안내 문구 없음", "만든 날" not in page.locator("#sheet").inner_text())
     for word in ("우유 사기", "계란", "카카오페이 충전"):
         page.fill('#sheet #listAddForm input[name="text"]', word)
@@ -243,17 +245,11 @@ with sync_playwright() as p:
     page.wait_for_timeout(420)
     check("시트 안에서 완료", page.locator("#sheet .card-items .trow.done").count() == 1)
     shot(page, "note-detail-v15.png", settle=700)
-    page.fill('#sheetForm input[name="topic"]', "이번 주")
-    page.click('#sheetForm button[type="submit"]')
+    page.click('#sheet .card-acts .btn-primary')
     page.wait_for_timeout(700)
     check("카드 저장 후 닫힘", page.locator("#sheetWrap.open").count() == 0)
-    check("주제가 카드 맨 윗줄에", page.locator("#s-diary .ncard .nc-topic").first.inner_text().strip() == "이번 주",
-          page.locator("#s-diary .ncard .nc-topic").first.inner_text())
-    check("주제 굵기 600", page.evaluate(
-        "() => getComputedStyle(document.querySelector('#s-diary .ncard .nc-topic')).fontWeight") == "600",
-        page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard .nc-topic')).fontWeight"))
-    check("주제 자리에 이름 안 나옴", page.locator("#s-diary .ncard .nc-top").first.inner_text().strip()
-          not in ("소영", "준영"), page.locator("#s-diary .ncard .nc-top").first.inner_text())
+    check("저장해도 카드엔 제목만", page.locator("#s-diary .ncard .nc-topic").count() == 0,
+          page.locator("#s-diary .ncard .nc-topic").count())
     check("카테고리명은 그대로", page.locator("#s-diary .ncard .nc-t").first.inner_text().strip() == "메모",
           page.locator("#s-diary .ncard .nc-t").first.inner_text())
     check("카드에 항목 미리보기", page.locator("#s-diary .ncard .nc-items .cti").count() >= 3,
@@ -275,25 +271,25 @@ with sync_playwright() as p:
     check("카드에서 바로 체크", page.locator("#s-diary .ncard .cti.on").count() != done_before,
           (done_before, page.locator("#s-diary .ncard .cti.on").count()))
 
-    # 새 카드에 주제까지 적어 만들기
+    # 새 카드 만들기 (v17: 제목만)
     page.locator("#s-diary .ncard.new").click()
     page.wait_for_timeout(400)
-    check("새 카드 시트에 주제 칸", page.locator('#sheetForm input[name="topic"]').count() == 1)
+    check("새 카드 시트에 주제 칸 없음", page.locator('#sheetForm input[name="topic"]').count() == 0)
     page.fill('#sheetForm input[name="title"]', "장보기")
-    page.fill('#sheetForm input[name="topic"]', "이번 주말")
     page.click('#sheetForm button[type="submit"]')
     page.wait_for_timeout(650)
     check("새 카드 추가", page.locator("#s-diary .ncard").count() == 3, page.locator("#s-diary .ncard").count())
-    new_topics = page.evaluate("() => Array.from(document.querySelectorAll('#s-diary .ncard .nc-topic')).map(e => e.innerText.trim())")
-    check("새 카드 주제 저장", "이번 주말" in new_topics, new_topics)
+    new_titles = page.evaluate("() => Array.from(document.querySelectorAll('#s-diary .ncard .nc-t')).map(e => e.innerText.trim())")
+    check("새 카드 제목 저장", "장보기" in new_titles, new_titles)
 
-    # 새로 열어도 주제·그림자 그대로
+    # 새로 열어도 제목·그림자 그대로
     page.reload(wait_until="networkidle")
     page.wait_for_timeout(900)
     page.locator("#tabbar .tab").nth(2).click()
     page.wait_for_timeout(600)
-    topics2 = page.evaluate("() => Array.from(document.querySelectorAll('#s-diary .ncard .nc-topic')).map(e => e.innerText.trim())")
-    check("새로 열어도 주제 유지", "이번 주" in topics2 and "이번 주말" in topics2, topics2)
+    titles2 = page.evaluate("() => Array.from(document.querySelectorAll('#s-diary .ncard .nc-t')).map(e => e.innerText.trim())")
+    check("새로 열어도 제목 유지", "메모" in titles2 and "장보기" in titles2, titles2)
+    check("새로 열어도 주제 줄 없음", page.locator("#s-diary .ncard .nc-topic").count() == 0)
     check("새로 열어도 그림자", page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard')).boxShadow")
           not in ("none", ""))
 
@@ -329,7 +325,7 @@ with sync_playwright() as p:
 
     # ---------- 6. 서비스 워커 버전 ----------
     ver = page.evaluate("fetch('sw.js').then(r => r.text()).then(t => (t.match(/twolog-v\\d+/) || [''])[0])")
-    check("sw 캐시 v16", ver == "twolog-v16", ver)
+    check("sw 캐시 v17", ver == "twolog-v17", ver)
     check("콘솔 오류 없음", len(errors) == 0, errors[:3])
     browser.close()
 

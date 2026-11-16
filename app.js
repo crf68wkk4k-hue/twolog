@@ -219,7 +219,7 @@
     S.groups[k].forEach(function (g) {
       if (!g.id) g.id = uid();
       if (typeof g.title !== "string") g.title = "";
-      if (typeof g.topic !== "string") g.topic = "";   /* v15: 카드 맨 윗줄에 보이는 주제 */
+      if ("topic" in g) delete g.topic;   /* v17: 카드 윗줄「주제」가 없어져 예전에 적어 둔 값도 지워요 */
       if (typeof g.caption !== "string") g.caption = "";
       if (g.who !== "you") g.who = "me";
       if (!/^\d{4}-\d{2}-\d{2}$/.test(String(g.date || "")) || isNaN(parse(g.date).getTime())) g.date = today;
@@ -271,12 +271,11 @@
     { n: "올리브", c: "#5B7048" }, { n: "세이지", c: "#537B67" }, { n: "네이비", c: "#3D5C82" },
     { n: "플럼", c: "#625A7F" }, { n: "코코아", c: "#745A4A" }, { n: "샌드", c: "#9B816C" }, { n: "차콜", c: "#4A4A4C" }
   ];
-  /* 홈 섹션 제목 줄(캡션)에 칠하는 뮤트 톤 10색 — 글씨는 색에 맞춰 진하게 */
+  /* 홈 섹션 제목 줄(캡션)·기본 버튼에 칠하는 12색 — 소영님이 고른 팔레트(IMG_4508), 4열 3줄 */
   var MUTED = [
-    { n: "아이보리", c: "#FBF6EE" }, { n: "라이트 그레이", c: "#F4F4F2" }, { n: "웜 샌드", c: "#EFE7DF" },
-    { n: "세이지", c: "#EDF1EC" }, { n: "민트", c: "#E7F0EC" }, { n: "스카이", c: "#ECF2F7" },
-    { n: "라벤더", c: "#EEEAF5" }, { n: "블러시", c: "#F8EBEE" }, { n: "코랄", c: "#FAEDE8" },
-    { n: "버터", c: "#FBF3DE" }
+    { n: "블러시", c: "#F2CFC9" }, { n: "로즈", c: "#DEA2A6" }, { n: "코랄", c: "#DD785B" }, { n: "오렌지", c: "#EA994D" },
+    { n: "레몬", c: "#EFD353" }, { n: "라임", c: "#C4C66A" }, { n: "세이지", c: "#B8CAA5" }, { n: "민트", c: "#B4D8D4" },
+    { n: "청록", c: "#80A4AA" }, { n: "라벤더", c: "#D2CBE3" }, { n: "모브", c: "#A299B8" }, { n: "샌드", c: "#C4B28E" }
   ];
   var SOFT = [
     { n: "핑크", c: "#F7C6D4" }, { n: "스카이", c: "#BCE0F7" }, { n: "라벤더", c: "#D6C5F7" }, { n: "민트", c: "#C8E9D5" },
@@ -1107,12 +1106,10 @@
 
   function noteCard(k, g) {
     var items = itemsOf(k).filter(function (x) { return x.gid === g.id; }).sort(byDone);
-    /* v16: 프사 동그라미도 지우고 맨 윗줄은 「주제」 한 줄만 — 카드는 더 심플하게 */
+    /* v17: 「주제」 줄을 없애고 카드는 제목부터 — 제목 아래로 To-do 미리보기 */
     var gTitle = g.title || GROUP_DEF[k];
-    var gTopic = String(g.topic || "").trim();
     var h = '<div class="ncard" role="button" tabindex="0" data-act="openGroup" data-tab="' + k + '" data-gid="' + g.id +
       '" aria-label="' + esc(gTitle) + ' 열기">';
-    h += '<div class="nc-top"><span class="nc-topic' + (gTopic ? "" : " empty") + '">' + esc(gTopic || "주제") + "</span></div>";
     h += '<div class="nc-t">' + esc(gTitle) + "</div>";
     if (items.length) {
       h += '<div class="nc-items">' + items.slice(0, 4).map(function (x) { return cardItem(k, x); }).join("") +
@@ -1124,15 +1121,14 @@
     return h;
   }
 
-  /* 리스트 카드 상세 시트 — v16: 제목·주제가 맨 위, 그 아래 To-do (한 줄 메모·누구는 삭제) */
+  /* 리스트 카드 상세 시트 — v17: 제목만 맨 위, 그 아래 To-do (주제·한 줄 메모·누구는 삭제) */
   function cardSheetHtml(k, g) {
     var items = itemsOf(k).filter(function (x) { return x.gid === g.id; }).sort(byDone);
     var h = '<div class="sheet-hd card-hd"><button class="icon-btn" data-close="1" aria-label="닫기">' + IC.x + "</button></div>";
     /* 제목을 시트 맨 위로 — 카드에서 가장 크게 보이는 값이라 먼저 고쳐요 */
     h += '<form class="form card-meta" id="sheetForm">' +
       '<div class="f"><label>제목</label><input class="field" name="title" value="' + esc(g.title || GROUP_DEF[k]) + '" required autocomplete="off"></div>' +
-      '<div class="f"><label>주제</label><input class="field" name="topic" value="' + esc(g.topic || "") + '" placeholder="예) 이번 주, 함께" autocomplete="off"></div>' +
-      '<p class="sheet-sub">「주제」는 카드 맨 윗줄에, 「제목」은 카드에서 가장 크고 진하게 보여요.</p>' +
+      '<p class="sheet-sub">「제목」은 카드 맨 윗줄에 가장 크고 진하게 보여요.</p>' +
       "</form>";
     h += '<div class="todo-label" style="margin-top:20px">To-do</div>';
     h += '<form class="todo-add" id="listAddForm" data-tab="' + k + '" data-gid="' + g.id + '">' +
@@ -1159,7 +1155,6 @@
       var t = String(fd.get("title") || "").trim();
       if (!t) { toast("제목을 적어 주세요"); return; }
       cur.title = t;
-      cur.topic = String(fd.get("topic") || "").trim();
       /* v16: 한 줄 메모·누구 칸은 없어졌어요 — 예전에 적어 둔 값은 건드리지 않고 그대로 둡니다 */
       openCard = null;
       save(); closeSheet(); renderDiary(); toast("저장했어요");
@@ -1174,16 +1169,12 @@
     var g = groupOf(openCard.tab, openCard.gid);
     if (!g) return;
     var st = sheet.scrollTop;
-    /* 항목을 체크해도 방금 적던 제목·주제가 날아가지 않도록 값을 잠깐 들고 있어요 */
+    /* 항목을 체크해도 방금 적던 제목이 날아가지 않도록 값을 잠깐 들고 있어요 */
     var keepT = sheet.querySelector('#sheetForm input[name="title"]');
-    var keepP = sheet.querySelector('#sheetForm input[name="topic"]');
     var typedT = keepT ? keepT.value : null;
-    var typedP = keepP ? keepP.value : null;
     sheet.innerHTML = '<div class="grab"></div>' + cardSheetHtml(openCard.tab, g);
     var t2 = sheet.querySelector('#sheetForm input[name="title"]');
-    var p2 = sheet.querySelector('#sheetForm input[name="topic"]');
     if (t2 && typedT !== null) t2.value = typedT;
-    if (p2 && typedP !== null) p2.value = typedP;
     sheet.scrollTop = st;
   }
 
@@ -1290,23 +1281,41 @@
     return '<span class="' + cls + '" data-capid="' + p.id + '" style="background:' + capBg(p) + '">' + esc(p.title || "") + "</span>";
   }
 
+  /* 사진첩 v17: 날짜별(최신순) 묶음 + 살짝 기운 폴라로이드 프레임 — IMG_4511 레이아웃 */
+  var POLA_TILT = ["-3deg", "2deg", "-1.5deg", "3deg"];
+  function photoDayLabel(day) {
+    var d = parse(day);
+    if (day === today) return '<span class="d acc">오늘</span>';
+    if (day === addDays(today, -1)) return '<span class="d acc">어제</span>';
+    return '<span class="d">' + (d.getMonth() + 1) + "월 " + d.getDate() + "일</span>" +
+      '<span class="w">· ' + WD[d.getDay()] + '요일</span>';
+  }
+
   function renderPhoto() {
     var h = '<header class="hdr' + capCls("photo") + '"' + capStyle("photo") + ' data-pg="photo"><div><h1><span class="eh">🖼️</span> 사진첩</h1><p class="sub">' + S.photos.length + "장의 순간</p></div>" +
       '<div class="hdr-acts"><button class="round-btn" data-act="addPhoto" aria-label="사진 추가" title="사진 추가">' + IC.plus + "</button></div></header>";
+    /* 앨범 대신 날짜로 묶어요 — 하루에 담은 순간이 한 줄에 모입니다 */
     var groups = [];
     var map = {};
     S.photos.slice().sort(byDateDesc).forEach(function (p) {
-      var k = p.album;
-      if (!map[k]) { map[k] = { name: k, date: p.date, items: [] }; groups.push(map[k]); }
+      var k = String(p.date || "").slice(0, 10);
+      if (!map[k]) { map[k] = { date: k, items: [] }; groups.push(map[k]); }
       map[k].items.push(p);
     });
     groups.forEach(function (g) {
-      var d = parse(g.date);
-      h += '<div class="album"><div class="album-hd"><span class="n">' + esc(g.name) + "</span>" +
-        '<span class="c">' + (d.getFullYear()) + "." + pad(d.getMonth() + 1) + " · " + g.items.length + "장</span></div>" +
-        '<div class="grid3">' +
-        g.items.map(function (p) {
-          return '<button class="ph" data-act="openPhoto" data-id="' + p.id + '" aria-label="' + esc(p.title || "사진") + '">' + photoImg(p) + capHtml(p, "cap") + "</button>";
+      /* 그날 사진이 모두 한 앨범이면 오른쪽에 앨범 이름을 함께 적어요 */
+      var albums = [];
+      g.items.forEach(function (p) { var a = String(p.album || "").trim(); if (a && albums.indexOf(a) < 0) albums.push(a); });
+      var meta = g.items.length + "장" + (albums.length === 1 ? " · " + esc(albums[0]) : "");
+      h += '<div class="pday"><div class="pday-hd">' + photoDayLabel(g.date) +
+        '<span class="c">' + meta + "</span></div>" +
+        '<div class="polas">' +
+        g.items.map(function (p, i) {
+          return '<button class="pola" style="--tilt:' + POLA_TILT[i % POLA_TILT.length] + '" data-act="openPhoto" data-id="' + p.id +
+            '" aria-label="' + esc(p.title || p.album || "사진") + ' 열기">' +
+            '<span class="pola-pic">' + photoImg(p) + "</span>" +
+            '<span class="pola-chin"' + (p.capBg ? ' style="background:' + esc(p.capBg) + '"' : "") + ">" +
+            esc(p.title || "") + "</span></button>";
         }).join("") + "</div></div>";
     });
     if (!S.photos.length) {
@@ -1616,21 +1625,19 @@
       '<button type="button" class="seg-btn' + (dark ? "" : " active") + '" data-act="mode" data-mode="light">라이트</button>' +
       '<button type="button" class="seg-btn' + (dark ? " active" : "") + '" data-act="mode" data-mode="dark">다크</button>' +
       "</div></div>" +
-      cpBlock("다가오는 일정 · " + monthNo + "월의 우리", "homeTitleBg", t.homeTitleBg, MUTED, "#EDF1EC") +
+      cpBlock("다가오는 일정 · " + monthNo + "월의 우리", "homeTitleBg", t.homeTitleBg, MUTED, "#F2CFC9") +
       '<p class="cp-note">고른 색은 두 섹션의 제목 줄(문구) 바탕과 저장·완료 같은 기본 버튼에 함께 칠해지고, 글씨는 색에 맞춰 또렷하게 바뀌어요. 바로 적용되고 앱을 다시 열어도 그대로 남아 있어요. ‘기본’으로 두면 원래대로 돌아가요.</p>' +
       '<button class="btn-primary" data-close="1">완료</button>';
   }
 
-  /* 새 리스트 시트 — v16: 제목·주제만 (한 줄 메모·누구 칸 삭제) */
+  /* 새 리스트 시트 — v17: 제목만 (주제·한 줄 메모·누구 칸 삭제) */
   function formGroup(k, g) {
     var isNew = !g;
     return sheetHead(isNew ? "새 리스트" : "리스트 수정") +
-      '<p class="sheet-sub">탭 안에 리스트를 나눠 담을 수 있어요. 제목과 주제를 적어 주세요.</p>' +
+      '<p class="sheet-sub">탭 안에 리스트를 나눠 담을 수 있어요. 제목을 적어 주세요.</p>' +
       '<form class="form" id="sheetForm">' +
       '<div class="f"><label>제목</label><input class="field" name="title" value="' + esc(g ? g.title : "") +
       '" placeholder="예) 장보기" autocomplete="off"></div>' +
-      '<div class="f"><label>주제</label><input class="field" name="topic" value="' + esc(g ? g.topic || "" : "") +
-      '" placeholder="예) 이번 주, 함께" autocomplete="off"></div>' +
       '<button class="btn-primary" type="submit">저장</button></form>' +
       '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
   }
@@ -2090,7 +2097,7 @@
     h += '<div class="cp"><div class="cp-hd"><span>일정 색</span><span class="cp-val">소영 · 준영 · 공동</span></div>' +
       colorPickRow("me") + colorPickRow("you") + colorPickRow("both") + "</div>";
     h += '<div class="cp"><div class="cp-hd"><span>홈 제목 색</span><span class="cp-val">뮤트 톤</span></div>' +
-      cpBlock("다가오는 일정 · " + monthNo + "월의 우리", "homeTitleBg", t.homeTitleBg, MUTED, "#EDF1EC") +
+      cpBlock("다가오는 일정 · " + monthNo + "월의 우리", "homeTitleBg", t.homeTitleBg, MUTED, "#F2CFC9") +
       '<p class="cp-note" style="margin-top:10px">두 섹션의 제목 줄과 저장·완료 버튼에 같은 색이 칠해져요. 일정 목록과 카드는 흰 바탕으로 남아요.</p></div>';
     h += '<div class="cp"><div class="cp-hd"><span>폰트</span><span class="cp-val">' + esc(fontOf(t.font).n) + '</span></div>' +
       '<div class="font-list">' + fontRows() + "</div></div>";
@@ -2455,7 +2462,7 @@
         if (!gTitle) { toast("리스트 이름을 적어 주세요"); return; }
         S.groups = S.groups || {};
         S.groups[agK] = S.groups[agK] || [];
-        S.groups[agK].push({ id: uid(), title: gTitle, topic: String(fd.get("topic") || "").trim(), who: "me", date: today });
+        S.groups[agK].push({ id: uid(), title: gTitle, who: "me", date: today });
         save(); closeSheet(); renderAll(); toast("리스트를 만들었어요");
       });
       return;
@@ -2472,7 +2479,6 @@
         var gTitle2 = String(fd.get("title") || "").trim();
         if (!gTitle2) { toast("리스트 이름을 적어 주세요"); return; }
         g2.title = gTitle2;
-        g2.topic = String(fd.get("topic") || "").trim();
         save(); closeSheet(); renderAll(); toast("저장했어요");
       });
       return;
@@ -3201,7 +3207,29 @@
   function registerWorker() {
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
-    navigator.serviceWorker.register("sw.js").catch(function (e) {
+    /* v17: 새 버전 서비스워커가 넘겨받으면 한 번만 새로고침 —
+       홈 화면 앱이 옛 캐시(v15 등)에 머물러 화면이 안 바뀌는 문제를 막아요. */
+    var hadController = !!navigator.serviceWorker.controller;
+    var reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (!hadController) { hadController = true; return; }   /* 첫 설치 때는 그대로 */
+      if (reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register("sw.js").then(function (reg) {
+      /* 앱을 열거나 다시 앞으로 꺼낼 때마다 새 sw.js 가 있는지 확인 */
+      function check() {
+        if (document.visibilityState !== "visible") return;
+        reg.update().catch(function () {});
+      }
+      check();
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "visible") check();
+      });
+      window.addEventListener("online", check);
+      window.addEventListener("pageshow", check);
+    }).catch(function (e) {
       console.warn("[투로그] service worker 등록 실패", e);
     });
   }

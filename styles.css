@@ -320,20 +320,32 @@ h1,h2,h3,p{margin:0}
 .tx .amt{font-size:13.5px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums; flex:0 0 auto}
 .tx .x{width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:#CFCFCA;flex:0 0 22px}
 
-/* ---------- photos ---------- */
+/* ---------- photos: 날짜별 폴라로이드 (v17) ---------- */
 .album{margin:22px 20px 0}
 .album-hd{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px}
 .album-hd .n{font-size:13px; font-weight:700; letter-spacing:-.02em}
 .album-hd .c{font-size:11px; color:var(--ink-3)}
-.grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:6px}
-.ph{position:relative; aspect-ratio:1/1; border-radius:0; overflow:hidden; background:var(--surface-2); display:block}
-.ph svg{width:100%; height:100%; display:block}
-.ph .cap{
-  position:absolute; left:0; right:0; bottom:0; height:26px; line-height:26px; padding:0 7px;
-  font-size:11.5px; font-weight:600; color:#111111; letter-spacing:-.015em;
-  background:#F4F4F2; box-shadow:inset 0 1px 0 rgba(28,28,30,.07);
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:left
-}
+/* 날짜 머리글 — 오늘·어제는 포인트 색, 지난 날은 날짜만 진하게 + 요일은 흐리게 */
+.pday{margin:26px 0 0}
+.pday-hd{display:flex; align-items:baseline; gap:7px; padding:0 22px; margin-bottom:12px}
+.pday-hd .d{font-size:15px; font-weight:800; letter-spacing:-.03em; color:var(--ink)}
+.pday-hd .d.acc{color:var(--accent)}
+.pday-hd .w{font-size:11.5px; font-weight:500; letter-spacing:-.01em; color:var(--ink-3)}
+.pday-hd .c{margin-left:auto; font-size:11px; letter-spacing:-.01em; color:var(--ink-3);
+  max-width:54%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+/* 사진 한 줄 — 각진 흰 폴라로이드(위·옆 6px, 아래 18px 턱), 살짝 기울고 조금씩 겹치게 */
+.polas{display:grid; grid-template-columns:repeat(3,1fr); gap:18px 0; padding:8px 17px 2px}
+.pola{position:relative; display:block; padding:6px 6px 18px; margin:0 -6px; border:0; background:#FFFFFF;
+  cursor:pointer; text-align:center; transform:rotate(var(--tilt, 0deg));
+  box-shadow:0 3px 10px rgba(0,0,0,.13), 0 1px 2px rgba(0,0,0,.07);
+  transition:transform .18s ease, box-shadow .18s ease}
+.pola:active{transform:rotate(0deg) scale(.975); box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.pola:focus,.pola:focus-visible{outline:none}
+.pola .pola-pic{display:block; aspect-ratio:1/1; overflow:hidden; background:var(--surface-2)}
+.pola .pola-pic svg,.pola .pola-pic img{width:100%; height:100%; display:block; object-fit:cover}
+.pola .pola-chin{position:absolute; left:6px; right:6px; bottom:3px; height:12px; display:flex; align-items:center;
+  justify-content:center; font-size:9.5px; font-weight:600; letter-spacing:-.01em; color:#4A4A4C;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 
 /* ---------- home: album preview + schedule ---------- */
 .sec .more-link{display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em}
@@ -351,6 +363,9 @@ h1,h2,h3,p{margin:0}
 .cp-hd span:first-child{font-size:12.5px; font-weight:700; letter-spacing:-.02em}
 .cp-val{font-size:11px; color:var(--ink-3); letter-spacing:.03em; font-variant-numeric:tabular-nums}
 .sw-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:6px}
+/* 제목 줄·기본 버튼 팔레트는 12색 — 사진처럼 4열 3줄 */
+.sw-grid[data-sw="homeTitleBg"]{grid-template-columns:repeat(4,1fr); gap:8px}
+.sw-grid[data-sw="homeTitleBg"] .sw{aspect-ratio:auto; height:54px}
 .sw{position:relative; aspect-ratio:1/1; border-radius:0; border:1px solid rgba(28,28,30,.10); padding:0}
 .sw.sel{box-shadow:inset 0 0 0 2px #fff, 0 0 0 1px var(--ink)}
 .sw-grid[data-sw="cap"] .sw.sel{box-shadow:inset 0 0 0 2px #FFFFFF, 0 0 0 1.5px #111111}
@@ -497,7 +512,7 @@ textarea.qfield{height:auto; min-height:44px; padding:11px 12px; line-height:1.5
 .set-hint{font-size:11px; color:var(--ink-3); line-height:1.6; margin-top:11px}
 .set-btn{height:38px; padding:0 14px; border:1px solid var(--line); background:var(--surface); font-size:12px; font-weight:700; letter-spacing:-.01em; color:var(--ink-2); display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap}
 .set-btn:active{background:var(--surface-2)}
-.set-btn.on{background:var(--ink); border-color:var(--ink); color:var(--bg)}
+.set-btn.on{background:var(--btn-bg, var(--ink)); border-color:var(--btn-bg, var(--ink)); color:var(--btn-ink, var(--bg))}
 .set-btn.warn{color:var(--accent-deep)}
 .set-btn.ghost{border-color:var(--line-2); color:var(--ink-3); height:32px; padding:0 10px}
 .set-form{display:flex; gap:8px; margin-top:11px}
@@ -629,7 +644,10 @@ html[data-mode="dark"] .todo.done .check{color:#141416}
 html[data-mode="dark"] .lchip.active i{background:#111}
 html[data-mode="dark"] .av{color:#141416}
 html[data-mode="dark"] .hol-badge{color:#EDA491}
-html[data-mode="dark"] .ph svg,html[data-mode="dark"] .pdetail svg{filter:brightness(.88) saturate(.96)}
+html[data-mode="dark"] .pola .pola-pic svg,html[data-mode="dark"] .pdetail svg{filter:brightness(.88) saturate(.96)}
+/* 다크 모드 폴라로이드: 검은 배경 위에 떠 있는 짙은 회색 프레임 */
+html[data-mode="dark"] .pola{background:#232326; box-shadow:0 4px 12px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.07)}
+html[data-mode="dark"] .pola .pola-chin{color:#C9C9CE}
 html[data-mode="dark"] .btag.doing{color:#EDA491}
 html[data-mode="dark"] .btag.done{color:#A9BCAF}
 
@@ -725,7 +743,7 @@ svg [rx]{rx:0}
 /* ==========================================================================
    photos: real uploads (file input → compressed blob)
    ========================================================================== */
-.ph img, .pdetail img{width:100%; height:100%; object-fit:cover; display:block}
+.pdetail img{width:100%; height:100%; object-fit:cover; display:block}
 .ph-cap-none{background:transparent !important; color:transparent !important; box-shadow:none !important}
 .hdr-acts{display:flex; align-items:center; gap:8px; flex:0 0 auto}
 .up-list{margin-top:6px}
@@ -902,12 +920,7 @@ html[data-mode="dark"] .bcard:active{background:#1A1A1C}
 html[data-mode="dark"] .ncard{background:var(--surface); border-color:rgba(255,255,255,.10);
   box-shadow:0 3px 12px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.05)}
 html[data-mode="dark"] .ncard:active{box-shadow:0 1px 5px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05)}
-.nc-top{display:flex; align-items:center; gap:7px; margin-bottom:6px; min-width:0}
-/* 주제 — 예전에 이름(준영·소영)이 있던 자리. v16: 프사 동그라미 없이 이 한 줄만 */
-.nc-topic{font-size:14px; font-weight:600; color:var(--ink-2); letter-spacing:-.014em; line-height:1.35;
-  min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.nc-topic.empty{font-weight:500; color:var(--ink-3); opacity:.8}
-/* 카테고리명(제목) — 가장 크고 진하게 (v16: 18px) */
+/* 카테고리명(제목) — 카드 맨 윗줄, 가장 크고 진하게 (v17: 「주제」 줄은 없앰) */
 .nc-t{font-size:18px; font-weight:800; letter-spacing:-.035em; line-height:1.25; word-break:keep-all; margin-top:2px}
 .nc-items{display:flex; flex-direction:column; gap:5px; margin-top:11px; min-width:0}
 .nc-empty{font-size:13px; color:var(--ink-3); margin-top:11px; letter-spacing:-.01em}
@@ -953,9 +966,9 @@ html[data-mode="dark"] .ncard:active{box-shadow:0 1px 5px rgba(0,0,0,.5), 0 0 0 
 .todo-add .circ{color:var(--ink-2); flex:0 0 auto; display:flex; align-items:center}
 .todo-in{flex:1 1 auto; min-width:0; border:0; background:transparent; font:inherit; font-size:14.5px; color:var(--ink); padding:9px 0; letter-spacing:-.015em; outline:none}
 .todo-in::placeholder{color:var(--ink-3)}
-.todo-add-btn{flex:0 0 auto; height:38px; padding:0 17px; border:0; border-radius:0; background:var(--ink); color:var(--bg); font-size:13px; font-weight:700; letter-spacing:-.01em; cursor:pointer}
+.todo-add-btn{flex:0 0 auto; height:38px; padding:0 17px; border:0; border-radius:0; background:var(--btn-bg, var(--ink)); color:var(--btn-ink, var(--bg)); font-size:13px; font-weight:700; letter-spacing:-.01em; cursor:pointer}
 .todo-add-btn:active{opacity:.82}
-html[data-mode="dark"] .todo-add-btn{background:#F2F2F4; color:#141416}
+html[data-mode="dark"] .todo-add-btn{background:var(--btn-bg, #F2F2F4); color:var(--btn-ink, #141416)}
 
 /* 노트: 항목 줄 (○ 미완료 → ✓ 완료는 아래로) */
 .todo-items{display:flex; flex-direction:column}

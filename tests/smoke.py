@@ -141,11 +141,11 @@ with sync_playwright() as p:
     check("사진 추가 시트", page.locator("#upBar").count() == 1)
     page.click('#sheetForm button[type="submit"]')
     page.wait_for_timeout(1500)
-    check("사진 타일", page.locator("#s-photo .ph").count() == 1, page.locator("#s-photo .ph").count())
-    src = page.locator("#s-photo .ph img").first.get_attribute("src") if page.locator("#s-photo .ph img").count() else ""
+    check("사진 타일", page.locator("#s-photo .pola").count() == 1, page.locator("#s-photo .pola").count())
+    src = page.locator("#s-photo .pola-pic img").first.get_attribute("src") if page.locator("#s-photo .pola-pic img").count() else ""
     check("사진 파일 렌더", str(src).startswith("blob:"), src)
 
-    page.locator("#s-photo .ph").first.click()
+    page.locator("#s-photo .pola").first.click()
     page.wait_for_timeout(250)
     check("사진 상세", page.locator(".pdetail").count() == 1)
     page.keyboard.press("Escape")
@@ -170,7 +170,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(700)
     page.locator("#tabbar .tab").nth(3).click()
     page.wait_for_timeout(400)
-    check("새로 열어도 사진 유지", page.locator("#s-photo .ph").count() == 1)
+    check("새로 열어도 사진 유지", page.locator("#s-photo .pola").count() == 1)
     page.locator("#tabbar .tab").nth(2).click()
     page.wait_for_timeout(400)
     page.locator("#s-diary .ncard").first.click()

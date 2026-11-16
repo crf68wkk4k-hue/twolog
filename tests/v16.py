@@ -114,9 +114,12 @@ with sync_playwright() as p:
     # 1. 카드에서 프사 동그라미가 사라졌는지
     check("카드에 프사 없음", page.locator("#s-diary .ncard .nc-av").count() == 0,
           page.locator("#s-diary .ncard .nc-av").count())
-    top_txt = page.locator("#s-diary .ncard .nc-top").first.inner_text().strip()
-    check("맨 윗줄은 주제 한 줄", "\n" not in top_txt, top_txt)
-    check("맨 윗줄에 이름 없음", ("소영" not in top_txt) and ("준영" not in top_txt), top_txt)
+    # v17: 「주제」 줄이 없어져 카드는 제목부터 시작해요
+    check("카드에 주제 줄 없음", page.locator("#s-diary .ncard .nc-topic").count() == 0 and
+          page.locator("#s-diary .ncard .nc-top").count() == 0,
+          page.locator("#s-diary .ncard .nc-topic").count())
+    first_cls = page.evaluate("() => { const c = document.querySelector('#s-diary .ncard'); const k = c.firstElementChild; return k ? k.className : ''; }")
+    check("카드 맨 윗줄은 제목", str(first_cls).startswith("nc-t"), first_cls)
     check("한 줄 메모 줄 없음", page.locator("#s-diary .ncard .nc-c").count() == 0,
           page.locator("#s-diary .ncard .nc-c").count())
     check("nc-av 스타일 정리", page.evaluate(
@@ -128,9 +131,7 @@ with sync_playwright() as p:
                       " const w = getComputedStyle(el).width; el.remove(); return w; }"))
 
     # 2. 카드 글씨 확대
-    tp_css = page.evaluate(CSS_OF, "#s-diary .ncard .nc-topic")
     t_css = page.evaluate(CSS_OF, "#s-diary .ncard .nc-t")
-    check("주제 14px", px(tp_css["fs"]) >= 14, tp_css["fs"])
     check("제목 18px", px(t_css["fs"]) >= 18, t_css["fs"])
     check("제목 800", int(t_css["fw"]) >= 800, t_css["fw"])
 
@@ -142,7 +143,8 @@ with sync_playwright() as p:
     check("시트 머리에 제목 중복 없음", page.locator("#sheet .sheet-hd h2").count() == 0,
           page.locator("#sheet .sheet-hd h2").count())
     labels = page.evaluate(LABELS)
-    check("제목·주제 칸 있음", "제목" in labels and "주제" in labels, labels)
+    check("제목 칸만 있음", labels == ["제목"], labels)
+    check("주제 칸 없음", page.locator('#sheetForm input[name="topic"]').count() == 0)
     check("한 줄 메모 칸 없음", "한 줄 메모 (선택)" not in labels and "한 줄 메모" not in labels, labels)
     check("누구 칸 없음", "누구" not in labels, labels)
     check("한 줄 메모 입력 없음", page.locator('#sheetForm input[name="caption"]').count() == 0)
@@ -151,13 +153,10 @@ with sync_playwright() as p:
     check("「한 줄 메모」 글씨 없음", "한 줄 메모" not in page.locator("#sheet").inner_text())
 
     y_title = page.evaluate(BOX, '#sheetForm input[name="title"]')
-    y_topic = page.evaluate(BOX, '#sheetForm input[name="topic"]')
     y_todo = page.evaluate(BOX, "#sheet .todo-label")
     y_items = page.evaluate(BOX, "#sheet .card-items")
-    check("제목이 주제보다 위", y_title and y_topic and y_title["y"] < y_topic["y"],
-          (y_title and round(y_title["y"]), y_topic and round(y_topic["y"])))
-    check("제목·주제가 To-do보다 위", y_title and y_todo and y_topic["y"] < y_todo["y"],
-          (y_topic and round(y_topic["y"]), y_todo and round(y_todo["y"])))
+    check("제목이 To-do보다 위", y_title and y_todo and y_title["y"] < y_todo["y"],
+          (y_title and round(y_title["y"]), y_todo and round(y_todo["y"])))
     check("제목이 항목 목록보다 위", y_title and y_items and y_title["y"] < y_items["y"],
           (y_title and round(y_title["y"]), y_items and round(y_items["y"])))
     check("To-do 안내 문구는 그대로", page.locator("#sheet .todo-add input.todo-in").count() == 1)
@@ -174,7 +173,6 @@ with sync_playwright() as p:
     check("시트 안에서 완료", page.locator("#sheet .card-items .trow.done").count() == 1)
     # 항목을 체크해도 적던 제목이 날아가지 않는지
     page.fill('#sheetForm input[name="title"]', "생일 준비")
-    page.fill('#sheetForm input[name="topic"]', "이번 주")
     page.locator("#sheet .card-items .trow .circ").nth(1).click()
     page.wait_for_timeout(400)
     check("체크해도 적던 제목 유지", page.input_value('#sheetForm input[name="title"]') == "생일 준비",
@@ -186,11 +184,7 @@ with sync_playwright() as p:
     check("저장하면 시트 닫힘", page.locator("#sheetWrap.open").count() == 0)
     check("저장한 제목이 카드에", page.locator("#s-diary .ncard .nc-t").first.inner_text().strip() == "생일 준비",
           page.locator("#s-diary .ncard .nc-t").first.inner_text())
-    check("저장한 주제가 카드 윗줄에",
-          page.locator("#s-diary .ncard .nc-topic").first.inner_text().strip() == "이번 주",
-          page.locator("#s-diary .ncard .nc-topic").first.inner_text())
-    tp2 = page.evaluate(CSS_OF, "#s-diary .ncard .nc-topic")
-    check("주제 채워지면 600", int(tp2["fw"]) == 600, tp2["fw"])
+    check("저장 후에도 주제 줄 없음", page.locator("#s-diary .ncard .nc-topic").count() == 0)
     check("카드에 항목 미리보기", page.locator("#s-diary .ncard .nc-items .cti").count() >= 3,
           page.locator("#s-diary .ncard .nc-items .cti").count())
     items_css = page.evaluate(CSS_OF, "#s-diary .ncard .nc-items .cti .cx")
@@ -206,25 +200,23 @@ with sync_playwright() as p:
     page.locator("#s-diary .ncard.new").click()
     page.wait_for_timeout(450)
     new_labels = page.evaluate(LABELS)
-    check("새 리스트에 제목·주제", "제목" in new_labels and "주제" in new_labels, new_labels)
+    check("새 리스트 라벨은 제목만", new_labels == ["제목"], new_labels)
+    check("새 리스트에 주제 칸 없음", page.locator('#sheetForm input[name="topic"]').count() == 0)
     check("새 리스트에 한 줄 메모 없음", page.locator('#sheetForm input[name="caption"]').count() == 0,
           new_labels)
     check("새 리스트에 누구 없음", "누구" not in new_labels
           and page.locator('#sheet [data-group="gwho"]').count() == 0, new_labels)
     ny_title = page.evaluate(BOX, '#sheetForm input[name="title"]')
-    ny_topic = page.evaluate(BOX, '#sheetForm input[name="topic"]')
-    check("새 리스트도 제목이 맨 위", ny_title and ny_topic and ny_title["y"] < ny_topic["y"],
-          (ny_title and round(ny_title["y"]), ny_topic and round(ny_topic["y"])))
+    check("새 리스트 제목칸 있음", bool(ny_title), ny_title)
     shot(page, "note-new-v16.png", settle=400)
     page.fill('#sheetForm input[name="title"]', "장보기")
-    page.fill('#sheetForm input[name="topic"]', "이번 주말")
     page.click('#sheetForm button[type="submit"]')
     page.wait_for_timeout(700)
     check("새 리스트 만들어짐", page.locator("#s-diary .ncard:not(.new)").count() == before + 1,
           page.locator("#s-diary .ncard:not(.new)").count())
-    new_topics = page.evaluate(
-        "() => Array.from(document.querySelectorAll('#s-diary .ncard .nc-topic')).map(e => e.innerText.trim())")
-    check("새 리스트 주제 저장", "이번 주말" in new_topics, new_topics)
+    new_titles = page.evaluate(
+        "() => Array.from(document.querySelectorAll('#s-diary .ncard .nc-t')).map(e => e.innerText.trim())")
+    check("새 리스트 제목 저장", "장보기" in new_titles, new_titles)
 
     # 6. 카드 삭제는 그대로 동작
     page.locator("#s-diary .ncard", has_text="장보기").first.click()
@@ -314,7 +306,7 @@ with sync_playwright() as p:
 
     # ---------- 9. 서비스 워커 ----------
     ver = page.evaluate("fetch('sw.js').then(r => r.text()).then(t => (t.match(/twolog-v\\d+/) || [''])[0])")
-    check("sw 캐시 v16", ver == "twolog-v16", ver)
+    check("sw 캐시 v17", ver == "twolog-v17", ver)
     check("콘솔 오류 없음", len(errors) == 0, errors[:3])
     browser.close()
 

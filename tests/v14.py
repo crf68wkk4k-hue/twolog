@@ -156,7 +156,7 @@ with sync_playwright() as p:
     check("제목 색 항목 하나로 통합", "다가오는 일정 · " in stxt and "월의 우리" in stxt, stxt[:160])
     check("옛 두 항목 없음", stxt.count("다가오는 일정") == 1, stxt.count("다가오는 일정"))
     check("컬러 라벨", page.locator("#sheet .cp-pick span", has_text="컬러").count() >= 1)
-    check("뮤트 10색", page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw').count() == 10,
+    check("뮤트 12색", page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw').count() == 12,
           page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw').count())
     shot(page, "theme-sheet-v14.png", settle=350)
     page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw').nth(0).click()
@@ -226,10 +226,10 @@ with sync_playwright() as p:
     grid = page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ngrid')).gridTemplateColumns")
     check("두 열", len(grid.split(" ")) == 2, grid)
     first = page.locator("#s-diary .ncard").first
-    # v16: 프사 동그라미를 빼고 주제 한 줄만
-    check("카드 주제만(프사 없음)", page.locator("#s-diary .ncard .nc-av").count() == 0 and
-          page.locator("#s-diary .ncard .nc-topic").first.inner_text().strip() in ("주제", "이번 주"),
-          page.locator("#s-diary .ncard .nc-topic").first.inner_text())
+    # v17: 프사 동그라미·「주제」 줄을 빼고 카드는 제목부터
+    check("카드에 프사·주제 없음", page.locator("#s-diary .ncard .nc-av").count() == 0 and
+          page.locator("#s-diary .ncard .nc-topic").count() == 0,
+          page.locator("#s-diary .ncard .nc-topic").count())
     check("카드 제목", page.locator("#s-diary .ncard .nc-t").first.inner_text().strip() == "메모",
           page.locator("#s-diary .ncard .nc-t").first.inner_text())
     check("카드에 날짜 없음", page.locator("#s-diary .ncard .nc-d").count() == 0)
@@ -268,13 +268,13 @@ with sync_playwright() as p:
     page.locator("#s-diary .ncard .nc-t").first.click()
     page.wait_for_timeout(400)
     check("카드 다시 열림", page.locator("#sheetWrap.open").count() == 1)
-    page.fill('#sheetForm input[name="topic"]', "이번 주말")
-    page.click('#sheetForm button[type="submit"]')
+    page.click('#sheet .card-acts .btn-primary')
     page.wait_for_timeout(700)
     check("카드 저장 후 닫힘", page.locator("#sheetWrap.open").count() == 0)
-    # v16: 한 줄 메모·누구 입력은 없어졌어요
-    check("카드 주제 반영", "이번 주말" in page.locator("#s-diary .ncard").first.inner_text(),
+    # v16: 한 줄 메모·누구 입력은 없어졌어요 / v17: 주제도 없어졌어요
+    check("카드 제목 그대로", page.locator("#s-diary .ncard .nc-t").first.inner_text().strip() == "메모",
           page.locator("#s-diary .ncard").first.inner_text()[:80])
+    check("카드에 주제 줄 없음", page.locator("#s-diary .ncard .nc-topic").count() == 0)
     check("카드에 항목 미리보기", page.locator("#s-diary .ncard .nc-items .cti").count() >= 3,
           page.locator("#s-diary .ncard .nc-items .cti").count())
     check("완료 항목 취소선", page.evaluate(
@@ -332,7 +332,7 @@ with sync_playwright() as p:
 
     # ---------- 8. 서비스 워커 버전 ----------
     ver = page.evaluate("fetch('sw.js').then(r => r.text()).then(t => (t.match(/twolog-v\\d+/) || [''])[0])")
-    check("sw 캐시 v16", ver == "twolog-v16", ver)
+    check("sw 캐시 v17", ver == "twolog-v17", ver)
     check("콘솔 오류 없음", len(errors) == 0, errors[:3])
     browser.close()
 

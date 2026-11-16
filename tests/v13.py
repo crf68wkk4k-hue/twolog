@@ -149,7 +149,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(350)
     sheet_txt = page.locator("#sheet").inner_text()
     check("테마 시트 항목", ("다가오는 일정" in sheet_txt) and ("월의 우리" in sheet_txt), sheet_txt[:120])
-    check("테마 시트 뮤트 10색", page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw').count() == 10,
+    check("테마 시트 뮤트 12색", page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw').count() == 12,
           page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw').count())
     check("컬러 라벨", page.locator('#sheet .js-color[data-target="homeTitleBg"]').count() == 1)
     shot(page, "theme-sheet-v13.png", settle=300)
@@ -195,7 +195,7 @@ with sync_playwright() as p:
     page.click('#sheetForm button[type="submit"]')
     page.wait_for_timeout(450)
     check("새 리스트 추가", page.locator("#s-diary .ncard").count() == 3, page.locator("#s-diary .ncard").count())
-    # v16: 한 줄 메모(캡션) 칸은 없어졌어요 — 카드는 주제·제목·항목만 보여 줍니다
+    # v17: 한 줄 메모(캡션)·「주제」 칸은 없어졌어요 — 카드는 제목·항목만 보여 줍니다
     check("새 리스트 제목", "장보기" in page.locator("#s-diary").inner_text())
     shot(page, "note-v13.png")
     # 다크 모드도 같은 화면으로 확인
