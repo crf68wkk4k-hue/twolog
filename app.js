@@ -187,8 +187,13 @@
   if (typeof S.couple.birthdays.me !== "string") S.couple.birthdays.me = S.couple.me === "소영" ? "6월 26일" : "";
   if (typeof S.couple.birthdays.you !== "string") S.couple.birthdays.you = "";
   if (!S.theme || typeof S.theme !== "object") S.theme = { name: null, log: null };
-  if (!("schedBg" in S.theme)) S.theme.schedBg = null;
-  if (!("ourBg" in S.theme)) S.theme.ourBg = null;
+  /* v14: 「다가오는 일정」과 「{월}월의 우리」 제목 색을 하나(homeTitleBg)로 묶었어요.
+     v13 에서 따로 저장해 둔 색은 한 번만 옮겨 오고 비웁니다. */
+  if (!("homeTitleBg" in S.theme)) S.theme.homeTitleBg = S.theme.schedBg || S.theme.ourBg || null;
+  if (!S.mig.homeBg) {
+    if (S.theme.schedBg || S.theme.ourBg) S.theme.schedBg = S.theme.ourBg = null;
+    S.mig.homeBg = 1;
+  }
   if (!S.couple.pics || typeof S.couple.pics !== "object") S.couple.pics = {};
   if (!("me" in S.couple.colors)) S.couple.colors.me = "#9E636B";
   if (!("you" in S.couple.colors)) S.couple.colors.you = "#3D5C82";
@@ -215,6 +220,8 @@
       if (!g.id) g.id = uid();
       if (typeof g.title !== "string") g.title = "";
       if (typeof g.caption !== "string") g.caption = "";
+      if (g.who !== "you") g.who = "me";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(g.date || "")) || isNaN(parse(g.date).getTime())) g.date = today;
     });
     if (!S.groups[k].length) {
       S.groups[k].push({ id: uid(), title: (NOTE_DEF[k] || {}).n || "할 일", caption: "" });
@@ -301,7 +308,7 @@
     var cur = String(sched(who) || "").toUpperCase();
     var h = '<div class="own-block"><div class="own-hd"><span class="own-nm">' + esc(schedName(who)) + "</span>" +
       '<span class="own-chip" style="background:' + cur + '"></span>' +
-      '<label class="own-pick"><input type="color" class="js-own" data-who="' + who + '" value="' + (cur || "#D96B52") + '"><span>직접 고르기</span></label></div>';
+      '<label class="own-pick"><input type="color" class="js-own" data-who="' + who + '" value="' + (cur || "#D96B52") + '"><span>컬러</span></label></div>';
     h += '<div class="own-sws">';
     OWNER_COLORS.forEach(function (c) {
       h += '<button type="button" class="sw osw' + (cur === c ? " sel" : "") + '" data-act="pickOwner" data-who="' + who +
@@ -430,8 +437,11 @@
     syncThemeSheet();
   }
 
+  /* 예전 이름(schedBg·ourBg)은 홈 제목 색 하나로 모읍니다 */
+  var THEME_ALIAS = { schedBg: "homeTitleBg", ourBg: "homeTitleBg" };
   function setThemeColor(target, color) {
-    var ok = target === "name" || target === "log" || target === "schedBg" || target === "ourBg";
+    target = THEME_ALIAS[target] || target;
+    var ok = target === "name" || target === "log" || target === "homeTitleBg";
     if (!ok) return;
     S.theme = S.theme || { name: null, log: null };
     S.theme[target] = color ? String(color).toUpperCase() : null;
@@ -602,20 +612,16 @@
     return b.status === "doing" ? { t: "진행 중", k: "doing" } : { t: "미완료", k: "todo" };
   }
 
-  /* 섹션 바탕 뮤트색 — 테두리 없이 블록 전체(제목+내용)에 깔고, 글씨는 색에 맞춰 진하게 */
-  function homeSecStyle(bg) {
+  /* 섹션 제목 줄(캡션) 바탕색 — 목록·카드가 아니라 제목 줄에만 칠하고, 글씨는 색에 맞춰 진하게 */
+  function secTintStyle(bg) {
     if (!bg) return "";
-    var ink = inkOn(bg);
-    var light = ink === "#111111";
-    return ' style="--sec-bg:' + bg + ";--sec-ink:" + ink +
-      ";--sec-surf:" + (light ? "rgba(255,255,255,.55)" : "rgba(255,255,255,.14)") +
-      ";--sec-line:" + (light ? "rgba(17,17,17,.10)" : "rgba(255,255,255,.20)") + '"';
+    return ' style="--sec-bg:' + bg + ";--sec-ink:" + inkOn(bg) + '"';
   }
 
   function renderHome() {
     var c = S.couple;
-    var schedBg = String((S.theme || {}).schedBg || "").toUpperCase();
-    var ourBg = String((S.theme || {}).ourBg || "").toUpperCase();
+    /* v14: 두 섹션의 제목 줄 색은 하나로 묶여 있어요 */
+    var titleBg = String(((S.theme || {}).homeTitleBg) || "").toUpperCase();
     var dday = Math.max(0, diffDays(c.since, today));
     var dl = ddayLabel(dday);
     var ann = nextAnniversary();
@@ -656,16 +662,19 @@
     var nmOn = S.theme && S.theme.name;
     html += '<div class="brand' + capCls("home") + '"' + capStyle("home") + ' data-pg="home"><span class="mark"><i></i><i></i></span><b>투로그</b><span class="bw">(twolog)</span>' +
       '<button class="icon-btn pal first" data-act="toggleMode" aria-label="' + modeLabel() + '" title="' + modeLabel() + '">' + modeIcon() + "</button>" +
-      '<button class="icon-btn pal" data-act="openTheme" aria-label="컬러 설정" title="색 고르기">' + IC.palette + "</button></div>";
+      '<button class="icon-btn pal" data-act="openTheme" aria-label="컬러" title="컬러">' + IC.palette + "</button></div>";
 
     /* ---- 1. D-day ---- */
-    /* 위 라벨: 「소영과 준영이 함께한 지」 — 날짜 없이 두 이름과 문구만 */
+    /* 프사는 양 옆에 크게, 가운데에 「우리는」 문구·D+N·기념일 배지 */
     html += '<div class="dday" data-act="editDday">' +
       '<button class="icon-btn dday-edit" data-act="editDday" aria-label="기념일 수정">' + IC.pencil + "</button>" +
-      '<div class="dday-avs">' + avSpan("me", "hero") + avSpan("you", "hero") + "</div>" +
+      '<div class="dday-side">' + avSpan("me", "hero") + "</div>" +
+      '<div class="dday-mid">' +
       '<div class="eyebrow">' + esc(ddayPhrase()) + "</div>" +
       '<div class="dday-num' + (dl.compact ? " compact" : "") + '">' + dl.text + "</div>" +
       (ann ? '<div class="chip-row"><span class="chip coral">' + ann.n + "주년 " + (ann.days === 0 ? "오늘" : "D-" + ann.days) + "</span></div>" : "") +
+      "</div>" +
+      '<div class="dday-side">' + avSpan("you", "hero") + "</div>" +
       "</div>";
 
     /* ---- 2. 다가오는 일정 ---- */
@@ -686,17 +695,17 @@
     });
     slist = slist.slice(0, 4);
 
-    html += '<div class="home-sec' + (schedBg ? " tinted" : "") + '" data-sec="sched"' + homeSecStyle(schedBg) + '>';
-    html += '<div class="sec"><h2>📅 다가오는 일정</h2><span class="more">' + (todayEvents.length + upcoming.length) + "개</span></div>";
+    html += '<div class="home-sec" data-sec="sched">';
+    html += '<div class="sec sec-tint"' + secTintStyle(titleBg) + '><h2>📅 다가오는 일정</h2><span class="more">' + (todayEvents.length + upcoming.length) + "개</span></div>";
     html += '<div class="pad"><div class="list">';
     if (slist.length) {
       slist.forEach(function (s) {
         var edge = sched(evWho(s.e));
-        html += '<div class="row sched">' +
+        /* 프사 대신 일정 색 띠(왼쪽)만으로 누구 일정인지 보여 줍니다 */
+        html += '<div class="row sched" data-who="' + evWho(s.e) + '">' +
           '<span class="bar" style="background:' + edge + '"></span>' +
           '<div class="sbody">' +
-          '<div class="srow1">' + whoRow(s.e) +
-          '<div class="t" title="' + esc(s.e.title) + '">' + esc(s.e.title) + "</div></div>" +
+          '<div class="srow1"><div class="t" title="' + esc(s.e.title) + '">' + esc(s.e.title) + "</div></div>" +
           '<div class="smeta"><span class="sd">' + esc(s.when) + '</span><span class="sl">' + esc(s.left) + "</span></div>" +
           "</div></div>";
       });
@@ -704,8 +713,8 @@
     html += "</div></div></div>";
 
     /* ---- 3. {month}월의 우리 dashboard ---- */
-    html += '<div class="home-sec' + (ourBg ? " tinted" : "") + '" data-sec="our"' + homeSecStyle(ourBg) + '>';
-    html += '<div class="sec"><h2>🗓️ ' + monthNo + '월의 우리</h2><span class="more">' + ym.replace("-", ".") + "</span></div>";
+    html += '<div class="home-sec" data-sec="our">';
+    html += '<div class="sec sec-tint"' + secTintStyle(titleBg) + '><h2>🗓️ ' + monthNo + '월의 우리</h2><span class="more">' + ym.replace("-", ".") + "</span></div>";
     html += '<div class="pad">';
     html += '<div class="bento">';
 
@@ -790,15 +799,40 @@
     var s = String(ds || "");
     return s.length >= 10 ? Number(s.slice(5, 7)) + "." + Number(s.slice(8, 10)) : s;
   }
-  /* 생일 문구("6월 26일")에서 다음 생일까지 남은 날 */
-  function nextBirthday(text) {
-    var m = String(text || "").match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
-    if (!m) return null;
-    var mo = Number(m[1]), da = Number(m[2]);
-    if (mo < 1 || mo > 12 || da < 1 || da > 31) return null;
+  /* 생일 — "6월 26일" 과 "1992-06-26" 둘 다 읽어요 */
+  function parseBirthday(v) {
+    var s = String(v || "").trim();
+    var m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) return bdOk(+m[1], +m[2], +m[3]);
+    m = s.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+    if (m) return bdOk(0, +m[1], +m[2]);
+    return null;
+  }
+  function bdOk(y, mo, da) {
+    if (!(mo >= 1 && mo <= 12) || !(da >= 1 && da <= 31)) return null;
+    return { y: y || 0, m: mo, d: da };
+  }
+  /* 화면에 보여 줄 "M월 D일" */
+  function bdayText(v) {
+    var p = parseBirthday(v);
+    return p ? p.m + "월 " + p.d + "일" : "";
+  }
+  /* 달력(input[type=date])에 넣을 값 — 연도를 모르면 소영은 1992, 상대는 올해로 채워요 */
+  function bdayInput(who) {
+    var p = parseBirthday((S.couple.birthdays || {})[who]);
+    if (!p) return "";
+    var y = p.y || (who === "me" ? 1992 : new Date().getFullYear());
+    var d = new Date(y, p.m - 1, p.d);
+    if (d.getMonth() !== p.m - 1 || d.getDate() !== p.d) d = new Date(y, p.m, 0); /* 2월 30일처럼 없는 날은 그 달 마지막 날 */
+    return iso(d);
+  }
+  /* 다음 생일까지 남은 날 — 월·일로만 계산해요 */
+  function nextBirthday(v) {
+    var p = parseBirthday(v);
+    if (!p) return null;
     var now = parse(today), y = now.getFullYear();
-    var d = new Date(y, mo - 1, da);
-    if (d.getTime() < new Date(y, now.getMonth(), now.getDate()).getTime()) d = new Date(y + 1, mo - 1, da);
+    var d = new Date(y, p.m - 1, p.d);
+    if (d.getTime() < new Date(y, now.getMonth(), now.getDate()).getTime()) d = new Date(y + 1, p.m - 1, p.d);
     return { date: iso(d), days: diffDays(today, iso(d)) };
   }
   function mileRow(name, date, left, soon) {
@@ -906,6 +940,16 @@
     }
     html += "</div></div>";
 
+    /* 달력 바로 아래: 두 사람 생일 한 줄씩 (누르면 달력에서 고치는 시트가 열려요) */
+    var bds = (S.couple && S.couple.birthdays) || {};
+    var bdMe = bdayText(bds.me), bdYou = bdayText(bds.you);
+    html += '<div class="pad"><button type="button" class="bday-note" data-act="editBirthdays" aria-label="생일 수정">' +
+      '<span class="bd"><span class="bd-nm">' + esc(S.couple.me) + '생일</span>' +
+      '<span class="bd-dt' + (bdMe ? "" : " empty") + '">' + esc(bdMe || "날짜 입력") + "</span></span>" +
+      '<span class="bd"><span class="bd-nm">' + esc(S.couple.you) + '생일</span>' +
+      '<span class="bd-dt' + (bdYou ? "" : " empty") + '">' + esc(bdYou || "날짜 입력") + "</span></span>" +
+      "</button></div>";
+
     /* 선택한 날: 기간이 걸치는 일정 모두 */
     var selEvents = S.events.filter(function (e) { return evCovers(e, sel); })
       .sort(function (a, b) {
@@ -935,15 +979,6 @@
     html += '<div style="padding:14px 0 0"><button class="ghost add-big" data-act="addEvent">' + IC.plus + " 일정 추가</button></div>";
     html += "</div>";
 
-    /* 캘린더 맨 아래: 두 사람 생일 한 줄씩 (누르면 바로 수정) */
-    var bds = (S.couple && S.couple.birthdays) || {};
-    var bdMe = String(bds.me || "").trim(), bdYou = String(bds.you || "").trim();
-    html += '<div class="pad"><button type="button" class="bday-note" data-act="editBirthdays" aria-label="생일 수정">' +
-      '<span class="bd"><span class="bd-nm">' + esc(S.couple.me) + '생일</span>' +
-      '<span class="bd-dt' + (bdMe ? "" : " empty") + '">' + esc(bdMe || "날짜 입력") + "</span></span>" +
-      '<span class="bd"><span class="bd-nm">' + esc(S.couple.you) + '생일</span>' +
-      '<span class="bd-dt' + (bdYou ? "" : " empty") + '">' + esc(bdYou || "날짜 입력") + "</span></span>" +
-      "</button></div>";
     html += '<div style="height:24px"></div>';
 
     $("#s-cal").innerHTML = html;
@@ -1006,10 +1041,12 @@
     html += '<div style="height:20px"></div>';
     $("#s-diary").innerHTML = html;
 
-    var act = $("#s-diary .lchip.active") || $("#s-diary .seg-btn.active");
-    if (act && act.scrollIntoView) {
-      try { act.scrollIntoView({ block: "nearest", inline: "center" }); } catch (e) {}
+    var act2 = $("#s-diary .lchip.active") || $("#s-diary .seg-btn.active");
+    if (act2 && act2.scrollIntoView) {
+      try { act2.scrollIntoView({ block: "nearest", inline: "center" }); } catch (e) {}
     }
+    /* 카드 상세가 열려 있으면 그 안의 To-do 목록도 같이 맞춰 줍니다 */
+    if (openCard) refreshCardSheet();
   }
 
   /* 노트 공통: 맨 아래 + 추가 줄 */
@@ -1050,30 +1087,108 @@
       "</div>";
   }
 
-  /* 탭 안의 리스트 한 칸: 제목·캡션 + To-do 입력 줄 + 항목들 */
-  function groupBlock(k, g, rowsHtml, total, emptyMsg) {
-    var h = '<div class="grp" data-gid="' + g.id + '" data-tab="' + k + '">';
-    h += '<div class="grp-hd"><div class="grp-l"><div class="grp-t">' + esc(g.title || GROUP_DEF[k]) + "</div>" +
-      (g.caption ? '<div class="grp-c">' + esc(g.caption) + "</div>" : "") + "</div>" +
-      '<button type="button" class="grp-e" data-act="editGroup" data-tab="' + k + '" data-gid="' + g.id + '" aria-label="리스트 수정">' + IC.pencil + "</button></div>";
-    h += '<div class="todo-label">To-do</div>';
-    h += '<form class="todo-add" id="listAddForm" data-tab="' + k + '" data-gid="' + g.id + '">' +
-      '<span class="circ" aria-hidden="true">' + CIR_OFF + "</span>" +
-      '<input class="todo-in" name="text" placeholder="내용을 추가해보세요." autocomplete="off" enterkeyhint="done" aria-label="내용">' +
-      '<button class="todo-add-btn" type="submit">Add</button></form>';
-    h += '<div class="todo-items" data-tab="' + k + '" data-gid="' + g.id + '">';
-    if (!total) h += '<div class="empty">' + esc(emptyMsg) + "</div>";
-    else if (!rowsHtml) h += '<div class="empty">완료한 항목을 숨겼어요.</div>';
-    h += rowsHtml;
-    h += "</div>";
-    if (!total) h += '<button type="button" class="grp-del" data-act="delGroup" data-tab="' + k + '" data-gid="' + g.id + '">리스트 삭제</button>';
+  /* 탭 안의 리스트는 2열 카드로 — 프사·이름 / 제목 / 메모 / 항목 미리보기 / 날짜 */
+  var CIR_S_OFF = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>';
+  var CIR_S_ON = '<svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7.4 12.3l3 3 5.8-6.2" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function cardItem(k, it) {
+    var label = k === "todo" ? it.text : it.title;
+    if (k === "log") {
+      return '<div class="cti log"><span class="lt">' + (it.kind === "movie" ? "영화" : "먹방") + "</span>" +
+        '<span class="cx">' + esc(label) + "</span></div>";
+    }
+    var act = k === "todo" ? "toggleTodo" : "toggleBucket";
+    return '<button type="button" class="cti' + (it.done ? " on" : "") + '" data-act="' + act + '" data-id="' + it.id +
+      '" aria-label="' + esc(label) + ' 완료 표시">' +
+      '<span class="cb">' + (it.done ? CIR_S_ON : CIR_S_OFF) + "</span>" +
+      '<span class="cx">' + esc(label) + "</span></button>";
+  }
+
+  function noteCard(k, g) {
+    var items = itemsOf(k).filter(function (x) { return x.gid === g.id; }).sort(byDone);
+    var who = g.who === "you" ? "you" : "me";
+    var nm = who === "me" ? S.couple.me : S.couple.you;
+    var h = '<div class="ncard" role="button" tabindex="0" data-act="openGroup" data-tab="' + k + '" data-gid="' + g.id +
+      '" aria-label="' + esc(g.title || GROUP_DEF[k]) + ' 열기">';
+    h += '<div class="nc-top"><span class="nc-av av ' + who + (avPic(who) ? " pic" : "") + '" aria-hidden="true">' + avInner(who) + "</span>" +
+      '<span class="nc-who">' + esc(nm) + "</span></div>";
+    h += '<div class="nc-t">' + esc(g.title || GROUP_DEF[k]) + "</div>";
+    if (g.caption) h += '<div class="nc-c">' + esc(g.caption) + "</div>";
+    if (items.length) {
+      h += '<div class="nc-items">' + items.slice(0, 4).map(function (x) { return cardItem(k, x); }).join("") +
+        (items.length > 4 ? '<div class="cmore">+' + (items.length - 4) + "개</div>" : "") + "</div>";
+    } else {
+      h += '<div class="nc-empty">아직 비어 있어요</div>';
+    }
+    h += '<div class="nc-d">' + esc(String(g.date || today).replace(/-/g, ". ")) + "</div>";
     h += "</div>";
     return h;
   }
 
-  function addGroupRow(k) {
-    return '<button type="button" class="addrow grp-add" data-act="addGroup" data-tab="' + k + '">' +
-      '<span class="ap">' + IC.plus + '</span><span class="al">새 리스트 추가</span></button>';
+  /* 리스트 카드 상세 시트 — To-do 입력·토글·삭제 + 제목/메모/작성자 수정 */
+  function cardSheetHtml(k, g) {
+    var items = itemsOf(k).filter(function (x) { return x.gid === g.id; }).sort(byDone);
+    var who = g.who === "you" ? "you" : "me";
+    var h = '<div class="sheet-hd"><h2>' + esc(g.title || GROUP_DEF[k]) + '</h2>' +
+      '<button class="icon-btn" data-close="1" aria-label="닫기">' + IC.x + "</button></div>";
+    h += '<div class="todo-label" style="margin-top:2px">To-do</div>';
+    h += '<form class="todo-add" id="listAddForm" data-tab="' + k + '" data-gid="' + g.id + '">' +
+      '<span class="circ" aria-hidden="true">' + CIR_OFF + "</span>" +
+      '<input class="todo-in" name="text" placeholder="내용을 추가해보세요" autocomplete="off" enterkeyhint="done" aria-label="내용">' +
+      '<button class="todo-add-btn" type="submit">Add</button></form>';
+    h += '<div class="todo-items card-items" data-tab="' + k + '" data-gid="' + g.id + '">';
+    if (!items.length) h += '<div class="empty">위 칸에 적고 Add 를 눌러 보세요.</div>';
+    items.forEach(function (it) { h += diaryRow(k, it); });
+    h += "</div>";
+    h += '<form class="form" id="sheetForm" style="margin-top:24px">' +
+      '<div class="f"><label>제목</label><input class="field" name="title" value="' + esc(g.title || GROUP_DEF[k]) + '" required autocomplete="off"></div>' +
+      '<div class="f"><label>한 줄 메모 (선택)</label><input class="field" name="caption" value="' + esc(g.caption || "") + '" placeholder="짧게 적어 두기" autocomplete="off"></div>' +
+      '<div class="f"><label>누구</label><div class="seg seg-sm" data-group="gwho">' +
+      '<button type="button" class="seg-btn' + (who === "me" ? " active" : "") + '" data-act="gwho" data-who="me">' + esc(S.couple.me) + '</button>' +
+      '<button type="button" class="seg-btn' + (who === "you" ? " active" : "") + '" data-act="gwho" data-who="you">' + esc(S.couple.you) + "</button></div>" +
+      '<input type="hidden" name="who" value="' + who + '"></div>' +
+      '<p class="sheet-sub" style="margin-top:-4px">카드에 보이는 날짜는 만든 날이에요.</p>' +
+      '<button class="btn-primary" type="submit">저장하기</button>' +
+      '<button type="button" class="btn-del" data-act="delCard" data-tab="' + k + '" data-gid="' + g.id + '">카드 삭제</button></form>';
+    return h;
+  }
+
+  function openGroupSheet(k, gid) {
+    var g = groupOf(k, gid);
+    if (!g) return;
+    openSheet(cardSheetHtml(k, g), function (fd) {
+      var cur = groupOf(k, gid);
+      if (!cur) return;
+      var t = String(fd.get("title") || "").trim();
+      if (!t) { toast("제목을 적어 주세요"); return; }
+      cur.title = t;
+      cur.caption = String(fd.get("caption") || "").trim();
+      cur.who = fd.get("who") === "you" ? "you" : "me";
+      openCard = null;
+      save(); closeSheet(); renderDiary(); toast("저장했어요");
+    });
+    /* openSheet 가 열린 카드 표시를 비우므로 시트를 띄운 뒤에 기억해요 */
+    openCard = { tab: k, gid: gid };
+  }
+
+  /* 시트를 닫지 않고 항목을 토글·추가·삭제할 때 카드 시트만 다시 그림 */
+  function refreshCardSheet() {
+    if (!openCard || !sheet || !sheetWrap || !sheetWrap.classList.contains("open")) return;
+    var g = groupOf(openCard.tab, openCard.gid);
+    if (!g) return;
+    var st = sheet.scrollTop;
+    sheet.innerHTML = '<div class="grab"></div>' + cardSheetHtml(openCard.tab, g);
+    sheet.scrollTop = st;
+  }
+
+  function viewCards(k) {
+    var h = '<div class="ngrid">';
+    groupsOf(k).forEach(function (g) { h += noteCard(k, g); });
+    h += '<button type="button" class="ncard new" data-act="addGroup" data-tab="' + k + '">' +
+      '<span class="ap">' + IC.plus + '</span><span>새 리스트</span></button>';
+    h += "</div>";
+    h += '<div style="height:18px"></div>';
+    return h;
   }
   function firstGroupId(k) {
     var gs = groupsOf(k);
@@ -1147,57 +1262,11 @@
     return h;
   }
 
-  function viewTodo() {
-    var done = S.todos.filter(function (t) { return t.done; }).length;
-    var pct = S.todos.length ? Math.round(done / S.todos.length * 100) : 0;
-    var h = '<div class="progress" data-tab="todo"><span class="n">' + done + " / " + S.todos.length + ' 완료</span><span class="bar"><i style="width:' + pct + '%"></i></span></div>';
-    h += doneToggle(done);
-    var hide = !!(S.ui && S.ui.hideDone);
-    groupsOf("todo").forEach(function (g) {
-      var all = S.todos.filter(function (t) { return t.gid === g.id; });
-      var rows = all.slice().sort(byDone);
-      if (hide) rows = rows.filter(function (t) { return !t.done; });
-      var body = rows.map(function (t) { return diaryRow("todo", t); }).join("");
-      h += groupBlock("todo", g, body, all.length, "내용을 적고 Add 를 눌러 보세요.");
-    });
-    h += addGroupRow("todo");
-    return h;
-  }
+  function viewTodo() { return viewCards("todo"); }
 
-  function viewBucket() {
-    var done = S.bucket.filter(function (b) { return b.done; }).length;
-    var h = '<div class="progress" data-tab="bucket"><span class="n">' + done + " / " + S.bucket.length + ' 달성</span><span class="bar"><i style="width:' +
-      (S.bucket.length ? Math.round(done / S.bucket.length * 100) : 0) + '%"></i></span></div>';
-    h += doneToggle(done);
-    var hide = !!(S.ui && S.ui.hideDone);
-    groupsOf("bucket").forEach(function (g) {
-      var all = S.bucket.filter(function (b) { return b.gid === g.id; });
-      var rows = all.slice().sort(byDone);
-      if (hide) rows = rows.filter(function (b) { return !b.done; });
-      var body = rows.map(function (b) { return diaryRow("bucket", b); }).join("");
-      h += groupBlock("bucket", g, body, all.length, "이루고 싶은 일을 적고 Add 를 눌러 보세요.");
-    });
-    h += addGroupRow("bucket");
-    return h;
-  }
+  function viewBucket() { return viewCards("bucket"); }
 
-  function viewLog() {
-    var items = S.logs.slice().sort(byDateDesc).sort(byDone);
-    var done = S.logs.filter(function (l) { return l.done; }).length;
-    var h = '<div class="progress" data-tab="log"><span class="n">' + done + " / " + S.logs.length + ' 완료</span><span class="bar"><i style="width:' +
-      (S.logs.length ? Math.round(done / S.logs.length * 100) : 0) + '%"></i></span></div>';
-    h += doneToggle(done);
-    var hide = !!(S.ui && S.ui.hideDone);
-    groupsOf("log").forEach(function (g) {
-      var all = S.logs.filter(function (l) { return l.gid === g.id; });
-      var rows = all.slice().sort(byDateDesc).sort(byDone);
-      if (hide) rows = rows.filter(function (l) { return !l.done; });
-      var body = rows.map(function (l) { return diaryRow("log", l); }).join("");
-      h += groupBlock("log", g, body, all.length, "영화나 맛집을 적고 Add 를 눌러 보세요.");
-    });
-    h += addGroupRow("log");
-    return h;
-  }
+  function viewLog() { return viewCards("log"); }
 
   /* ------------------------------------------------------------------ photos */
   function photoSrc(p) {
@@ -1245,6 +1314,7 @@
   var sheetWrap = $("#sheetWrap"), sheet = $("#sheet"), sheetSubmit = null;
   function openSheet(html, onSubmit) {
     personSheetWho = null;
+    openCard = null;
     sheet.innerHTML = '<div class="grab"></div>' + html;
     sheetSubmit = onSubmit || null;
     sheetWrap.classList.add("open");
@@ -1253,12 +1323,16 @@
   }
   function closeSheet() {
     personSheetWho = null;
+    openCard = null;
     sheetWrap.classList.remove("open");
     sheetWrap.setAttribute("aria-hidden", "true");
     sheetSubmit = null;
     pendingUrls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
     pendingUrls = [];
     pendingFiles = [];
+    /* 시트에서 고친 내용(카드 안 To-do 등)이 뒤 화면에도 바로 보이도록 노트를 다시 그림 */
+    var dEl = document.getElementById("s-diary");
+    if (dEl && dEl.classList.contains("active")) renderDiary();
   }
 
   function toast(msg) {
@@ -1432,8 +1506,19 @@
     var bd = c.birthdays || {};
     var h = sheetHead("기념일 & 생일");
 
-    /* 1·2·3주년 + 두 사람 생일 — 누르는 즉시 보여요 */
-    h += '<div class="mile">';
+    /* 1. 문구는 맨 위에서 — 라벨은 「우리는」 */
+    h += '<form class="form" id="sheetForm">' +
+      '<div class="f"><label>우리는</label><input class="field" name="phrase" value="' + esc(ddayPhrase()) + '" placeholder="소영과 준영이 함께한 지" autocomplete="off"></div>' +
+      '<p class="sheet-sub" style="margin-top:-4px">홈 D-day 위에 이 문구가 그대로 보여요.</p>' +
+      '<div class="f"><label>처음 만난 날</label><input class="field" type="date" name="since" value="' + c.since + '" required></div>' +
+      '<div class="f"><label>D-day 표기</label><div class="seg seg-sm" data-group="fmt">' +
+      '<button type="button" class="seg-btn' + (c.fmt === "Y" ? "" : " active") + '" data-act="fmt" data-fmt="D">일수로 · D+365일</button>' +
+      '<button type="button" class="seg-btn' + (c.fmt === "Y" ? " active" : "") + '" data-act="fmt" data-fmt="Y">연·일로 · 1년 4일째</button>' +
+      '</div><input type="hidden" name="fmt" value="' + (c.fmt === "Y" ? "Y" : "D") + '"></div>' +
+      '<p style="font-size:11.5px;color:var(--ink-3);line-height:1.6;margin-top:-2px">이 날을 기준으로 D-day와 기념일을 계산해요.</p>';
+
+    /* 2. 기념일 & 생일 — 주년은 그대로, 두 사람 생일은 달력에서 바로 고쳐요 */
+    h += '<div class="mile-hd">기념일 &amp; 생일</div><div class="mile">';
     var since = parse(c.since);
     for (var n = 1; n <= 3; n++) {
       var ad = new Date(since.getFullYear() + n, since.getMonth(), since.getDate());
@@ -1441,24 +1526,21 @@
       h += mileRow(n + "주년", ads.replace(/-/g, "."), add === 0 ? "오늘" : add > 0 ? "D-" + add : -add + "일 지남", add >= 0 && add <= 30);
     }
     ["me", "you"].forEach(function (w) {
-      var txt = String(bd[w] || "").trim();
-      var nb = nextBirthday(txt);
-      h += mileRow((w === "me" ? c.me : c.you) + " 생일", txt || "날짜 입력",
-        nb ? (nb.days === 0 ? "오늘" : "D-" + nb.days) : "—", !!nb && nb.days <= 30);
+      var nm = w === "me" ? c.me : c.you;
+      var nb = nextBirthday(bd[w]);
+      h += '<div class="mile-bd">' +
+        '<div class="mile-row bd-top">' +
+        '<span class="mile-n">' + esc(nm) + ' 생일</span>' +
+        '<span class="mile-d" data-bdtxt="' + w + '">' + esc(bdayText(bd[w]) || "날짜 입력") + "</span>" +
+        '<span class="mile-x' + (nb && nb.days <= 30 ? " soon" : "") + '" data-bdleft="' + w + '">' +
+        (nb ? (nb.days === 0 ? "오늘" : "D-" + nb.days) : "—") + "</span></div>" +
+        '<input class="field bd-in js-bday" type="date" name="bd' + (w === "me" ? "Me" : "You") +
+        '" data-who="' + w + '" value="' + bdayInput(w) + '" aria-label="' + esc(nm) + ' 생일 달력">' +
+        "</div>";
     });
     h += "</div>";
-    h += '<button type="button" class="set-btn" data-act="editBirthdays" style="width:100%;margin:12px 0 0">생일 입력·수정</button>';
-
-    h += '<form class="form" id="sheetForm" style="margin-top:18px">' +
-      '<div class="f"><label>기념일 문구</label><input class="field" name="phrase" value="' + esc(ddayPhrase()) + '" placeholder="소영과 준영이 함께한 지" autocomplete="off"></div>' +
-      '<p class="sheet-sub" style="margin-top:-2px">홈 D-day 위에 이 문구가 그대로 보여요. 자유롭게 적어 주세요.</p>' +
-      '<div class="f" style="margin-top:2px"><label>처음 만난 날</label><input class="field" type="date" name="since" value="' + c.since + '" required></div>' +
-      '<div class="f"><label>D-day 표기</label><div class="seg seg-sm" data-group="fmt">' +
-      '<button type="button" class="seg-btn' + (c.fmt === "Y" ? "" : " active") + '" data-act="fmt" data-fmt="D">일수로 · D+365일</button>' +
-      '<button type="button" class="seg-btn' + (c.fmt === "Y" ? " active" : "") + '" data-act="fmt" data-fmt="Y">연·일로 · 1년 4일째</button>' +
-      '</div><input type="hidden" name="fmt" value="' + (c.fmt === "Y" ? "Y" : "D") + '"></div>' +
-      '<p style="font-size:11.5px;color:var(--ink-3);line-height:1.6;margin-top:-2px">이 날을 기준으로 D-day와 기념일을 계산해요.</p>' +
-      '<button class="btn-primary" type="submit">저장하기</button></form>';
+    h += '<p class="cp-note" style="margin-top:10px">생일은 달력에서 고르면 캘린더 아래에 「6월 26일」처럼 보여요. 연도는 표시에만 쓰이고 D-day는 월·일로 계산해요.</p>';
+    h += '<button class="btn-primary" type="submit">저장하기</button></form>';
     return h;
   }
 
@@ -1513,7 +1595,7 @@
     return '<div class="cp"><div class="cp-hd"><span>' + title + '</span><span class="cp-val" data-val="' + target + '">' +
       (cur ? curU : "기본") + "</span></div>" + swRow(target, curU, pal) +
       '<div class="cp-foot"><label class="cp-pick"><input type="color" class="js-color" data-target="' + target + '" value="' +
-      (curU || fallback) + '"><span>직접 고르기</span></label>' +
+      (curU || fallback) + '"><span>컬러</span></label>' +
       '<button class="cp-reset' + (cur ? "" : " on") + '" data-act="pickColor" data-target="' + target + '" data-color="">기본</button></div></div>';
   }
 
@@ -1521,28 +1603,26 @@
     var t = S.theme || {};
     var dark = t.mode === "dark";
     var monthNo = Number(today.slice(5, 7));
-    return sheetHead("색 고르기") +
-      '<p class="sheet-sub">화면 밝기와 홈 섹션 바탕색을 골라 주세요.</p>' +
+    return sheetHead("컬러") +
+      '<p class="sheet-sub">화면 밝기와 홈 제목 줄 색을 골라 주세요.</p>' +
       '<div class="cp"><div class="cp-hd"><span>화면</span><span class="cp-val">' + (dark ? "다크" : "라이트") + '</span></div>' +
       '<div class="seg seg-sm" data-group="mode">' +
       '<button type="button" class="seg-btn' + (dark ? "" : " active") + '" data-act="mode" data-mode="light">라이트</button>' +
       '<button type="button" class="seg-btn' + (dark ? " active" : "") + '" data-act="mode" data-mode="dark">다크</button>' +
       "</div></div>" +
-      cpBlock("다가오는 일정", "schedBg", t.schedBg, MUTED, "#FBF6EE") +
-      cpBlock(monthNo + "월의 우리", "ourBg", t.ourBg, MUTED, "#EDF1EC") +
-      '<p class="cp-note">고른 색은 홈의 그 섹션 전체에 테두리 없이 깔리고, 글씨는 색에 맞춰 진하게 바뀌어요. 바로 적용되고 앱을 다시 열어도 그대로 남아 있어요. ‘기본’으로 두면 원래대로 돌아가요.</p>' +
+      cpBlock("다가오는 일정 · " + monthNo + "월의 우리", "homeTitleBg", t.homeTitleBg, MUTED, "#EDF1EC") +
+      '<p class="cp-note">고른 색은 두 섹션의 제목 줄(문구) 바탕에만 칠해지고, 일정 목록과 카드는 원래처럼 깨끗한 바탕으로 남아요. 바로 적용되고 앱을 다시 열어도 그대로 남아 있어요. ‘기본’으로 두면 원래대로 돌아가요.</p>' +
       '<button class="btn-primary" data-close="1">완료</button>';
   }
 
   function formBirthdays() {
-    var b = (S.couple && S.couple.birthdays) || {};
     return sheetHead("생일") +
-      '<p class="sheet-sub">두 사람의 생일을 적어 두면 캘린더 아래에 늘 보여요.</p>' +
+      '<p class="sheet-sub">두 사람의 생일을 달력에서 고르면 캘린더 아래에 늘 보여요.</p>' +
       '<form class="form" id="sheetForm">' +
       '<div class="f"><label>' + esc(S.couple.me) + ' 생일</label>' +
-      '<input class="field" name="me" value="' + esc(b.me || "") + '" placeholder="예) 6월 26일" autocomplete="off"></div>' +
+      '<input class="field" type="date" name="me" value="' + bdayInput("me") + '"></div>' +
       '<div class="f"><label>' + esc(S.couple.you) + ' 생일</label>' +
-      '<input class="field" name="you" value="' + esc(b.you || "") + '" placeholder="예) 3월 14일" autocomplete="off"></div>' +
+      '<input class="field" type="date" name="you" value="' + bdayInput("you") + '"></div>' +
       '<button class="btn-primary" type="submit">저장</button></form>' +
       '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
   }
@@ -1560,6 +1640,20 @@
       '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
   }
 
+  /* 기념일 시트 안 생일 달력을 고르는 순간 「6월 26일 · D-223」을 바로 갱신 */
+  function updateBdayRow(inp) {
+    var w = inp.getAttribute("data-who") === "you" ? "you" : "me";
+    var val = String(inp.value || "");
+    var nb = nextBirthday(val);
+    var left = sheet.querySelector('[data-bdleft="' + w + '"]');
+    if (left) {
+      left.textContent = nb ? (nb.days === 0 ? "오늘" : "D-" + nb.days) : "—";
+      left.classList.toggle("soon", !!nb && nb.days <= 30);
+    }
+    var txt = sheet.querySelector('[data-bdtxt="' + w + '"]');
+    if (txt) txt.textContent = bdayText(val) || "날짜 입력";
+  }
+
   function syncThemeSheet() {
     if (!sheet) return;
     var modeGroup = sheet.querySelector('[data-group="mode"]');
@@ -1571,7 +1665,7 @@
       var mv = modeGroup.parentNode.querySelector('.cp-val');
       if (mv) mv.textContent = dk ? "다크" : "라이트";
     }
-    ["name", "log", "schedBg", "ourBg"].forEach(function (t) {
+    ["name", "log", "homeTitleBg"].forEach(function (t) {
       var cur = String((S.theme || {})[t] || "").toUpperCase();
       var val = sheet.querySelector('.cp-val[data-val="' + t + '"]');
       if (val) val.textContent = cur || "기본";
@@ -1609,7 +1703,7 @@
       '<button class="set-btn warn" data-act="photoDelete" data-id="' + p.id + '">삭제</button></div>' +
       '<div class="cp"><div class="cp-hd"><span>캡션 바탕색</span><span class="cp-val" data-capval="' + p.id + '">' +
       (p.capBg ? p.capBg.toUpperCase() : "기본") + "</span></div>" + sw +
-      '<div class="cp-foot"><label class="cp-pick"><input type="color" class="js-cap" data-id="' + p.id + '" value="' + capBg(p) + '"><span>직접 고르기</span></label>' +
+      '<div class="cp-foot"><label class="cp-pick"><input type="color" class="js-cap" data-id="' + p.id + '" value="' + capBg(p) + '"><span>컬러</span></label>' +
       '<button class="cp-reset' + (p.capBg ? "" : " on") + '" data-act="pickCap" data-id="' + p.id + '" data-color="">기본</button></div>' +
       '<p class="cp-note">글씨는 어느 색을 골라도 검정으로 유지돼요. 고른 색은 앱을 다시 열어도 그대로 남아 있어요.</p></div>' +
       '<div style="height:6px"></div>';
@@ -1792,6 +1886,8 @@
     });
   }
   var personSheetWho = null;
+  /* 노트 카드 상세 시트가 열려 있을 때 어느 카드인지 */
+  var openCard = null;
 
   function formPerson(who) {
     var isMe = who === "me";
@@ -1913,7 +2009,7 @@
       h += '<button type="button" class="sw' + (cur === c.toUpperCase() ? " sel" : "") + '" data-act="pickCapAll" data-color="' + c +
         '" style="background:' + c + '" aria-label="캡션 ' + c + '"></button>';
     });
-    h += '</div><input type="color" class="cap-pick js-capall" value="' + (cur || "#FFFFFF") + '" aria-label="캡션 색 직접 고르기"></div>';
+    h += '</div><input type="color" class="cap-pick js-capall" value="' + (cur || "#FFFFFF") + '" aria-label="캡션 컬러"></div>';
     return h;
   }
 
@@ -1979,11 +2075,11 @@
     var t = S.theme || {};
     var parts = [t.mode === "dark" ? "다크" : "라이트", fontOf(t.font).n];
     if (t.cap) parts.push("캡션 색");
-    if (t.schedBg || t.ourBg) parts.push("홈 섹션 색");
+    if (t.homeTitleBg) parts.push("홈 제목 색");
     return parts.join(" · ");
   }
 
-  /* 테마 관리 — 화면·캡션 색·일정 색·홈 섹션 색·폰트를 한 곳에서 */
+  /* 테마 관리 — 화면·캡션 색·일정 색·홈 제목 색·폰트를 한 곳에서 */
   function themeManagerHtml() {
     var t = S.theme || {}, dark = t.mode === "dark";
     var monthNo = Number(today.slice(5, 7));
@@ -1998,9 +2094,9 @@
       '<p class="cp-note" style="margin-top:10px">홈·캘린더·노트·사진첩·My 제목 줄에 한 번에 적용돼요. 글씨는 늘 검정으로 또렷하게 보여요.</p></div>';
     h += '<div class="cp"><div class="cp-hd"><span>일정 색</span><span class="cp-val">소영 · 준영 · 공동</span></div>' +
       colorPickRow("me") + colorPickRow("you") + colorPickRow("both") + "</div>";
-    h += '<div class="cp"><div class="cp-hd"><span>홈 섹션 색</span><span class="cp-val">뮤트 톤</span></div>' +
-      cpBlock("다가오는 일정", "schedBg", t.schedBg, MUTED, "#FBF6EE") +
-      cpBlock(monthNo + "월의 우리", "ourBg", t.ourBg, MUTED, "#EDF1EC") + "</div>";
+    h += '<div class="cp"><div class="cp-hd"><span>홈 제목 색</span><span class="cp-val">뮤트 톤</span></div>' +
+      cpBlock("다가오는 일정 · " + monthNo + "월의 우리", "homeTitleBg", t.homeTitleBg, MUTED, "#EDF1EC") +
+      '<p class="cp-note" style="margin-top:10px">두 섹션의 제목 줄 바탕에만 색이 칠해지고, 목록과 카드는 흰 바탕으로 남아요.</p></div>';
     h += '<div class="cp"><div class="cp-hd"><span>폰트</span><span class="cp-val">' + esc(fontOf(t.font).n) + '</span></div>' +
       '<div class="font-list">' + fontRows() + "</div></div>";
     h += '<div style="height:16px"></div><button class="btn-primary" data-close="1">완료</button>';
@@ -2187,6 +2283,12 @@
         S.couple.phrase = String(fd.get("phrase") || "").trim() || defaultPhrase();
         if (fd.get("since")) S.couple.since = fd.get("since");
         S.couple.fmt = fd.get("fmt") === "Y" ? "Y" : "D";
+        /* 생일은 시트 안 달력(input[type=date])에서 바로 — 빈 값이면 비우기 */
+        if (fd.has("bdMe") || fd.has("bdYou")) {
+          S.couple.birthdays = S.couple.birthdays || {};
+          S.couple.birthdays.me = String(fd.get("bdMe") || "").trim();
+          S.couple.birthdays.you = String(fd.get("bdYou") || "").trim();
+        }
         save(); closeSheet(); renderAll(); toast("기념일을 저장했어요");
       });
       return;
@@ -2331,6 +2433,37 @@
       return;
     }
 
+    if (act === "openGroup") {
+      openGroupSheet(el.getAttribute("data-tab") || "todo", el.getAttribute("data-gid"));
+      return;
+    }
+
+    if (act === "gwho") {
+      var gw = el.getAttribute("data-who") === "you" ? "you" : "me";
+      var gwhoBox = el.closest('[data-group="gwho"]');
+      if (gwhoBox) {
+        gwhoBox.querySelectorAll(".seg-btn").forEach(function (b) { b.classList.toggle("active", b === el); });
+        var gwhoIn = gwhoBox.parentNode.querySelector('input[name="who"]');
+        if (gwhoIn) gwhoIn.value = gw;
+      }
+      return;
+    }
+
+    if (act === "delCard") {
+      var dcK = el.getAttribute("data-tab") || "todo";
+      var dcGid = el.getAttribute("data-gid");
+      var dcg = groupOf(dcK, dcGid);
+      if (!dcg) return;
+      askConfirm("‘" + esc(dcg.title || GROUP_DEF[dcK]) + "’ 카드를 지울까요? 안에 적은 항목도 함께 사라져요.", "지우기", function () {
+        S.groups[dcK] = (S.groups[dcK] || []).filter(function (g) { return g.id !== dcGid; });
+        var dckey = GROUP_ARR[dcK];
+        S[dckey] = (S[dckey] || []).filter(function (x) { return x.gid !== dcGid; });
+        openCard = null;
+        save(); closeSheet(); renderDiary(); toast("카드를 지웠어요");
+      });
+      return;
+    }
+
     if (act === "addGroup") {
       var agK = el.getAttribute("data-tab") || "todo";
       openSheet(formGroup(agK, null), function (fd) {
@@ -2338,7 +2471,7 @@
         if (!gTitle) { toast("리스트 이름을 적어 주세요"); return; }
         S.groups = S.groups || {};
         S.groups[agK] = S.groups[agK] || [];
-        S.groups[agK].push({ id: uid(), title: gTitle, caption: String(fd.get("caption") || "").trim() });
+        S.groups[agK].push({ id: uid(), title: gTitle, caption: String(fd.get("caption") || "").trim(), who: "me", date: today });
         save(); closeSheet(); renderAll(); toast("리스트를 만들었어요");
       });
       return;
@@ -2923,6 +3056,17 @@
       else { lit.kind = "movie"; lit.title = ltxt; lit.rating = 4; lit.date = today; lit.review = ""; lit.place = ""; lit.done = true; }
       itemsOf(lk).push(lit);
       save();
+      /* 카드 상세 시트에서 바로 더한 경우 — 시트 안 목록에 붙이고 입력칸을 비워요 */
+      if (openCard && openCard.tab === lk && openCard.gid === lgid) {
+        var sbox = document.querySelector('#sheet .card-items');
+        if (sbox) {
+          var sel2 = sbox.querySelector(".empty");
+          if (sel2) sel2.remove();
+          sbox.insertAdjacentHTML("beforeend", diaryRow(lk, lit));
+        }
+        if (lin) { lin.value = ""; lin.focus(); }
+        return;
+      }
       var lbox = document.querySelector('#s-diary .todo-items[data-tab="' + lk + '"][data-gid="' + lgid + '"]');
       if (lbox) {
         var lel = lbox.querySelector(".empty");
@@ -2947,6 +3091,7 @@
     if (t && t.classList && t.classList.contains("js-page")) setPageCap(t.getAttribute("data-page"), t.value);
     if (t && t.classList && t.classList.contains("js-capall")) setCapAll(t.value);
     if (t && t.classList && t.classList.contains("js-own")) setOwnerColor(t.getAttribute("data-who") || "me", t.value);
+    if (t && t.classList && t.classList.contains("js-bday")) updateBdayRow(t);
   });
 
   /* 파일 선택 → 프로필 사진 (동그란 아바타) */

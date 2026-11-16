@@ -39,6 +39,30 @@ def serve():
 threading.Thread(target=serve, daemon=True).start()
 time.sleep(0.8)
 
+# 이 환경은 시스템 라이브러리(libatk 등)가 없어 LD_LIBRARY_PATH 로 넘겨 줍니다.
+LIB = "/workspace/.libs/usr/lib/x86_64-linux-gnu"
+CHROMES = [
+    None,
+    "/workspace/.cache/ms-playwright/chromium_headless_shell-1255/chrome-headless-shell-linux64/chrome-headless-shell",
+    "/workspace/.cache/ms-playwright/chromium-1255/chrome-linux64/chrome",
+]
+
+
+def launch(p):
+    env = dict(os.environ)
+    if os.path.isdir(LIB):
+        env["LD_LIBRARY_PATH"] = LIB
+    last = None
+    for exe in CHROMES:
+        try:
+            kw = {"args": ["--no-sandbox"], "env": env}
+            if exe:
+                kw["executable_path"] = exe
+            return p.chromium.launch(**kw)
+        except Exception as e:  # noqa: BLE001
+            last = e
+    raise last
+
 CSS_OF = """(sel) => { const el = document.querySelector(sel); if (!el) return null;
   const s = getComputedStyle(el); return {bw: s.borderTopWidth, bg: s.backgroundColor,
   mt: s.marginTop, fs: s.fontSize, lh: s.lineHeight, h: s.height}; }"""
@@ -54,12 +78,7 @@ def shot(page, name, settle=1900):
 
 
 with sync_playwright() as p:
-    try:
-        browser = p.chromium.launch()
-    except Exception:
-        browser = p.chromium.launch(
-            executable_path="/workspace/.cache/ms-playwright/chromium-1255/chrome-linux64/chrome",
-            args=["--no-sandbox"])
+    browser = launch(p)
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
     page = ctx.new_page()
     errors = []
@@ -94,7 +113,7 @@ with sync_playwright() as p:
     page.locator(".bday-note").click()
     page.wait_for_timeout(350)
     check("생일 시트", page.locator('#sheetForm input[name="me"]').count() == 1)
-    page.fill('#sheetForm input[name="you"]', "3월 14일")
+    page.fill('#sheetForm input[name="you"]', "2000-03-14")
     page.click('#sheetForm button[type="submit"]')
     page.wait_for_timeout(500)
     check("생일 저장", "3월 14일" in page.locator(".bday-note").inner_text(), page.locator(".bday-note").inner_text())
@@ -129,7 +148,7 @@ with sync_playwright() as p:
     check("일정 글씨 확대", t and float(t["fs"].replace("px", "")) >= 14, t)
     check("일정 색 띠", page.locator(".row.sched .bar").count() >= 1, page.locator(".row.sched .bar").count())
     check("일정 날짜 표시", page.locator(".row.sched .smeta .sd").count() >= 1)
-    check("공동 일정 하트", page.locator(".who-row.both .heart").count() >= 1)
+    check("공동 일정 하트", page.locator("#s-cal .who-row.both .heart").count() >= 1)
     shot(page, "home-v13.png")
 
     # ---------- 상단 팔레트: 다가오는 일정 / 11월의 우리 뮤트색 ----------
@@ -137,51 +156,53 @@ with sync_playwright() as p:
     page.wait_for_timeout(350)
     sheet_txt = page.locator("#sheet").inner_text()
     check("테마 시트 항목", ("다가오는 일정" in sheet_txt) and ("월의 우리" in sheet_txt), sheet_txt[:120])
-    check("테마 시트 뮤트 10색", page.locator('#sheet .sw-grid[data-sw="schedBg"] .sw').count() == 10,
-          page.locator('#sheet .sw-grid[data-sw="schedBg"] .sw').count())
-    check("직접 고르기", page.locator('#sheet .js-color[data-target="schedBg"]').count() == 1)
+    check("테마 시트 뮤트 10색", page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw').count() == 10,
+          page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw').count())
+    check("컬러 라벨", page.locator('#sheet .js-color[data-target="homeTitleBg"]').count() == 1)
     shot(page, "theme-sheet-v13.png", settle=300)
-    page.locator('#sheet .sw-grid[data-sw="schedBg"] .sw').nth(0).click()
+    page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw').nth(0).click()
     page.wait_for_timeout(350)
-    tint = page.evaluate(CSS_OF, ".home-sec[data-sec='sched']")
-    check("섹션 바탕 적용", tint and tint["bg"] not in ("rgba(0, 0, 0, 0)", "transparent"), tint)
+    tint = page.evaluate(CSS_OF, ".home-sec[data-sec='sched'] .sec-tint")
+    check("제목 줄 바탕 적용", tint and tint["bg"] not in ("rgba(0, 0, 0, 0)", "transparent"), tint)
     check("시트 유지", page.locator("#sheetWrap.open").count() == 1)
-    page.locator('#sheet .sw-grid[data-sw="ourBg"] .sw').nth(3).click()
-    page.wait_for_timeout(400)
     page.keyboard.press("Escape")
     shot(page, "home-tinted-v13.png")
     page.locator('#s-home [data-act="openTheme"]').click()
     page.wait_for_timeout(300)
-    page.locator('#sheet .cp-reset[data-target="schedBg"]').click()
-    page.locator('#sheet .cp-reset[data-target="ourBg"]').click()
+    page.locator('#sheet .cp-reset[data-target="homeTitleBg"]').click()
     page.wait_for_timeout(300)
     page.keyboard.press("Escape")
     page.wait_for_timeout(250)
-    check("뮤트색 해제", page.locator(".home-sec.tinted").count() == 0, page.locator(".home-sec.tinted").count())
+    check("뮤트색 해제", page.locator(".sec-tint").first.evaluate("el => getComputedStyle(el).backgroundColor")
+          in ("rgba(0, 0, 0, 0)", "transparent"))
 
     # ---------- 노트: 리스트 안 To-do + 새 리스트 ----------
     page.locator("#tabbar .tab").nth(2).click()
+    page.wait_for_timeout(450)
+    check("메모 카드", page.locator("#s-diary .ncard").count() == 2, page.locator("#s-diary .ncard").count())
+    page.locator("#s-diary .ncard").first.click()
     page.wait_for_timeout(400)
-    check("메모 리스트 블록", page.locator("#s-diary .grp").count() == 1, page.locator("#s-diary .grp").count())
-    check("To-do 라벨", page.locator("#s-diary .todo-label").count() == 1)
-    check("To-do 입력 줄", page.locator('#s-diary #listAddForm input[name="text"]').count() == 1)
-    check("Add 버튼", page.locator("#s-diary .todo-add-btn").count() == 1)
+    check("To-do 라벨", page.locator("#sheet .todo-label").count() == 1)
+    check("To-do 입력 줄", page.locator('#sheet #listAddForm input[name="text"]').count() == 1)
+    check("Add 버튼", page.locator("#sheet .todo-add-btn").count() == 1)
     for word in ("우유 사기", "계란", "카카오페이 충전"):
-        page.fill('#s-diary #listAddForm input[name="text"]', word)
-        page.click("#s-diary .todo-add-btn")
+        page.fill('#sheet #listAddForm input[name="text"]', word)
+        page.click("#sheet .todo-add-btn")
         page.wait_for_timeout(300)
-    check("항목 바로 추가", page.locator("#s-diary .trow").count() == 3, page.locator("#s-diary .trow").count())
-    page.locator("#s-diary .trow .circ").first.click()
+    check("항목 바로 추가", page.locator("#sheet .card-items .trow").count() == 3, page.locator("#sheet .card-items .trow").count())
+    page.locator("#sheet .card-items .trow .circ").first.click()
     page.wait_for_timeout(350)
-    check("완료 표시", page.locator("#s-diary .trow.done").count() >= 1)
-    check("완료는 아래로", page.locator("#s-diary .trow").last.evaluate("el => el.classList.contains('done')"))
-    page.locator('#s-diary [data-act="addGroup"]').first.click()
+    check("완료 표시", page.locator("#sheet .card-items .trow.done").count() >= 1)
+    check("완료는 아래로", page.locator("#sheet .card-items .trow").last.evaluate("el => el.classList.contains('done')"))
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(300)
+    page.locator("#s-diary .ncard.new").click()
     page.wait_for_timeout(350)
     page.fill('#sheetForm input[name="title"]', "장보기")
     page.fill('#sheetForm input[name="caption"]', "이번 주말에 사 올 것")
     page.click('#sheetForm button[type="submit"]')
     page.wait_for_timeout(450)
-    check("새 리스트 추가", page.locator("#s-diary .grp").count() == 2, page.locator("#s-diary .grp").count())
+    check("새 리스트 추가", page.locator("#s-diary .ncard").count() == 3, page.locator("#s-diary .ncard").count())
     check("리스트 캡션", "이번 주말에 사 올 것" in page.locator("#s-diary").inner_text())
     shot(page, "note-v13.png")
     # 다크 모드도 같은 화면으로 확인
@@ -202,7 +223,7 @@ with sync_playwright() as p:
     page.locator('#s-set .menu-row[data-act="openThemeManager"]').click()
     page.wait_for_timeout(400)
     tm = page.locator("#sheet").inner_text()
-    check("테마 관리 시트", all(k in tm for k in ["화면", "페이지 캡션 색", "일정 색", "홈 섹션 색", "폰트"]), tm[:160])
+    check("테마 관리 시트", all(k in tm for k in ["화면", "페이지 캡션 색", "일정 색", "홈 제목 색", "폰트"]), tm[:160])
     check("배민 폰트 5종", all(n in tm for n in ["배민 주아체", "배민 도현체", "배민 한나체 Pro", "배민 연성체", "배민 을지로체"]))
     shot(page, "theme-manager-v13.png", settle=400)
     loaded = page.evaluate("""() => {
