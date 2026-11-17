@@ -109,6 +109,7 @@ with sync_playwright() as p:
     if len(caps) == 2:
         same = all(caps[0][k] == caps[1][k] for k in ("fs", "fw", "lh", "ls", "col"))
         check("두 제목 글씨 크기·굵기·스타일 동일", same, caps)
+        check("항목 이름 글씨 15px·700", caps[0]["fs"] == "15px" and caps[0]["fw"] == "700", caps[0])
         check("화면이 맨 위 · 컬러가 그 아래", caps[0]["top"] < caps[1]["top"], caps)
 
     # 남아야 하는 것
@@ -221,6 +222,307 @@ with sync_playwright() as p:
     ml = page.evaluate("getComputedStyle(document.querySelector('#sheet .btn-primary')).color")
     check("색 비운 라이트 완료 버튼도 글씨 검정", max(int(x) for x in ml[4:-1].split(",")) <= 60, ml)
     page.locator('#sheet .btn-primary[data-close="1"]').click()
+    page.wait_for_timeout(300)
+
+    # ---------------- 노트: 리스트를 누르면 그 목록으로 들어간다 ----------------
+    def sheet_open():
+        return page.evaluate("(() => { const w = document.getElementById('sheetWrap'); return !!(w && w.classList.contains('open')); })()")
+
+    def close_sheet():
+        if sheet_open():
+            page.locator('#sheet [data-close]').first.click()
+            page.wait_for_timeout(300)
+
+    page.locator("#tabbar .tab").nth(2).click()
+    page.wait_for_timeout(500)
+    check("노트 화면 열림", page.locator("#s-diary .ngrid").count() == 1)
+
+    # 메모 탭에 카드 하나 더 만들어 두기
+    page.locator("#s-diary .ncard.new").click()
+    page.wait_for_timeout(400)
+    page.fill('#sheet #sheetForm input[name="title"]', "주말 장보기")
+    page.locator('#sheet button[type="submit"]').click()
+    page.wait_for_timeout(500)
+    check("메모 카드 2개", page.locator("#s-diary .ngrid .ncard:not(.new)").count() == 2,
+          page.locator("#s-diary .ngrid .ncard:not(.new)").count())
+
+    seg_names = ["메모", "버킷리스트", "영화·먹방"]
+    for si in range(3):
+        page.locator("#s-diary .segs .seg-btn").nth(si).click()
+        page.wait_for_timeout(420)
+        n = page.locator("#s-diary .ngrid .ncard:not(.new)").count()
+        check("%s 탭 카드 %d개" % (seg_names[si], n), n >= 1, n)
+        check("%s 카드마다 꺾쇠 표시" % seg_names[si],
+              page.locator("#s-diary .ngrid .ncard:not(.new) .nc-go").count() == n)
+        for j in range(n):
+            card = page.locator("#s-diary .ngrid .ncard:not(.new)").nth(j)
+            title = card.locator(".nc-t").inner_text().strip()
+            card.locator(".nc-t").tap()
+            page.wait_for_timeout(430)
+            st2 = page.evaluate("""(() => { const i = document.querySelector('#sheet #sheetForm input[name=\"title\"]');
+               return {title: i ? i.value : null, items: document.querySelectorAll('#sheet .card-items .trow').length}; })()""")
+            check("%s 「%s」 누르면 그 목록 열림" % (seg_names[si], title),
+                  sheet_open() and (st2["title"] or "").strip() == title, st2)
+            close_sheet()
+
+    # 메모 첫 카드: 항목 추가 → 체크 → 수정 → 카드에 반영
+    page.locator("#s-diary .segs .seg-btn").nth(0).click()
+    page.wait_for_timeout(420)
+    page.locator("#s-diary .ngrid .ncard:not(.new)").first.locator(".nc-t").tap()
+    page.wait_for_timeout(450)
+    check("카드 시트에 부가설명 없음", page.locator("#sheet .card-meta .sheet-sub").count() == 0
+          and "카드 맨 윗줄에" not in page.locator("#sheet").inner_text(),
+          page.locator("#sheet").inner_text()[:90])
+    before = page.locator("#sheet .card-items .trow").count()
+    page.fill('#sheet #listAddForm input[name="text"]', "우유 사기")
+    page.locator("#sheet .todo-add-btn").click()
+    page.wait_for_timeout(450)
+    after = page.locator("#sheet .card-items .trow").count()
+    check("카드 목록에서 항목 추가", after == before + 1, (before, after))
+    check("추가한 항목이 목록에 보임", "우유 사기" in page.locator("#sheet .card-items").inner_text())
+    page.locator("#sheet .card-items .trow", has_text="우유 사기").first.locator(".circ").click()
+    page.wait_for_timeout(500)
+    milk_cls = page.locator("#sheet .card-items .trow", has_text="우유 사기").first.get_attribute("class") or ""
+    check("카드 목록에서 체크", "done" in milk_cls, milk_cls)
+    order = page.evaluate("Array.from(document.querySelectorAll('#sheet .card-items .trow')).map(r => r.classList.contains('done'))")
+    check("체크한 항목은 카드 목록 맨 아래로", order == sorted(order), order)
+    page.locator("#sheet .card-items .trow", has_text="우유 사기").first.locator(".body").click()
+    page.wait_for_timeout(450)
+    ed = page.evaluate("""(() => { const i = document.querySelector('#sheet #sheetForm input[name=\"text\"]');
+       return {hd: document.querySelector('#sheet .sheet-hd h2').textContent, v: i ? i.value : null}; })()""")
+    check("항목 본문 누르면 수정 열림", ed["hd"].strip().endswith("수정") and ed["v"] == "우유 사기", ed)
+    page.fill('#sheet #sheetForm input[name="text"]', "우유 사기 (저지방)")
+    page.locator('#sheet button[type="submit"]').click()
+    page.wait_for_timeout(550)
+    close_sheet()
+    page.locator("#s-diary .ngrid .ncard:not(.new)").first.locator(".nc-t").tap()
+    page.wait_for_timeout(450)
+    check("수정한 항목이 목록에 남음", "저지방" in page.locator("#sheet .card-items").inner_text(),
+          page.locator("#sheet .card-items").inner_text()[:120])
+    close_sheet()
+    prev = page.locator("#s-diary .ngrid .ncard:not(.new)").first.inner_text()
+    check("카드 미리보기에 항목·개수 표시", "개" in prev and page.locator("#s-diary .ngrid .ncard:not(.new)").first.locator(".nc-n").inner_text().strip() == "7", prev[:80])
+
+    # 살짝 길게 눌러도(순서 이동과 헷갈리는 경우) 그 목록이 열려야 함
+    order_before = page.evaluate("Array.from(document.querySelectorAll('#s-diary .ngrid .ncard:not(.new) .nc-t')).map(e => e.textContent)")
+    box = page.locator("#s-diary .ngrid .ncard:not(.new)").first.bounding_box()
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + 28)
+    page.mouse.down()
+    page.wait_for_timeout(430)
+    page.mouse.up()
+    page.wait_for_timeout(500)
+    toast_txt = page.evaluate("(() => { const t = document.querySelector('.toast'); return t ? t.textContent : ''; })()")
+    check("살짝 길게 눌러도 목록 열림", sheet_open())
+    check("순서 바꿈 토스트 없음", "순서를 바꿨어요" not in toast_txt, toast_txt)
+    close_sheet()
+    order_after = page.evaluate("Array.from(document.querySelectorAll('#s-diary .ngrid .ncard:not(.new) .nc-t')).map(e => e.textContent)")
+    check("누르기만 해서는 순서 그대로", order_before == order_after, (order_before, order_after))
+
+    # 카드 안 미리보기 항목을 눌러도 (카드 안 체크가 아니라) 목록으로 들어감
+    page.locator("#s-diary .ngrid .ncard:not(.new)").first.locator(".nc-items .cti").first.tap()
+    page.wait_for_timeout(430)
+    check("미리보기 항목을 눌러도 목록 열림", sheet_open())
+    close_sheet()
+
+    # 카드 안 동그라미를 눌러도 바깥에서는 체크되지 않고 목록으로 들어감
+    done_state_before = page.evaluate("window.__app.state.todos.filter(t => t.done).length")
+    page.locator("#s-diary .ngrid .ncard:not(.new)").first.locator(".nc-items .cti .cb").first.tap()
+    page.wait_for_timeout(430)
+    done_state_after = page.evaluate("window.__app.state.todos.filter(t => t.done).length")
+    check("카드 동그라미를 눌러도 밖에서 체크 안 됨", done_state_before == done_state_after and sheet_open(),
+          {"before": done_state_before, "after": done_state_after, "open": sheet_open()})
+    close_sheet()
+
+    # 키보드 Enter 로도 열기
+    page.locator("#s-diary .ngrid .ncard:not(.new)").first.focus()
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(430)
+    check("Enter 로도 목록 열림", sheet_open())
+    close_sheet()
+
+    # 커스텀 리스트 칩: 누르면 그 리스트의 전체 목록
+    page.locator("#s-diary .lchip").first.tap()
+    page.wait_for_timeout(450)
+    chip_name = page.locator("#s-diary .lchip").first.locator("span:last-child").inner_text().strip()
+    body = page.locator("#s-diary .dbody").inner_text()
+    check("커스텀 리스트 칩 누르면 그 리스트", chip_name in body and page.locator("#s-diary .lchip.active").count() == 1, body[:60])
+    check("그 리스트 항목이 보임", page.locator("#s-diary .dbody .trow").count() >= 1,
+          page.locator("#s-diary .dbody .trow").count())
+    page.fill("#s-diary #listAddForm input[name=text]", "칩에서 바로 추가")
+    page.locator("#s-diary .todo-add-btn").click()
+    page.wait_for_timeout(450)
+    check("리스트에 항목 추가", "칩에서 바로 추가" in page.locator("#s-diary .dbody").inner_text())
+    page.locator("#s-diary .dbody .trow", has_text="칩에서 바로 추가").first.locator(".circ").click()
+    page.wait_for_timeout(500)
+    o2 = page.evaluate("Array.from(document.querySelectorAll('#s-diary .dbody .trow')).map(r => r.classList.contains('done'))")
+    check("리스트에서도 체크한 항목이 아래로", o2 == sorted(o2), o2)
+    page.locator("#s-diary .dbody .trow", has_text="칩에서 바로 추가").first.locator(".body").tap()
+    page.wait_for_timeout(450)
+    ed2 = page.evaluate("""(() => { const h = document.querySelector('#sheet .sheet-hd h2'); return h ? h.textContent : null; })()""")
+    check("리스트 항목 누르면 수정 열림", bool(ed2) and ed2.strip().endswith("수정"), ed2)
+    close_sheet()
+
+    # ---------------- 버킷리스트: 카테고리 태그 없이, 글씨를 눌러도 체크만 ----------------
+    page.locator("#s-diary .segs .seg-btn").nth(1).click()
+    page.wait_for_timeout(420)
+    check("버킷 카드에 카테고리 태그 없음", page.locator("#s-diary .tagchip").count() == 0,
+          page.locator("#s-diary .tagchip").count())
+    page.locator("#s-diary .ngrid .ncard:not(.new)").first.locator(".nc-t").tap()
+    page.wait_for_timeout(450)
+    check("버킷 목록에도 «기타» 태그 없음", page.locator("#sheet .card-items .tagchip").count() == 0
+          and "기타" not in page.locator("#sheet .card-items").inner_text(),
+          page.locator("#sheet .card-items").inner_text()[:80])
+    done_before = page.locator("#sheet .card-items .trow.done").count()
+    if page.locator("#sheet .card-items .trow:not(.done)").count() == 0:
+        page.locator("#sheet .card-items .trow .circ").first.click()
+        page.wait_for_timeout(400)
+        done_before = page.locator("#sheet .card-items .trow.done").count()
+    page.locator("#sheet .card-items .trow:not(.done) .body").last.click()
+    page.wait_for_timeout(450)
+    still_card = page.evaluate("!!document.querySelector('#sheet #sheetForm input[name=\"title\"]')")
+    done_after = page.locator("#sheet .card-items .trow.done").count()
+    check("버킷 항목 글씨 누르면 체크만 (수정 시트 안 열림)",
+          still_card and done_after == done_before + 1,
+          {"still_card": still_card, "before": done_before, "after": done_after})
+    page.screenshot(path=os.path.join(SHOT, "note-detail-v19.png"))
+    close_sheet()
+
+    # ---------------- 항목 이름 글씨: 앱 전체 동일하게 14.5px·700 ----------------
+    def label_css(sel):
+        return page.evaluate("(sel) => Array.from(document.querySelectorAll(sel)).map(e => { const cs = getComputedStyle(e); return cs.fontSize + '/' + cs.fontWeight + '/' + cs.color; })", sel)
+
+    found = {}
+    page.locator("#tabbar .tab").nth(0).click()
+    page.wait_for_timeout(400)
+    page.locator('#s-home [data-act="openTheme"]').click()
+    page.wait_for_timeout(450)
+    found["컬러 시트"] = label_css("#sheet .cp-hd > span:first-child")
+    close_sheet()
+    page.locator("#tabbar .tab").nth(1).click()
+    page.wait_for_timeout(400)
+    page.locator('#s-cal [data-act="addEvent"]').click()
+    page.wait_for_timeout(450)
+    found["일정 추가 시트"] = label_css("#sheet .f > label")
+    close_sheet()
+    page.locator("#tabbar .tab").nth(2).click()
+    page.wait_for_timeout(400)
+    page.locator("#s-diary .ngrid .ncard:not(.new)").first.locator(".nc-t").tap()
+    page.wait_for_timeout(450)
+    found["노트 카드 시트"] = label_css("#sheet .f > label") + label_css("#sheet .todo-label")
+    close_sheet()
+    page.locator("#s-diary [data-act='noteSettings']").click()
+    page.wait_for_timeout(450)
+    found["노트 설정"] = label_css("#sheet .set-lbl")
+    close_sheet()
+    page.locator("#tabbar .tab").nth(4).click()
+    page.wait_for_timeout(400)
+    page.locator("#s-set [data-act='openThemeManager']").click()
+    page.wait_for_timeout(450)
+    found["테마 관리"] = label_css("#sheet .cp-hd > span:first-child")
+    close_sheet()
+    for k, v in found.items():
+        check("%s 항목 이름 15px·700·검정" % k,
+              bool(v) and all(x == "15px/700/rgb(28, 28, 30)" for x in v), v)
+    all_vals = [x for v in found.values() for x in v]
+    check("시트마다 항목 이름 글씨 동일", len(set(all_vals)) == 1, all_vals)
+
+    page.locator("#tabbar .tab").nth(2).click()
+    page.wait_for_timeout(400)
+    page.screenshot(path=os.path.join(SHOT, "note-v19.png"))
+
+    # ---------------- 캘린더: 테두리·세로 견자선 없이, 주 사이에만 오옅은 가로선 ----------------
+    page.locator("#tabbar .tab").nth(1).click()
+    page.wait_for_timeout(600)
+    cal = page.evaluate("""(() => {
+      const c = document.querySelector('#s-cal .cal'); const cs = getComputedStyle(c);
+      const rows = Array.from(document.querySelectorAll('#s-cal .cal-row'));
+      const days = Array.from(document.querySelectorAll('#s-cal .day'));
+      const sel = document.querySelector('#s-cal .day.sel');
+      const dnum = sel ? sel.querySelector('.dnum') : null;
+      return {border: cs.borderTopWidth + '/' + cs.borderLeftWidth, bg: cs.backgroundColor,
+        rows: rows.length, row2: rows.length > 1 ? getComputedStyle(rows[1]).borderTopWidth : null,
+        row1: rows.length > 0 ? getComputedStyle(rows[0]).borderTopWidth : null,
+        selBg: sel ? getComputedStyle(sel).backgroundColor : null,
+        numColor: dnum ? getComputedStyle(dnum).color : null,
+        selShadow: sel ? getComputedStyle(sel).boxShadow : null,
+        dayBorders: days.filter(d => { const s = getComputedStyle(d); return s.borderTopWidth !== '0px' || s.borderLeftWidth !== '0px' || s.borderRightWidth !== '0px'; }).length,
+        ebars: document.querySelectorAll('#s-cal .ebar').length,
+        todayAfter: getComputedStyle(document.querySelector('#s-cal .day.today') || document.createElement('div'), '::after').content};
+    })()""")
+    check("달력 바깥 테두리 없음", cal["border"] == "0px/0px", cal["border"])
+    check("달력 배경 투명", cal["bg"] in ("rgba(0, 0, 0, 0)", "transparent"), cal["bg"])
+    check("주 행 사이에만 가로선", cal["row1"] in ("0px", None) and cal["row2"] == "1px", (cal["row1"], cal["row2"]))
+    check("날짜 칸에 테두리·격자선 없음", cal["dayBorders"] == 0, cal["dayBorders"])
+    check("선택한 날 = 어두운 바탕", cal["selBg"] == "rgb(28, 28, 30)", cal["selBg"])
+    check("선택한 날 글씨 반전", cal["numColor"] == "rgb(255, 255, 255)", cal["numColor"])
+    check("선택한 날 테두리 상자 없음", cal["selShadow"] == "none", cal["selShadow"])
+    check("여러 날 일정 막대 유지", cal["ebars"] >= 1, cal["ebars"])
+
+    # 상단: 가운데 월 · 양사이드 화살표 · 오른쪽 검색 아이콘
+    head = page.evaluate("""(() => {
+      const cal = document.querySelector('#s-cal .cal'); const cr = cal.getBoundingClientRect();
+      const mo = document.querySelector('#s-cal .cal-month'); const mr = mo.getBoundingClientRect();
+      const prev = document.querySelector('#s-cal [data-act=\"calPrev\"]');
+      const next = document.querySelector('#s-cal [data-act=\"calNext\"]');
+      const srch = document.querySelector('#s-cal [data-act=\"calSearch\"]');
+      const pr = prev.getBoundingClientRect(), nr = next.getBoundingClientRect(), sr = srch.getBoundingClientRect();
+      return {txt: mo.textContent.trim(), calMid: cr.left + cr.width / 2, monMid: mr.left + mr.width / 2,
+              prevLeft: pr.left - cr.left, nextRight: cr.right - nr.right, searchRight: cr.right - sr.right,
+              searchIcon: !!srch.querySelector('svg'), fs: getComputedStyle(mo).fontSize};
+    })()""")
+    check("월 표시가 가운데", abs(head["calMid"] - head["monMid"]) <= 3, head)
+    check("왼쪽에 이전 화살표", head["prevLeft"] <= 8, head["prevLeft"])
+    check("오른쪽에 다음 화살표", head["nextRight"] <= 60, head["nextRight"])
+    check("오른쪽 끝에 검색 아이콘", head["searchIcon"] and head["searchRight"] <= 10, head["searchRight"])
+
+    # 하단 날짜: 연도 + 월·일 + 요일, 글씨 크게
+    dp = page.evaluate("""(() => { const d = document.querySelector('#s-cal .daypanel-hd .d'); const cs = getComputedStyle(d);
+      return {txt: d.innerText.replace(/\\n/g, ' '), fs: cs.fontSize, fw: cs.fontWeight}; })()""")
+    check("하단 날짜에 연도·요일까지", "2026년" in dp["txt"] and "월" in dp["txt"] and "일" in dp["txt"] and "(" in dp["txt"], dp["txt"])
+    check("하단 날짜 글씨 확대(18.5px·800)", dp["fs"] == "18.5px" and dp["fw"] == "800", dp)
+
+    # 공휴일 빨강 (10월로 이동 — 개천절·한글날)
+    page.locator('#s-cal [data-act="calPrev"]').click()
+    page.wait_for_timeout(450)
+    hol = page.evaluate("""(() => { const d = document.querySelector('#s-cal .day.hol .dnum'); const n = document.querySelector('#s-cal .day.hol .dhol');
+      return {month: document.querySelector('#s-cal .cal-month').textContent.trim(),
+              num: d ? getComputedStyle(d).color : null, name: n ? getComputedStyle(n).color : null,
+              count: document.querySelectorAll('#s-cal .day.hol').length}; })()""")
+    check("공휴일 숫자 빨강", hol["num"] == "rgb(217, 72, 72)" and hol["count"] >= 1, hol)
+    check("공휴일 이름도 빨강", hol["name"] == "rgb(217, 72, 72)", hol)
+    page.screenshot(path=os.path.join(SHOT, "calendar-holiday-v19.png"))
+
+    # 일정 검색 → 결과 누르면 그 달·날짜로
+    page.locator('#s-cal [data-act="calSearch"]').click()
+    page.wait_for_timeout(450)
+    check("검색 시트 열림", "일정 검색" in page.locator("#sheet").inner_text())
+    page.fill("#calSearchIn", "성수")
+    page.wait_for_timeout(450)
+    nres = page.locator("#sheet .sres").count()
+    check("검색 결과 있음", nres >= 1, page.locator("#sheet").inner_text()[:120])
+    rt = page.locator("#sheet .sres").first.inner_text()
+    check("결과에 제목·날짜·종류", "성수" in rt and "2026" in rt, rt)
+    page.locator("#sheet .sres").first.click()
+    page.wait_for_timeout(700)
+    jumped = page.evaluate("""(() => ({month: document.querySelector('#s-cal .cal-month').textContent.trim(),
+      sel: document.querySelector('#s-cal .day.sel') ? document.querySelector('#s-cal .day.sel .dnum').textContent : null,
+      dp: document.querySelector('#s-cal .daypanel-hd .d') ? document.querySelector('#s-cal .daypanel-hd .d').innerText.replace(/\\n/g,' ') : null,
+      open: document.getElementById('sheetWrap').classList.contains('open')}))()""")
+    check("결과 누르면 그 달로 이동", jumped["month"] == "2026년 11월", jumped)
+    check("그 날짜가 선택됨", jumped["sel"] == "17", jumped)
+    check("하단 날짜도 그 날", jumped["dp"] and "11월 17일" in jumped["dp"], jumped["dp"])
+    check("검색 시트는 닫힘", not jumped["open"])
+    page.wait_for_timeout(2400)   # 이동 안내(toast)가 사라진 뒤 깔끔한 화면으로 저장
+    page.screenshot(path=os.path.join(SHOT, "calendar-day-v19.png"))
+    # 다크 모드에서도 같은 모양(밝은 바탕 + 반전)
+    page.evaluate("document.documentElement.setAttribute('data-mode','dark'); 0")
+    page.wait_for_timeout(300)
+    cdk = page.evaluate("""(() => { const sel = document.querySelector('#s-cal .day.sel');
+      return {bg: sel ? getComputedStyle(sel).backgroundColor : null,
+              num: sel ? getComputedStyle(sel.querySelector('.dnum')).color : null}; })()""")
+    check("다크에서도 선택한 날 = 밝은 바탕 + 반전", cdk["bg"] == "rgb(245, 245, 245)" and cdk["num"] == "rgb(17, 17, 17)", cdk)
+    page.screenshot(path=os.path.join(SHOT, "calendar-day-v19-dark.png"))
+    page.evaluate("document.documentElement.setAttribute('data-mode','light'); 0")
     page.wait_for_timeout(300)
 
     check("콘솔 오류 없음", len(errors) == 0, errors[:5])

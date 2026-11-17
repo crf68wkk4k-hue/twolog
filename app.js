@@ -51,7 +51,8 @@
     check: svg('<path d="M5 12.6l4.2 4.2L19 7"/>', 13),
     palette: svg('<path d="M12 3.4a8.6 8.6 0 1 0 0 17.2c1.1 0 1.9-.8 1.9-1.8 0-.9-.6-1.4-.6-2.1 0-.8.7-1.4 1.5-1.4h1.4a4.3 4.3 0 0 0 4.3-4.3c0-4.2-3.7-7.6-8.5-7.6z"/><circle cx="8.3" cy="9.8" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.8" r="1" fill="currentColor" stroke="none"/><circle cx="15.7" cy="9.7" r="1" fill="currentColor" stroke="none"/>', 17),
     gear: svg('<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="1.9"/><circle cx="9" cy="12" r="1.9"/><circle cx="17.5" cy="17" r="1.9"/>', 21),
-    person: svg('<circle cx="12" cy="8.3" r="3.5"/><path d="M5.2 20c0-3.4 3.1-5.7 6.8-5.7s6.8 2.3 6.8 5.7"/>', 21)
+    person: svg('<circle cx="12" cy="8.3" r="3.5"/><path d="M5.2 20c0-3.4 3.1-5.7 6.8-5.7s6.8 2.3 6.8 5.7"/>', 21),
+    search: svg('<circle cx="10.8" cy="10.8" r="6.2"/><path d="M15.4 15.4l4.1 4.1"/>', 20)
   };
   var STAR = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.8l2.86 5.94 6.54.9-4.77 4.55 1.18 6.5L12 17.6l-5.81 3.09 1.18-6.5L2.6 9.64l6.54-.9z"/></svg>';
 
@@ -862,6 +863,36 @@
       '<span class="mile-x' + (soon ? " soon" : "") + '">' + esc(left) + "</span></div>";
   }
 
+  /* v19: 캘린더 일정 검색 — 제목으로 찾고, 결과를 누르면 그 달·날짜로 이동해요 */
+  function calSearchResults(q) {
+    var raw = String(q || "").trim();
+    var key = raw.toLowerCase();
+    var list = (S.events || []).slice();
+    if (key) {
+      list = list.filter(function (e) { return String(e.title || "").toLowerCase().indexOf(key) >= 0; });
+    }
+    list.sort(function (a, b) { var as = evStart(a), bs = evStart(b); return as < bs ? -1 : as > bs ? 1 : 0; });
+    if (!list.length) return '<div class="sres-empty">' + (key ? "「" + esc(raw) + "」와 맞는 일정이 없어요." : "일정이 없어요.") + "</div>";
+    return list.slice(0, 60).map(function (e) {
+      var t = TYPE[e.type] || TYPE.etc;
+      var rng = evRange(e);
+      return '<button type="button" class="sres" data-act="goEvent" data-date="' + evStart(e) + '">' +
+        '<span class="sbar" style="background:' + sched(evWho(e)) + '"></span>' +
+        '<span class="sbody"><span class="st">' + esc(e.title) + "</span>" +
+        '<span class="sd">' + esc(rng || evStart(e).replace(/-/g, ".")) + " · " + esc(t.label) + "</span></span>" +
+        '<span class="sgo" aria-hidden="true">›</span></button>';
+    }).join("");
+  }
+
+  function formCalSearch(q) {
+    return sheetHead("일정 검색") +
+      '<div class="f" style="margin-top:14px"><label>검색어</label>' +
+      '<input class="field" id="calSearchIn" value="' + esc(q || "") + '" placeholder="예) 성수, 치과, 여행" autocomplete="off" enterkeyhint="search" aria-label="일정 검색어">' +
+      "</div>" +
+      '<div class="sres-wrap" id="calSearchOut">' + calSearchResults(q) + "</div>" +
+      '<div style="height:12px"></div><button class="btn-line" data-close="1">닫기</button>';
+  }
+
   function renderCal() {
     var cur = S.ui.calMonth || today.slice(0, 7);
     var y = Number(cur.slice(0, 4)), m = Number(cur.slice(5, 7)) - 1;
@@ -872,9 +903,12 @@
     var html = "";
     html += '<header class="hdr' + capCls("cal") + '"' + capStyle("cal") + ' data-pg="cal"><div><h1><span class="eh">🗓️</span> 캘린더</h1></div></header>';
 
-    html += '<div class="cal"><div class="cal-head"><div class="cal-month">' + y + "년 " + (m + 1) + "월</div>" +
-      '<div class="cal-nav"><button data-act="calPrev" aria-label="이전 달">' + IC.left + "</button>" +
-      '<button data-act="calNext" aria-label="다음 달">' + IC.right + "</button></div></div>";
+    html += '<div class="cal"><div class="cal-head">' +
+      '<button class="cal-arrow" data-act="calPrev" aria-label="이전 달">' + IC.left + "</button>" +
+      '<div class="cal-month">' + y + "년 " + (m + 1) + "월</div>" +
+      '<div class="cal-right"><button class="cal-arrow" data-act="calNext" aria-label="다음 달">' + IC.right + "</button>" +
+      '<button class="cal-search" data-act="calSearch" aria-label="일정 검색" title="일정 검색">' + IC.search + "</button></div>" +
+      "</div>";
 
     html += '<div class="cal-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>';
 
@@ -981,7 +1015,7 @@
         if (String(g.date || "").slice(0, 10) === sel) dayMemos.push({ k: k, g: g });
       });
     });
-    html += '<div class="daypanel"><div class="daypanel-hd"><div class="d">' + (sd.getMonth() + 1) + "월 " + sd.getDate() + "일<em>" + WD[sd.getDay()] + "요일</em>" +
+    html += '<div class="daypanel"><div class="daypanel-hd"><div class="d">' + sd.getFullYear() + "년 " + (sd.getMonth() + 1) + "월 " + sd.getDate() + "일<em>(" + WD[sd.getDay()] + ")</em>" +
       (selHol ? '<span class="hol-badge">' + esc(selHol) + "</span>" : "") + "</div>" +
       '<span class="more" style="font-size:11.5px;color:var(--ink-3)">' + selEvents.length + "개</span></div>";
     html += '<div class="daylist daytl">';
@@ -1131,6 +1165,31 @@
 
   /* 완료된 항목은 아래로 내리고, 원하면 숨길 수 있게 */
   function byDone(a, b) { return (a.done ? 1 : 0) - (b.done ? 1 : 0); }
+
+  /* v19: 체크/해제로 항목이 위아래로 자리를 옮길 때 살짝 부드럽게 (FLIP) */
+  function rowTops(sel) {
+    var o = {};
+    Array.prototype.forEach.call(document.querySelectorAll(sel + " .trow"), function (r) {
+      var b = r.querySelector("[data-id]");
+      if (b) o[b.getAttribute("data-id")] = r.getBoundingClientRect().top;
+    });
+    return o;
+  }
+  function rowMoveAnim(sel, before) {
+    if (!before) return;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    Array.prototype.forEach.call(document.querySelectorAll(sel + " .trow"), function (r) {
+      var b = r.querySelector("[data-id]");
+      if (!b || !r.animate) return;
+      var old = before[b.getAttribute("data-id")];
+      if (old == null) return;
+      var dy = old - r.getBoundingClientRect().top;
+      if (Math.abs(dy) < 2) return;
+      r.animate([{ transform: "translateY(" + dy + "px)" }, { transform: "translateY(0)" }],
+        { duration: 190, easing: "cubic-bezier(.2,.8,.3,1)" });
+    });
+  }
+
   function doneToggle(doneCount) {
     if (!doneCount) return "";
     var hide = !!(S.ui && S.ui.hideDone);
@@ -1170,11 +1229,11 @@
       return '<div class="cti log"><span class="lt">' + (it.kind === "movie" ? "영화" : "먹방") + "</span>" +
         '<span class="cx">' + esc(label) + "</span></div>";
     }
-    var act = k === "todo" ? "toggleTodo" : "toggleBucket";
-    return '<button type="button" class="cti' + (it.done ? " on" : "") + '" data-act="' + act + '" data-id="' + it.id +
-      '" aria-label="' + esc(label) + ' 완료 표시">' +
+    /* v19: 미리보기는 «보기만» — 카드를 누르면 언제나 그 리스트의 전체 목록으로 들어가요.
+       (예전에는 항목을 누르면 카드 안에서 바로 체크돼서 리스트로 들어가지 않는 것처럼 보였어요) */
+    return '<div class="cti' + (it.done ? " on" : "") + '">' +
       '<span class="cb">' + (it.done ? CIR_S_ON : CIR_S_OFF) + "</span>" +
-      '<span class="cx">' + esc(label) + "</span></button>";
+      '<span class="cx">' + esc(label) + "</span></div>";
   }
 
   function noteCard(k, g) {
@@ -1182,8 +1241,10 @@
     /* v17: 「주제」 줄을 없애고 카드는 제목부터 — 제목 아래로 To-do 미리보기 */
     var gTitle = g.title || GROUP_DEF[k];
     var h = '<div class="ncard" role="button" tabindex="0" data-act="openGroup" data-tab="' + k + '" data-gid="' + g.id +
-      '" aria-label="' + esc(gTitle) + ' 열기">';
-    h += '<div class="nc-t">' + esc(gTitle) + "</div>";
+      '" aria-label="' + esc(gTitle) + ' 목록 열기">';
+    h += '<div class="nc-hd"><div class="nc-t">' + esc(gTitle) + "</div>" +
+      '<div class="nc-meta">' + (items.length ? '<span class="nc-n">' + items.length + "</span>" : "") +
+      '<span class="nc-go" aria-hidden="true">›</span></div></div>';
     if (items.length) {
       h += '<div class="nc-items">' + items.slice(0, 4).map(function (x) { return cardItem(k, x); }).join("") +
         (items.length > 4 ? '<div class="cmore">+' + (items.length - 4) + "개</div>" : "") + "</div>";
@@ -1199,9 +1260,10 @@
     var items = itemsOf(k).filter(function (x) { return x.gid === g.id; }).sort(byDone);
     var h = '<div class="sheet-hd card-hd"><button class="icon-btn" data-close="1" aria-label="닫기">' + IC.x + "</button></div>";
     /* 제목을 시트 맨 위로 — 카드에서 가장 크게 보이는 값이라 먼저 고쳐요 */
+    /* 제목을 시트 맨 위로 — 카드에서 가장 크게 보이는 값이라 먼저 고쳐요.
+       v19: 입력칸 아래 부가설명 줄은 지웠어요 (제목 → To-do 로 바로). */
     h += '<form class="form card-meta" id="sheetForm">' +
       '<div class="f"><label>제목</label><input class="field" name="title" value="' + esc(g.title || GROUP_DEF[k]) + '" required autocomplete="off"></div>' +
-      '<p class="sheet-sub">「제목」은 카드 맨 윗줄에 가장 크고 진하게 보여요.</p>' +
       "</form>";
     h += '<div class="todo-label" style="margin-top:20px">To-do</div>';
     h += '<form class="todo-add" id="listAddForm" data-tab="' + k + '" data-gid="' + g.id + '">' +
@@ -1245,10 +1307,13 @@
     /* 항목을 체크해도 방금 적던 제목이 날아가지 않도록 값을 잠깐 들고 있어요 */
     var keepT = sheet.querySelector('#sheetForm input[name="title"]');
     var typedT = keepT ? keepT.value : null;
+    /* v19: 체크한 항목이 아래로 내려가는 움직임을 부드럽게 */
+    var rtBefore = rowTops("#sheet .card-items");
     sheet.innerHTML = '<div class="grab"></div>' + cardSheetHtml(openCard.tab, g);
     var t2 = sheet.querySelector('#sheetForm input[name="title"]');
     if (t2 && typedT !== null) t2.value = typedT;
     sheet.scrollTop = st;
+    rowMoveAnim("#sheet .card-items", rtBefore);
   }
 
   function viewCards(k) {
@@ -1281,10 +1346,11 @@
         'data-act="delTodo" data-id="' + it.id + '"');
     }
     if (k === "bucket") {
+      /* v19: 항목 아래 카테고리 태그(기타 등)는 없앴어요 — 글씨를 눌러도 완료 체크만 토글되고
+         `버킷 수정` 시트는 열리지 않아요. 삭제는 오른쪽 ×, 순서는 꾹 눌러 이동. */
       return listItemRow(it, '<div class="t tw">' + esc(it.title) + "</div>" +
-        '<div class="sub"><span class="tagchip">' + esc(it.cat || "기타") + "</span>" +
-        (it.memo ? '<span class="subtx">' + esc(it.memo) + "</span>" : "") + "</div>",
-        'data-act="toggleBucket" data-id="' + it.id + '"', 'data-act="editBucket" data-id="' + it.id + '"',
+        (it.memo ? '<div class="sub"><span class="subtx">' + esc(it.memo) + "</span></div>" : ""),
+        'data-act="toggleBucket" data-id="' + it.id + '"', 'data-act="toggleBucket" data-id="' + it.id + '"',
         'data-act="delBucket" data-id="' + it.id + '"');
     }
     return listItemRow(it, '<div class="lrow"><span class="tag ' + it.kind + '">' + (it.kind === "movie" ? "영화" : "먹방") +
@@ -2668,6 +2734,18 @@
 
     if (act === "pickDay") { S.ui.selDate = el.getAttribute("data-date"); save(); renderCal(); return; }
 
+    /* v19: 일정 검색 → 결과를 누르면 그 달·날짜로 */
+    if (act === "calSearch") { openSheet(formCalSearch("")); return; }
+    if (act === "goEvent") {
+      var gd = String(el.getAttribute("data-date") || "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(gd)) return;
+      S.ui.calMonth = gd.slice(0, 7);
+      S.ui.selDate = gd;
+      save(); closeSheet(); go("cal");
+      toast(Number(gd.slice(5, 7)) + "월 " + Number(gd.slice(8, 10)) + "일로 이동했어요");
+      return;
+    }
+
     if (act === "addEvent") {
       openSheet(formEvent(S.ui.selDate || today), function (fd) {
         var st = String(fd.get("start") || today).slice(0, 10);
@@ -2760,8 +2838,9 @@
     if (act === "toggleListItem") {
       var tl = findList(el.getAttribute("data-list"));
       var ti = el.getAttribute("data-id");
+      var ltBefore = rowTops("#s-diary .dbody");
       if (tl) tl.items.forEach(function (it) { if (it.id === ti) it.done = !it.done; });
-      save(); renderDiary(); return;
+      save(); renderDiary(); rowMoveAnim("#s-diary .dbody", ltBefore); return;
     }
 
     if (act === "delListItem") {
@@ -3260,7 +3339,7 @@
      · 그 뒤에는 손가락/마우스를 움직여 원하는 자리에 놓으면 순서가 저장됩니다
      · 스크롤하려고 바로 움직이면(8px 이상) 드래그를 포기하고 평소처럼 스크롤돼요
      ========================================================================== */
-  var RZ_LONG = 320;
+  var RZ_LONG = 460;
   var rzState = null;
   var rzMoved = false;
 
@@ -3276,14 +3355,30 @@
   function rzSiblings(st) {
     var sel = st.kind === "card" ? ".ncard:not(.new)" : ".trow";
     return Array.prototype.slice.call(st.box.children).filter(function (n) {
-      return n !== st.el && n.matches && n.matches(sel);
+      return n !== st.el && n !== st.ph && n.matches && n.matches(sel);
     });
   }
 
   function rzBegin(st) {
     if (!st || st.active || !st.el.parentNode) return;
     st.active = true;
+    st.moved = false;
+    var r = st.el.getBoundingClientRect();
+    /* v19: 원래 자리에는 점선 빈 자리를 두고, 잡힌 카드/행은 fixed 로 떠서 손가락을 따라갑니다 */
+    var ph = document.createElement("div");
+    ph.className = "rz-ph" + (st.kind === "card" ? " rz-ph-card" : " rz-ph-row");
+    ph.style.width = r.width + "px";
+    ph.style.height = r.height + "px";
+    st.el.parentNode.insertBefore(ph, st.el);
+    st.ph = ph;
     st.el.classList.add("lift");
+    st.el.style.boxSizing = "border-box";
+    st.el.style.width = r.width + "px";
+    st.el.style.height = r.height + "px";
+    st.el.style.left = r.left + "px";
+    st.el.style.top = r.top + "px";
+    st.el.style.margin = "0";
+    st.el.style.transform = "translate3d(0,0,0) scale(1.03)";
     if (st.box.classList) st.box.classList.add("rz-on");
     try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
   }
@@ -3292,6 +3387,11 @@
     var st = rzState;
     if (!st || !st.active) return;
     var x = ev.clientX, y = ev.clientY;
+    /* v19: 손가락이 실제로 움직였는지 기억 — 안 움직였으면 «누른 것» 으로 보고 클릭을 살립니다 */
+    if (!st.moved && (Math.abs(x - st.x) > 4 || Math.abs(y - st.y) > 4)) st.moved = true;
+    /* 잡힌 카드/행은 손가락을 그대로 따라가요 */
+    st.el.style.transform = "translate3d(" + (x - st.x) + "px," + (y - st.y) + "px,0) scale(1.03)";
+    if (!st.moved) return;
     var sibs = rzSiblings(st);
     if (!sibs.length) return;
     var best = null, bestD = Infinity;
@@ -3311,10 +3411,11 @@
     } else {
       after = y > r2.top + r2.height / 2;
     }
+    /* 빈 자리(placeholder)가 실시간으로 밀려나며 어디로 들어가는지 보여요 */
     if (after) {
-      if (best.nextSibling !== st.el) best.parentNode.insertBefore(st.el, best.nextSibling);
-    } else if (best !== st.el.nextSibling) {
-      best.parentNode.insertBefore(st.el, best);
+      if (best.nextSibling !== st.ph) best.parentNode.insertBefore(st.ph, best.nextSibling);
+    } else if (best !== st.ph.nextSibling) {
+      best.parentNode.insertBefore(st.ph, best);
     }
   }
 
@@ -3371,11 +3472,22 @@
     if (!st) return;
     clearTimeout(st.timer);
     if (st.active) {
+      var movedNow = st.moved;
+      /* 잡았던 카드/행을 (옮겨 둔) 자리로 되돌리고 임시 스타일을 지워요 */
+      if (st.ph && st.ph.parentNode) st.ph.parentNode.insertBefore(st.el, st.ph);
       st.el.classList.remove("lift");
+      ["boxSizing", "width", "height", "left", "top", "margin", "transform", "position", "pointerEvents"].forEach(function (k) {
+        st.el.style[k] = "";
+      });
+      if (st.ph && st.ph.parentNode) st.ph.parentNode.removeChild(st.ph);
       if (st.box.classList) st.box.classList.remove("rz-on");
-      rzMoved = true;
-      setTimeout(function () { rzMoved = false; }, 500);
-      rzCommit(st);
+      /* v19: 꾹 눌렀어도 손가락을 움직이지 않았으면 그냥 누른 것 — 순서를 바꾸지 않고,
+         다음 click 도 막지 않아 그 리스트의 전체 목록이 열립니다. */
+      if (movedNow) {
+        rzMoved = true;
+        setTimeout(function () { rzMoved = false; }, 500);
+        rzCommit(st);
+      }
     }
     rzState = null;
   }
@@ -3419,6 +3531,15 @@
   document.addEventListener("click", function (ev) {
     if (rzMoved) { ev.stopPropagation(); ev.preventDefault(); rzMoved = false; }
   }, true);
+
+  /* v19: 키보드로도 카드 열기 (Enter / Space) — div[role=button] 은 스스로 click 을 만들지 않아요 */
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Enter" && ev.key !== " " && ev.key !== "Spacebar") return;
+    var el = ev.target.closest && ev.target.closest("#s-diary .ncard[data-act='openGroup']");
+    if (!el) return;
+    ev.preventDefault();
+    el.click();
+  });
 
   /* 사진 크게 보기: 손가락으로 좌우 넘기기 */
   var pvSwipe = null;
@@ -3636,6 +3757,12 @@
 
   document.addEventListener("input", function (ev) {
     var t = ev.target;
+    /* v19: 일정 검색 — 글자를 칠 때마다 결과를 바로 */
+    if (t && t.id === "calSearchIn") {
+      var sOut = document.getElementById("calSearchOut");
+      if (sOut) sOut.innerHTML = calSearchResults(t.value);
+      return;
+    }
     if (t && t.classList && t.classList.contains("js-color")) setThemeColor(t.getAttribute("data-target"), t.value);
     if (t && t.classList && t.classList.contains("js-cap")) setCapColor(t.getAttribute("data-id"), t.value);
     if (t && t.classList && t.classList.contains("js-page")) setPageCap(t.getAttribute("data-page"), t.value);
