@@ -683,7 +683,8 @@
 
     var html = "";
     var nmOn = S.theme && S.theme.name;
-    html += '<div class="brand' + capCls("home") + '"' + capStyle("home") + ' data-pg="home"><span class="mark"><i></i><i></i></span><b>투로그</b><span class="bw">(twolog)</span>' +
+    /* v20: 「투로그」 앞의 두 네모 로고는 지웠어요 — 이름만 깔끔하게 */
+    html += '<div class="brand' + capCls("home") + '"' + capStyle("home") + ' data-pg="home"><b>투로그</b><span class="bw">(twolog)</span>' +
       '<button class="icon-btn pal first" data-act="toggleMode" aria-label="' + modeLabel() + '" title="' + modeLabel() + '">' + modeIcon() + "</button>" +
       '<button class="icon-btn pal" data-act="openTheme" aria-label="컬러" title="컬러">' + IC.palette + "</button></div>";
 
@@ -901,14 +902,22 @@
     var monthStart = cur + "-01", monthEnd = ymd(y, m, daysIn);
 
     var html = "";
-    html += '<header class="hdr' + capCls("cal") + '"' + capStyle("cal") + ' data-pg="cal"><div><h1><span class="eh">🗓️</span> 캘린더</h1></div></header>';
-
-    html += '<div class="cal"><div class="cal-head">' +
-      '<button class="cal-arrow" data-act="calPrev" aria-label="이전 달">' + IC.left + "</button>" +
-      '<div class="cal-month">' + y + "년 " + (m + 1) + "월</div>" +
-      '<div class="cal-right"><button class="cal-arrow" data-act="calNext" aria-label="다음 달">' + IC.right + "</button>" +
-      '<button class="cal-search" data-act="calSearch" aria-label="일정 검색" title="일정 검색">' + IC.search + "</button></div>" +
+    /* v20: 「🗓️ 캘린더」 제목 줄을 지우고, 그 자리에 그 달(11월)을 제목과 같은 크기로 왼쪽에 —
+       같은 줄 맨 오른쪽 끝에 돋보기. 달 이동은 「11월」 옆의 작은 화살표로 해요 */
+    var thisYear = Number(today.slice(0, 4));
+    var monthTxt = (m + 1) + "월";
+    html += '<div class="cal-top">' +
+      '<div class="cal-title" title="' + y + "년 " + (m + 1) + '월" aria-label="' + y + "년 " + (m + 1) + '월">' +
+      '<span class="cal-month">' + monthTxt + "</span>" +
+      (y !== thisYear ? '<span class="cal-year">' + y + "</span>" : "") +
+      '<span class="cal-nav">' +
+      '<button type="button" class="cal-arrow" data-act="calPrev" aria-label="이전 달">' + IC.left + "</button>" +
+      '<button type="button" class="cal-arrow" data-act="calNext" aria-label="다음 달">' + IC.right + "</button>" +
+      "</span></div>" +
+      '<button type="button" class="cal-search" data-act="calSearch" aria-label="일정 검색" title="일정 검색">' + IC.search + "</button>" +
       "</div>";
+
+    html += '<div class="cal">';
 
     html += '<div class="cal-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>';
 
@@ -1004,7 +1013,6 @@
         return evStart(a) < evStart(b) ? -1 : evStart(a) > evStart(b) ? 1 : (a.title < b.title ? -1 : 1);
       });
     var sd = parse(sel);
-    var selHol = holName(sel);
     /* v18: 그날의 타임라인 — 일정에 더해 그날 찍은 폴라로이드·기록도 함께 */
     var dayPhotos = S.photos.filter(function (p) { return String(p.date || "").slice(0, 10) === sel; });
     var dayLogs = (S.logs || []).filter(function (x) { return String(x.date || "").slice(0, 10) === sel; });
@@ -1015,9 +1023,8 @@
         if (String(g.date || "").slice(0, 10) === sel) dayMemos.push({ k: k, g: g });
       });
     });
-    html += '<div class="daypanel"><div class="daypanel-hd"><div class="d">' + sd.getFullYear() + "년 " + (sd.getMonth() + 1) + "월 " + sd.getDate() + "일<em>(" + WD[sd.getDay()] + ")</em>" +
-      (selHol ? '<span class="hol-badge">' + esc(selHol) + "</span>" : "") + "</div>" +
-      '<span class="more" style="font-size:11.5px;color:var(--ink-3)">' + selEvents.length + "개</span></div>";
+    /* v20: 날짜 줄에는 「2026년 11월 17일」만 — 요일·공휴일 배지·개수는 지웠어요 */
+    html += '<div class="daypanel"><div class="daypanel-hd"><div class="d">' + sd.getFullYear() + "년 " + (sd.getMonth() + 1) + "월 " + sd.getDate() + "일</div></div>";
     html += '<div class="daylist daytl">';
     if (selEvents.length) {
       selEvents.forEach(function (e) {
@@ -2287,7 +2294,7 @@
       "</div></div>";
     h += '<div class="cp"><div class="cp-hd"><span>페이지 캡션 색</span><span class="cp-val">' +
       (String(t.cap || "").toUpperCase() || "기본") + "</span></div>" + capPickAll() +
-      '<p class="cp-note" style="margin-top:10px">홈·캘린더·노트·사진첩·My 제목 줄에 한 번에 적용돼요. 글씨는 늘 검정으로 또렷하게 보여요.</p></div>';
+      '<p class="cp-note" style="margin-top:10px">홈·노트·사진첩·My 제목 줄에 한 번에 적용돼요. 글씨는 늘 검정으로 또렷하게 보여요.</p></div>';
     h += '<div class="cp"><div class="cp-hd"><span>일정 색</span><span class="cp-val">소영 · 준영 · 공동</span></div>' +
       colorPickRow("me") + colorPickRow("you") + colorPickRow("both") + "</div>";
     h += '<div class="cp"><div class="cp-hd"><span>홈 제목 색</span><span class="cp-val">뮤트 톤</span></div>' +
