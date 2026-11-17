@@ -172,9 +172,6 @@
   if (!S.theme.pages || typeof S.theme.pages !== "object") S.theme.pages = {};
   if (!S.note || typeof S.note !== "object") S.note = {};
   /* v18: My 탭 4자리 화면 잠금 (이 기기에만 저장) */
-  if (!S.lock || typeof S.lock !== "object") S.lock = { on: false, pin: "" };
-  S.lock.on = !!S.lock.on && /^\d{4}$/.test(String(S.lock.pin || ""));
-  if (!S.lock.on) S.lock.pin = /^\d{4}$/.test(String(S.lock.pin || "")) ? String(S.lock.pin) : "";
   ["todo", "bucket", "log"].forEach(function (k) {
     if (!S.note[k] || typeof S.note[k] !== "object") S.note[k] = {};
     if (typeof S.note[k].e !== "string") S.note[k].e = NOTE_DEF[k].e;
@@ -2276,7 +2273,19 @@
      v18: My 탭 — 4자리 화면 잠금
      ========================================================================== */
   var lockBuf = "";
-  function lockOn() { return !!(S && S.lock && S.lock.on && /^\d{4}$/.test(String(S.lock.pin || ""))); }
+  var LOCK_KEY = "twolog:v1:lock";   /* 잠금은 이 기기에만 — 상대 기기로 PIN 이 넘어가지 않게 */
+  function lockCfg() {
+    try {
+      var raw = localStorage.getItem(LOCK_KEY);
+      var c = raw ? JSON.parse(raw) : null;
+      if (c && typeof c === "object") return { on: !!c.on, pin: String(c.pin || "") };
+    } catch (e) {}
+    return { on: false, pin: "" };
+  }
+  function lockSave(cfg) {
+    try { localStorage.setItem(LOCK_KEY, JSON.stringify({ on: !!cfg.on, pin: String(cfg.pin || "") })); } catch (e) {}
+  }
+  function lockOn() { var c = lockCfg(); return !!c.on && /^\d{4}$/.test(c.pin); }
 
   function showLock() {
     var el = $("#lockScreen");
@@ -2316,7 +2325,7 @@
     else if (/^\d$/.test(k) && lockBuf.length < 4) lockBuf += k;
     renderLockScreen("");
     if (lockBuf.length !== 4) return;
-    if (lockBuf === String(S.lock.pin)) {
+    if (lockBuf === lockCfg().pin) {
       lockBuf = "";
       hideLock();
       toast("다시 오셨네요");
@@ -2565,15 +2574,15 @@
       var cIn = sheet.querySelector('#lockForm input[name="cur"]');
       var cVal = cIn ? String(cIn.value || "") : "";
       if (!/^\d{4}$/.test(cVal)) { toast("지금 비밀번호 4자리를 적어 주세요"); return; }
-      if (cVal !== String(S.lock.pin)) { toast("비밀번호가 달라요"); return; }
-      S.lock = { on: false, pin: "" };
-      save(); closeSheet(); renderSet(); hideLock(); toast("화면 잠금을 껐어요");
+      if (cVal !== lockCfg().pin) { toast("비밀번호가 달라요"); return; }
+      lockSave({ on: false, pin: "" });
+      closeSheet(); renderSet(); hideLock(); toast("화면 잠금을 껐어요");
       return;
     }
     if (act === "lockForgot") {
       askConfirm("비밀번호를 잊었다면 이 기기에서 잠금을 끌 수 있어요. 기록은 그대로 남고, 끄면 앱을 열 때 더 이상 묻지 않아요.", "잠금 끄기", function () {
-        S.lock = { on: false, pin: "" };
-        save(); closeSheet(); renderSet(); hideLock(); toast("화면 잠금을 껐어요");
+        lockSave({ on: false, pin: "" });
+        closeSheet(); renderSet(); hideLock(); toast("화면 잠금을 껐어요");
       }, "잠금 끄기");
       return;
     }
@@ -3411,11 +3420,11 @@
       var curPin = String(lf.get("cur") || "");
       var nPin = String(lf.get("pin") || "").trim();
       var nPin2 = String(lf.get("pin2") || "").trim();
-      if (wasOn && curPin !== String(S.lock.pin)) { toast("지금 비밀번호가 달라요"); return; }
+      if (wasOn && curPin !== lockCfg().pin) { toast("지금 비밀번호가 달라요"); return; }
       if (!/^\d{4}$/.test(nPin)) { toast("숫자 4자리로 정해 주세요"); return; }
       if (nPin !== nPin2) { toast("두 번 적은 숫자가 달라요"); return; }
-      S.lock = { on: true, pin: nPin };
-      save(); closeSheet(); renderSet();
+      lockSave({ on: true, pin: nPin });
+      closeSheet(); renderSet();
       toast(wasOn ? "비밀번호를 바꿨어요" : "화면 잠금을 켰어요");
       return;
     }
