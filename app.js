@@ -3,6 +3,9 @@
   "use strict";
 
   /* ------------------------------------------------------------------ utils */
+  /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
+     My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
+  var APP_VERSION = "v22";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -1261,13 +1264,9 @@
     /* v21: 카드 위쪽은 색이 꽉 차는 제목 띠 — 고른 색이 없으면 은은한 기본 회색 띠 */
     var ink = tBg ? inkOn(tBg) : "";
     h += '<div class="nc-hd' + (tBg ? " tint" : "") + '"' + (tBg ? ' style="background:' + tBg + '"' : "") + ">" +
-      '<div class="nc-t"' + (tBg ? ' style="color:' + ink + '"' : "") + ">" + esc(gTitle) + "</div>" +
-      '<div class="nc-meta"' + (tBg ? ' style="color:' + ink + '"' : "") + ">" +
-      (items.length ? '<span class="nc-n">' + items.length + "</span>" : "") +
-      '<span class="nc-go" aria-hidden="true">›</span></div></div>';
+      '<div class="nc-t"' + (tBg ? ' style="color:' + ink + '"' : "") + ">" + esc(gTitle) + "</div></div>";
     if (items.length) {
-      h += '<div class="nc-items">' + items.slice(0, 4).map(function (x) { return cardItem(k, x); }).join("") +
-        (items.length > 4 ? '<div class="cmore">+' + (items.length - 4) + "개</div>" : "") + "</div>";
+      h += '<div class="nc-items">' + items.slice(0, 4).map(function (x) { return cardItem(k, x); }).join("") + "</div>";
     } else {
       h += '<div class="nc-empty">아직 비어 있어요</div>';
     }
@@ -1276,18 +1275,19 @@
   }
 
   /* v21: 카드 상세 시트의 제목 색 컬러판 — 제목 입력칸 바로 위,
-     앱의 다른 색 고르기와 같은 12색 뮤트 팔레트 + 「기본」(색 없음) */
+     앱의 다른 색 고르기와 같은 12색 뮤트 팔레트 + 「기본」(색 없음)
+     v22: 팔레트는 작은 동그라미 한 줄, 「기본」은 제목 옆에 (일정 시트와 같게) */
   function cardColorPanel(k, g) {
     var cur = String(g.titleBg || "").toUpperCase();
-    /* v19 의 「헥스 코드는 지운다」에 맞춰 값은 글자로 적지 않고 고른 칸에 테두리로만 표시해요 */
-    var h = '<div class="cp ccp"><div class="cp-hd"><span>제목 색</span></div>' +
-      '<div class="sw-grid" data-sw="cardTitleBg">';
+    var h = '<div class="cp ccp"><div class="cp-hd"><span>제목 색</span>' +
+      '<button type="button" class="cp-reset' + (cur ? "" : " on") +
+      '" data-act="pickCardColor" data-tab="' + k + '" data-gid="' + g.id + '" data-color="">기본</button></div>' +
+      '<div class="sw-grid sw-row" data-sw="cardTitleBg">';
     MUTED.forEach(function (p) {
       h += '<button type="button" class="sw' + (cur === p.c ? " sel" : "") + '" data-act="pickCardColor" data-tab="' + k +
         '" data-gid="' + g.id + '" data-color="' + p.c + '" style="background:' + p.c + '" aria-label="' + p.n + " " + p.c + '"></button>';
     });
-    h += '</div><div class="cp-foot"><span></span><button type="button" class="cp-reset' + (cur ? "" : " on") +
-      '" data-act="pickCardColor" data-tab="' + k + '" data-gid="' + g.id + '" data-color="">기본</button></div></div>';
+    h += "</div></div>";
     return h;
   }
 
@@ -1510,7 +1510,25 @@
 
   /* ------------------------------------------------------------------ sheet */
   var sheetWrap = $("#sheetWrap"), sheet = $("#sheet"), sheetSubmit = null;
-  var sheetCenter = false;   /* v21: 일정 검색처럼 화면 가운데 모달로 띄울 때 */
+  var sheetCenter = false;   /* v21: 일정 검색처럼 떠 있는 모달로 띄울 때 */
+  var vvBound = false;
+  /* v22: 아이폰 키보드가 올라오면 «보이는 화면»이 짧아져요. 그 높이에 맞춰
+     검색 모달의 최대 높이를 다시 잡아 줍니다 — 검색칸과 결과가 키보드 위에 남아요. */
+  function fitCenterSheet() {
+    if (!sheet || !sheetWrap.classList.contains("sheet-center")) return;
+    var vv = window.visualViewport;
+    var vh = (vv && vv.height) || window.innerHeight || 844;
+    var top = 64;
+    try { top = parseFloat(getComputedStyle(sheetWrap).paddingTop) || 64; } catch (e) {}
+    sheet.style.maxHeight = Math.max(200, Math.round(vh - top - 14)) + "px";
+  }
+  function bindViewportFit() {
+    if (vvBound || !window.visualViewport) return;
+    vvBound = true;
+    window.visualViewport.addEventListener("resize", fitCenterSheet);
+    window.visualViewport.addEventListener("scroll", fitCenterSheet);
+    window.addEventListener("resize", fitCenterSheet);
+  }
   function openSheet(html, onSubmit) {
     personSheetWho = null;
     openCard = null;
@@ -1520,12 +1538,15 @@
     sheetSubmit = onSubmit || null;
     sheetWrap.classList.add("open");
     sheetWrap.setAttribute("aria-hidden", "false");
+    sheet.style.maxHeight = "";
     sheet.scrollTop = 0;
+    if (sheetWrap.classList.contains("sheet-center")) { bindViewportFit(); fitCenterSheet(); }
   }
   function closeSheet() {
     personSheetWho = null;
     openCard = null;
     sheetWrap.classList.remove("sheet-center");
+    sheet.style.maxHeight = "";
     sheetWrap.classList.remove("open");
     sheetWrap.setAttribute("aria-hidden", "true");
     sheetSubmit = null;
@@ -1810,7 +1831,7 @@
   function swRow(target, cur, pal) {
     var list = pal || PALETTE;
     var curU = String(cur || "").toUpperCase();
-    var h = '<div class="sw-grid" data-sw="' + target + '">';
+    var h = '<div class="sw-grid sw-row" data-sw="' + target + '">';
     list.forEach(function (p) {
       h += '<button class="sw' + (curU === p.c ? " sel" : "") + '" data-act="pickColor" data-target="' + target +
         '" data-color="' + p.c + '" style="background:' + p.c + '" aria-label="' + p.n + ' ' + p.c + '"></button>';
@@ -2392,7 +2413,8 @@
     var c = S.couple, t = S.theme || {}, li = S.link || {}, dark = t.mode === "dark";
     var remote = !!(Store && Store.mode === "remote");
     var acct = (S.auth || {});
-    var h = '<header class="hdr' + capCls("set") + '"' + capStyle("set") + ' data-pg="set"><div><h1>My</h1></div></header>';
+    var h = '<header class="hdr' + capCls("set") + '"' + capStyle("set") + ' data-pg="set"><div><h1>My</h1></div>' +
+      '<span class="app-ver" title="투로그 버전">버전 ' + APP_VERSION + "</span></header>";
 
     /* ---- 1. 계정 및 커플 연결 ---- */
     h += '<div class="sec"><h2>계정 및 커플 연결</h2><span class="more">' + (li.connected ? "연결됨" : "미연결") + "</span></div>";

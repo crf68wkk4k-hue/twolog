@@ -252,8 +252,10 @@ with sync_playwright() as p:
         page.wait_for_timeout(420)
         n = page.locator("#s-diary .ngrid .ncard:not(.new)").count()
         check("%s 탭 카드 %d개" % (seg_names[si], n), n >= 1, n)
-        check("%s 카드마다 꺾쇠 표시" % seg_names[si],
-              page.locator("#s-diary .ngrid .ncard:not(.new) .nc-go").count() == n)
+        # v22: 제목 옆 숫자·꺾쇠는 사용자 요청으로 지웠어요
+        check("%s 카드에 숫자·꺾쇠 없음" % seg_names[si],
+              page.locator("#s-diary .ngrid .ncard:not(.new) .nc-go").count() == 0
+              and page.locator("#s-diary .ngrid .ncard:not(.new) .nc-n").count() == 0)
         for j in range(n):
             card = page.locator("#s-diary .ngrid .ncard:not(.new)").nth(j)
             title = card.locator(".nc-t").inner_text().strip()
@@ -301,7 +303,10 @@ with sync_playwright() as p:
           page.locator("#sheet .card-items").inner_text()[:120])
     close_sheet()
     prev = page.locator("#s-diary .ngrid .ncard:not(.new)").first.inner_text()
-    check("카드 미리보기에 항목·개수 표시", "개" in prev and page.locator("#s-diary .ngrid .ncard:not(.new)").first.locator(".nc-n").inner_text().strip() == "7", prev[:80])
+    # v22: 카드 제목 옆 개수·아래 「+N개」는 사용자 요청으로 지웠어요
+    check("카드 미리보기에 항목만 (개수·+N 없음)",
+          page.locator("#s-diary .ngrid .ncard:not(.new)").first.locator(".nc-n").count() == 0
+          and "+" not in prev and "개" not in prev, prev[:80])
 
     # 살짝 길게 눌러도(순서 이동과 헷갈리는 경우) 그 목록이 열려야 함
     order_before = page.evaluate("Array.from(document.querySelectorAll('#s-diary .ngrid .ncard:not(.new) .nc-t')).map(e => e.textContent)")

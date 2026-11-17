@@ -146,7 +146,8 @@ with sync_playwright() as p:
     check("탭 글씨 확대 (15.5px)", segs is not None and segs["fs"] == "15.5px", segs.get("fs") if segs else None)
     check("탭 칸 높이 44px", segs is not None and round(segs["h"]) == 44, segs.get("h") if segs else None)
     nct = page.evaluate("getComputedStyle(document.querySelector('#s-diary .ncard .nc-t')).fontSize")
-    check("카드 캡션 1포인트 축소 (17px)", nct == "17px", nct)
+    # v22: 사용자 요청으로 카드 제목을 더 작게(13.5px) 줄였어요
+    check("카드 제목 13.5px", nct == "13.5px", nct)
     page.screenshot(path=os.path.join(SHOT, "note-v18.png"))
 
     # ---------------- 노트 설정: 이모지 + 이름 한 칸 ----------------

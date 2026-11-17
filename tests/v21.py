@@ -86,7 +86,7 @@ with sync_playwright() as p:
 
     # ---------------- 서비스워커 캐시 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
-    check("sw.js 캐시 버전 twolog-v21", 'const VERSION = "twolog-v21"' in sw,
+    check("sw.js 캐시 버전 twolog-v22", 'const VERSION = "twolog-v22"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장되는 일반 모드로 옮겨요
@@ -173,7 +173,9 @@ with sync_playwright() as p:
         "#B8CAA5", "#B4D8D4", "#80A4AA", "#D2CBE3", "#A299B8", "#C4B28E"], pal.get("colors"))
     check("컬러판이 제목 입력칸 «바로 위»", pal.get("paletteAbove") and pal.get("paletteAboveInput")
           and pal.get("gapTopal", 999) <= 24, (pal.get("paletteAbove"), pal.get("paletteAboveInput"), pal.get("gapTopal")))
-    check("컬러판 제목 줄 「제목 색」만 (헥스 코드 없음)", pal.get("hd") == "제목 색" and pal.get("val") is None, pal)
+    # v22: 「기본」이 제목 줄 오른쪽으로 올라가고 색 값(헥스)은 그대로 적지 않아요
+    check("컬러판 제목 줄은 「제목 색」 (헥스 코드 없음)", "제목 색" in str(pal.get("hd"))
+          and "#" not in str(pal.get("hd")) and pal.get("val") is None, pal)
     check("처음엔 「기본」 선택", pal.get("resetOn") is True, pal.get("resetOn"))
 
     # 노란색(레몬 #EFD353) 고르기
@@ -450,8 +452,9 @@ with sync_playwright() as p:
               bottom: window.innerHeight - r.bottom, radius: getComputedStyle(sh).borderTopLeftRadius,
               cls: w.className, width: Math.round(r.width)};
     })()""")
-    check("검색창이 화면 가운데에 뜸", abs(pos["center"] - pos["vh"] / 2) <= 60, pos)
-    check("아래에 붙지 않음(위·아래 여백 비슷)", abs(pos["top"] - pos["bottom"]) <= 80 and pos["top"] > 90, pos)
+    # v22: 아이폰 키보드에 가려지지 않도록 «화면 위쪽» 고정으로 바뀌었어요 (v21 의 «가운데» 기준을 현행에 맞춤)
+    check("검색창이 화면 위쪽에 떠 있음", pos["top"] <= 90, pos)
+    check("아래 절반은 비워 둠(키보드 자리)", pos["bottom"] >= pos["vh"] * 0.35, pos)
     check("검색 모달은 둥글고 좁게", "sheet-center" in pos["cls"] and pos["radius"] != "0px" and pos["width"] <= 350, pos)
     check("처음부터 결과 목록·안내 문구 없음", "일정이 없어요" not in sr["text"] and sr["labels"] == 0, sr["text"][:120])
     check("검색칸은 안내를 플레이스홀더로", sr["ph"] and "검색" in sr["ph"], sr["ph"])
@@ -566,8 +569,9 @@ with sync_playwright() as p:
           (ef["order"], ef["order2"], ef["who3"]))
     check("제목 칸은 밑줄만 (네모 테두리 없음)", ef["titleStyle"]["bt"] == "0px" and ef["titleStyle"]["bl"] == "0px"
           and ef["titleStyle"]["bb"] != "0px" and ef["titleStyle"]["r"] == "0px", ef["titleStyle"])
-    check("컬러는 작은 동그라미(24px·둥글게)", ef["swSize"]["w"] <= 26 and ef["swSize"]["h"] <= 26
-          and "50%" in ef["swSize"]["radius"], ef["swSize"])
+    # v22: 스와치를 20px 로 한 단계 더 줄였어요 (모양은 그대로 동그라미)
+    check("컬러는 작은 동그라미(20px·둥글게)", ef["swSize"]["w"] <= 22 and ef["swSize"]["h"] <= 22
+          and ("50%" in ef["swSize"]["radius"] or "999px" in ef["swSize"]["radius"]), ef["swSize"])
     check("기본 시간은 오전 12:00 · 오후 09:00", ef["timeLabels"] == ["오전 12:00", "오후 09:00"], ef["timeLabels"])
     check("큰 날짜 두 개 + 가운데 ~", len(ef["bigs"]) == 2 and ef["tildeTxt"] == "~", (ef["bigs"], ef["tildeTxt"]))
     import re as _re
