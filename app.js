@@ -171,9 +171,13 @@
   if (S.theme.mode !== "dark") S.theme.mode = "light";
   if (!S.theme.pages || typeof S.theme.pages !== "object") S.theme.pages = {};
   if (!S.note || typeof S.note !== "object") S.note = {};
+  /* v18: My 탭 4자리 화면 잠금 (이 기기에만 저장) */
+  if (!S.lock || typeof S.lock !== "object") S.lock = { on: false, pin: "" };
+  S.lock.on = !!S.lock.on && /^\d{4}$/.test(String(S.lock.pin || ""));
+  if (!S.lock.on) S.lock.pin = /^\d{4}$/.test(String(S.lock.pin || "")) ? String(S.lock.pin) : "";
   ["todo", "bucket", "log"].forEach(function (k) {
     if (!S.note[k] || typeof S.note[k] !== "object") S.note[k] = {};
-    if (typeof S.note[k].e !== "string" || !S.note[k].e) S.note[k].e = NOTE_DEF[k].e;
+    if (typeof S.note[k].e !== "string") S.note[k].e = NOTE_DEF[k].e;
     if (typeof S.note[k].n !== "string" || !S.note[k].n) S.note[k].n = NOTE_DEF[k].n;
   });
   if (S.couple.fmt !== "Y") S.couple.fmt = "D";
@@ -957,10 +961,13 @@
       });
     var sd = parse(sel);
     var selHol = holName(sel);
+    /* v18: 그날의 타임라인 — 일정에 더해 그날 찍은 폴라로이드·기록도 함께 */
+    var dayPhotos = S.photos.filter(function (p) { return String(p.date || "").slice(0, 10) === sel; });
+    var dayLogs = (S.logs || []).filter(function (x) { return String(x.date || "").slice(0, 10) === sel; });
     html += '<div class="daypanel"><div class="daypanel-hd"><div class="d">' + (sd.getMonth() + 1) + "월 " + sd.getDate() + "일<em>" + WD[sd.getDay()] + "요일</em>" +
       (selHol ? '<span class="hol-badge">' + esc(selHol) + "</span>" : "") + "</div>" +
       '<span class="more" style="font-size:11.5px;color:var(--ink-3)">' + selEvents.length + "개</span></div>";
-    html += '<div class="daylist">';
+    html += '<div class="daylist daytl">';
     if (selEvents.length) {
       selEvents.forEach(function (e) {
         var rng = evRange(e);
@@ -972,10 +979,34 @@
           '<div class="m">' + (rng ? rng : t.label) + "</div>" +
           '<button class="x" data-act="delEvent" data-id="' + e.id + '" aria-label="삭제">' + IC.x + "</button></div>";
       });
-    } else {
+    }
+    if (!selEvents.length && !dayPhotos.length && !dayLogs.length) {
       html += '<div class="empty">이 날은 아직 비어 있어요.</div>';
     }
     html += "</div>";
+    if (dayLogs.length) {
+      html += '<div class="dp-sec"><div class="dp-hd">🎬 기록<span class="c">' + dayLogs.length + "개</span></div>";
+      dayLogs.forEach(function (x) {
+        html += '<div class="dp-log"><span class="tag ' + (x.kind === "movie" ? "movie" : "food") + '">' +
+          (x.kind === "movie" ? "영화" : "먹방") + "</span><span class=\"dp-lt\">" + esc(x.title) + "</span>" +
+          stars(x.rating) + "</div>";
+      });
+      html += "</div>";
+    }
+    if (dayPhotos.length) {
+      html += '<div class="dp-sec"><div class="dp-hd">🖼️ 사진<span class="c">' + dayPhotos.length + "장</span></div>";
+      html += '<div class="dp-photos">';
+      dayPhotos.slice(0, 3).forEach(function (p) {
+        html += '<button class="dp-ph" data-act="openPhoto" data-id="' + p.id + '" aria-label="' + esc(p.title || "사진") + ' 열기">' +
+          photoImg(p) + "</button>";
+      });
+      if (dayPhotos.length > 3) {
+        html += '<button class="dp-ph dp-ph-more" data-act="openPhoto" data-id="' + dayPhotos[2].id + '" aria-label="그날 사진 모두 보기">+' +
+          (dayPhotos.length - 3) + "</button>";
+      }
+      html += "</div>";
+      html += '<div class="dp-ph-cap">' + dayPhotos.slice(0, 3).map(function (p) { return esc(p.title || ""); }).filter(Boolean).join(" · ") + "</div></div>";
+    }
     html += '<div style="padding:14px 0 0"><button class="ghost add-big" data-act="addEvent">' + IC.plus + " 일정 추가</button></div>";
     html += "</div>";
 
@@ -990,12 +1021,28 @@
   function noteTab(k) {
     var v = (S.note || {})[k] || {};
     var d = NOTE_DEF[k];
+    /* v18: 이모지를 비우고 이름만 쓸 수도 있어요(예: 「함께」). 빈 문자열은 그대로 존중합니다 */
     return {
-      e: typeof v.e === "string" && v.e ? v.e : d.e,
+      e: typeof v.e === "string" ? v.e : d.e,
       n: typeof v.n === "string" && v.n ? v.n : d.n
     };
   }
-  function noteLabel(k) { var t = noteTab(k); return t.e + " " + t.n; }
+  function noteLabel(k) { var t = noteTab(k); return t.e ? t.e + " " + t.n : t.n; }
+
+  /* v18: 이모지 + 이름을 한 칸에서 받아 — 앞의 이모지만 떼어 저장해요 */
+  function splitEmojiName(s) {
+    var t = String(s == null ? "" : s).trim();
+    if (!t) return { e: "", n: "" };
+    var m = t.match(/^([\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}\u{20E3}]+)\s*([\s\S]*)$/u);
+    if (!m) return { e: "", n: t };
+    var rest = String(m[2] || "").trim();
+    if (!rest) return { e: "", n: t };
+    return { e: String(m[1] || "").trim(), n: rest };
+  }
+  function listLabel(l) {
+    if (!l) return "";
+    return l.emoji ? String(l.emoji) + " " + String(l.title || "") : String(l.title || "");
+  }
 
   function findList(id) {
     for (var i = 0; i < S.lists.length; i++) if (S.lists[i].id === id) return S.lists[i];
@@ -1019,15 +1066,15 @@
     var html = "";
     html += '<header class="hdr' + capCls("diary") + '"' + capStyle("diary") + ' data-pg="diary"><div><h1><span class="eh">📖</span> 노트</h1></div>' +
       '<div class="hdr-acts"><button class="round-btn" data-act="noteSettings" aria-label="노트 설정">' + IC.gear + "</button></div></header>";
-    html += '<div class="seg">';
+    html += '<div class="segs">';
     NOTE_BASE.forEach(function (k) { html += segBtn(seg, k, noteLabel(k)); });
     html += "</div>";
     if (S.lists.length) {
       html += '<div class="lstbar"><div class="lst-scroll">';
       S.lists.forEach(function (l) {
         var on = seg === "list:" + l.id;
-        html += '<button class="lchip' + (on ? " active" : "") + '" data-act="seg" data-seg="list:' + l.id + '" aria-label="' + esc(l.title) + '">' +
-          '<span class="le">' + esc(l.emoji || "📌") + "</span><span>" + esc(l.title) + "</span></button>";
+        html += '<button class="lchip' + (on ? " active" : "") + '" data-act="seg" data-seg="list:' + l.id + '" aria-label="' + esc(listLabel(l)) + '">' +
+          (l.emoji ? '<span class="le">' + esc(l.emoji) + "</span>" : "") + "<span>" + esc(l.title) + "</span></button>";
       });
       html += "</div></div>";
     }
@@ -1226,7 +1273,7 @@
 
   function viewList(l) {
     if (!l) return '<div class="list" style="margin:0 20px"><div class="empty">리스트를 찾을 수 없어요.</div></div>';
-    var h = '<div class="note-hd"><div class="nh-l"><span class="t">' + esc((l.emoji || "📌") + " " + l.title) + "</span>" +
+    var h = '<div class="note-hd"><div class="nh-l"><span class="t">' + esc(listLabel(l)) + "</span>" +
       '<span class="k">' + (l.kind === "memo" ? "메모" : "체크") + "</span></div></div>";
 
     var done = l.items.filter(function (i) { return i.done; }).length;
@@ -1283,6 +1330,7 @@
 
   /* 사진첩 v17: 날짜별(최신순) 묶음 + 살짝 기운 폴라로이드 프레임 — IMG_4511 레이아웃 */
   var POLA_TILT = ["-3deg", "2deg", "-1.5deg", "3deg"];
+  var PHOTOS_PER_DAY = 3;   /* v18: 하루에 보이는 폴라로이드는 3개까지 */
   function photoDayLabel(day) {
     var d = parse(day);
     if (day === today) return '<span class="d acc">오늘</span>';
@@ -1307,13 +1355,17 @@
       var albums = [];
       g.items.forEach(function (p) { var a = String(p.album || "").trim(); if (a && albums.indexOf(a) < 0) albums.push(a); });
       var meta = g.items.length + "장" + (albums.length === 1 ? " · " + esc(albums[0]) : "");
+      /* v18: 하루는 폴라로이드 3개까지 — 넘치면 세 번째에 +N, 눌러서 그날 사진을 모두 봐요 */
+      var shown = g.items.slice(0, PHOTOS_PER_DAY);
+      var rest = g.items.length - shown.length;
       h += '<div class="pday"><div class="pday-hd">' + photoDayLabel(g.date) +
         '<span class="c">' + meta + "</span></div>" +
         '<div class="polas">' +
-        g.items.map(function (p, i) {
+        shown.map(function (p, i) {
+          var more = (rest > 0 && i === shown.length - 1) ? '<span class="pola-more">+' + rest + "</span>" : "";
           return '<button class="pola" style="--tilt:' + POLA_TILT[i % POLA_TILT.length] + '" data-act="openPhoto" data-id="' + p.id +
             '" aria-label="' + esc(p.title || p.album || "사진") + ' 열기">' +
-            '<span class="pola-pic">' + photoImg(p) + "</span>" +
+            '<span class="pola-pic">' + photoImg(p) + more + "</span>" +
             '<span class="pola-chin' + (p.capBg ? " tinted" : "") + '"' + (p.capBg ? ' style="background:' + esc(p.capBg) + '"' : "") + ">" +
             esc(p.title || "") + "</span></button>";
         }).join("") + "</div></div>";
@@ -1386,28 +1438,26 @@
 
   function formNoteSettings() {
     var h = sheetHead("노트 설정");
-    h += '<p class="sheet-sub">탭 이름과 내 리스트를 여기서 정리해요.</p>';
+    h += '<p class="sheet-sub">탭 이름과 내 리스트를 여기서 정리해요. 이모지와 이름을 한 칸에 함께 적으면 돼요.</p>';
     h += '<form class="form" id="noteForm" style="margin-top:12px">';
     h += '<div class="set-lbl">탭 이름</div>';
     NOTE_BASE.forEach(function (k) {
       var t = noteTab(k);
+      /* v18: 이모지 칸을 따로 두지 않고 한 칸에 — 「📝 메모」처럼 이모지와 이름을 함께 적어요 */
       h += '<div class="nt-row">' +
-        '<input class="field nt-emo" name="t_' + k + '_e" value="' + esc(t.e) + '" maxlength="4" aria-label="' + esc(t.n) + ' 이모지" autocomplete="off">' +
-        '<input class="field nt-nm" name="t_' + k + '_n" value="' + esc(t.n) + '" aria-label="탭 이름" autocomplete="off">' +
+        '<input class="field nt-nm" name="t_' + k + '" value="' + esc(t.e ? t.e + " " + t.n : t.n) + '" placeholder="예) 📝 메모" aria-label="탭 이름" autocomplete="off">' +
         "</div>";
     });
     h += '<div class="set-lbl" style="margin-top:20px">내 리스트</div>';
     if (!S.lists.length) h += '<div class="set-hint" style="margin-top:0">아직 만든 리스트가 없어요. 아래에서 새로 만들 수 있어요.</div>';
     S.lists.forEach(function (l) {
       h += '<div class="nt-row">' +
-        '<input class="field nt-emo" name="l_' + l.id + '_e" value="' + esc(l.emoji || "📌") + '" maxlength="4" aria-label="' + esc(l.title) + ' 이모지" autocomplete="off">' +
-        '<input class="field nt-nm" name="l_' + l.id + '_n" value="' + esc(l.title) + '" aria-label="리스트 이름" autocomplete="off">' +
+        '<input class="field nt-nm" name="l_' + l.id + '" value="' + esc(listLabel(l)) + '" placeholder="예) 🧳 여행 준비물" aria-label="리스트 이름" autocomplete="off">' +
         '<button type="button" class="nt-del" data-act="delListFromNote" data-id="' + l.id + '">삭제</button></div>';
     });
     h += '<div class="nt-new"><div class="set-lbl">새 리스트</div>' +
       '<div class="nt-row">' +
-      '<input class="field nt-emo" name="new_e" value="📌" maxlength="4" aria-label="새 리스트 이모지" autocomplete="off">' +
-      '<input class="field nt-nm" name="new_n" placeholder="예) 여행 준비물" aria-label="새 리스트 이름" autocomplete="off">' +
+      '<input class="field nt-nm" name="new_n" placeholder="예) 📌 여행 준비물" aria-label="새 리스트 이름" autocomplete="off">' +
       '<select class="field nt-kind" name="new_kind" aria-label="새 리스트 형식"><option value="check">체크</option><option value="memo">메모</option></select>' +
       "</div></div>";
     h += '<div style="height:14px"></div><button class="btn-primary" type="submit">저장하기</button></form>';
@@ -1683,9 +1733,24 @@
   }
 
   /* ------------------------------------------------------------------ photo detail */
-  function openPhoto(id) {
-    var p = S.photos.filter(function (x) { return x.id === id; })[0];
-    if (!p) return;
+  /* v18: 폴라로이드를 누르면 그날 사진이 크게 — 좌우로 넘겨 보고, 캡션·정보·삭제도 여기서 */
+  var photoView = null;    /* { ids: [...그날 사진 id], i: 지금 보고 있는 순서 } */
+
+  function photoDayIds(p) {
+    var day = String((p && p.date) || "").slice(0, 10);
+    return S.photos.slice().sort(byDateDesc)
+      .filter(function (x) { return String(x.date || "").slice(0, 10) === day; })
+      .map(function (x) { return x.id; });
+  }
+
+  function photoViewBody() {
+    var ids = (photoView && photoView.ids) || [];
+    var i = photoView ? photoView.i : 0;
+    var p = S.photos.filter(function (x) { return x.id === ids[i]; })[0];
+    if (!p) {
+      return '<div class="sheet-hd"><h2>사진</h2><button class="icon-btn" data-close="1" aria-label="닫기">' + IC.x + "</button></div>" +
+        '<p class="sheet-sub">사진을 찾을 수 없어요.</p>';
+    }
     var d = parse(p.date);
     var cur = p.capBg || "";
     var sw = '<div class="sw-grid" data-sw="cap">';
@@ -1694,9 +1759,14 @@
         '" data-color="' + c.c + '" style="background:' + c.c + '" aria-label="' + c.n + ' ' + c.c + '"></button>';
     });
     sw += "</div>";
+    var many = ids.length > 1;
     var html = '<div class="sheet-hd"><h2>' + esc(p.title || p.album || "사진") + '</h2><button class="icon-btn" data-close="1" aria-label="닫기">' + IC.x + "</button></div>" +
-      '<div class="pdetail">' + photoImg(p, true) +
-      capHtml(p, "pd-cap") + "</div>" +
+      '<div class="pview" data-pv="1">' + photoImg(p, true) +
+      '<button class="pv-nav prev" type="button" data-act="photoStep" data-step="-1" aria-label="이전 사진"' + (i <= 0 ? " disabled" : "") + ">" + IC.left + "</button>" +
+      '<button class="pv-nav next" type="button" data-act="photoStep" data-step="1" aria-label="다음 사진"' + (i >= ids.length - 1 ? " disabled" : "") + ">" + IC.right + "</button>" +
+      "</div>" +
+      '<div class="pv-cap">' + capHtml(p, "pd-cap") + "</div>" +
+      (many ? '<div class="pv-count">' + (i + 1) + " / " + ids.length + " · 옆으로 넘겨 보기</div>" : "") +
       '<div style="margin-top:14px">' +
       '<div style="font-size:13.5px;font-weight:600;letter-spacing:-.02em">' + esc(p.album) + "</div>" +
       '<div style="font-size:11.5px;color:var(--ink-3);margin-top:3px">' + d.getFullYear() + "." + pad(d.getMonth() + 1) + "." + pad(d.getDate()) + (p.place ? " · " + esc(p.place) : "") + "</div></div>" +
@@ -1709,7 +1779,31 @@
       '<button class="cp-reset' + (p.capBg ? "" : " on") + '" data-act="pickCap" data-id="' + p.id + '" data-color="">기본</button></div>' +
       '<p class="cp-note">글씨는 어느 색을 골라도 검정으로 유지돼요. 고른 색은 앱을 다시 열어도 그대로 남아 있어요.</p></div>' +
       '<div style="height:6px"></div>';
-    openSheet(html, null);
+    return html;
+  }
+
+  function photoShow(id) {
+    var p = S.photos.filter(function (x) { return x.id === id; })[0];
+    if (!p) return false;
+    var ids = photoDayIds(p);
+    var i = ids.indexOf(p.id);
+    photoView = { ids: ids, i: i < 0 ? 0 : i };
+    return true;
+  }
+
+  function photoStep(step) {
+    if (!photoView) return;
+    var n = photoView.i + step;
+    if (n < 0 || n >= photoView.ids.length) return;
+    photoView.i = n;
+    var st = sheet.scrollTop;
+    sheet.innerHTML = '<div class="grab"></div>' + photoViewBody();
+    sheet.scrollTop = st;
+  }
+
+  function openPhoto(id) {
+    if (!photoShow(id)) return;
+    openSheet(photoViewBody(), null);
   }
 
   function setCapColor(id, color) {
@@ -2154,7 +2248,14 @@
 
     h += '<div style="margin:14px 20px 0"><button class="set-btn warn" data-act="logout" style="width:100%;height:46px">로그아웃</button></div>';
 
-    /* ---- 2. 꾸미기 ---- */
+    /* ---- 2. 잠금 · 보관 (v18) ---- */
+    h += '<div class="my-gap"></div>';
+    h += '<div class="sec"><h2>잠금 · 보관</h2></div>';
+    h += '<div class="list">' +
+      menuRow("lockSheet", "🔒", "화면 잠금", lockOn() ? "켜짐 · 4자리 비밀번호" : "꺼짐") +
+      menuRow("exportSheet", "📄", "기록 PDF 내보내기", "이번 달 · 올해 · 전체") + "</div>";
+
+    /* ---- 3. 꾸미기 ---- */
     h += '<div class="my-gap"></div>';
     h += '<div class="sec"><h2>꾸미기</h2></div>';
     h += '<div class="list">' + menuRow("openThemeManager", "🎨", "테마 관리", themeSummary()) + "</div>";
@@ -2171,8 +2272,192 @@
     $("#s-set").innerHTML = h;
   }
 
-  function installHint() {
-    try {
+  /* ==========================================================================
+     v18: My 탭 — 4자리 화면 잠금
+     ========================================================================== */
+  var lockBuf = "";
+  function lockOn() { return !!(S && S.lock && S.lock.on && /^\d{4}$/.test(String(S.lock.pin || ""))); }
+
+  function showLock() {
+    var el = $("#lockScreen");
+    if (!el) return;
+    lockBuf = "";
+    el.hidden = false;
+    el.setAttribute("aria-hidden", "false");
+    renderLockScreen("");
+  }
+  function hideLock() {
+    var el = $("#lockScreen");
+    if (!el) return;
+    el.hidden = true;
+    el.setAttribute("aria-hidden", "true");
+  }
+  function renderLockScreen(msg) {
+    var el = $("#lockScreen");
+    if (!el) return;
+    var dots = "";
+    for (var i = 0; i < 4; i++) dots += '<span class="lk-dot' + (i < lockBuf.length ? " on" : "") + '"></span>';
+    var keys = "";
+    for (var n = 1; n <= 9; n++) keys += '<button type="button" class="lk-key" data-act="lockKey" data-k="' + n + '">' + n + "</button>";
+    keys += '<button type="button" class="lk-key ghost" data-act="lockKey" data-k="clear">전체 삭제</button>' +
+      '<button type="button" class="lk-key" data-act="lockKey" data-k="0">0</button>' +
+      '<button type="button" class="lk-key ghost" data-act="lockKey" data-k="del">지우기</button>';
+    var who = (S && S.couple && S.couple.me) ? S.couple.me + "님, " : "";
+    el.innerHTML = '<div class="lk-body"><div class="mark"><i></i><i></i></div>' +
+      '<div class="lk-title">투로그</div>' +
+      '<p class="lk-sub">' + esc(who) + "4자리 비밀번호를 입력해 주세요</p>" +
+      '<div class="lk-dots' + (msg === "wrong" ? " lk-shake" : "") + '">' + dots + "</div>" +
+      '<div class="lk-msg">' + (msg === "wrong" ? "비밀번호가 달라요. 다시 입력해 주세요." : "") + "</div>" +
+      '<div class="lk-pad">' + keys + "</div></div>";
+  }
+  function lockKey(k) {
+    if (k === "del") lockBuf = lockBuf.slice(0, -1);
+    else if (k === "clear") lockBuf = "";
+    else if (/^\d$/.test(k) && lockBuf.length < 4) lockBuf += k;
+    renderLockScreen("");
+    if (lockBuf.length !== 4) return;
+    if (lockBuf === String(S.lock.pin)) {
+      lockBuf = "";
+      hideLock();
+      toast("다시 오셨네요");
+    } else {
+      lockBuf = "";
+      renderLockScreen("wrong");
+      try { if (navigator.vibrate) navigator.vibrate([12, 60, 12]); } catch (e) {}
+    }
+  }
+
+  function formLock() {
+    var on = lockOn();
+    var h = sheetHead("화면 잠금");
+    h += '<p class="sheet-sub">' + (on
+      ? "지금 화면 잠금이 켜져 있어요. 앱을 열 때 4자리 숫자를 먼저 확인해요."
+      : "앱을 열 때 4자리 숫자를 먼저 확인해요. 이 기기에서만 쓰는 간단한 잠금이에요.") + "</p>";
+    h += '<form class="form" id="lockForm" style="margin-top:12px">';
+    if (on) h += '<div class="f"><label>지금 비밀번호</label><input class="field" type="password" name="cur" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4자리"></div>';
+    h += '<div class="f"><label>' + (on ? "새 비밀번호" : "4자리 비밀번호") + '</label><input class="field" type="password" name="pin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4자리 숫자" required></div>' +
+      '<div class="f"><label>한 번 더</label><input class="field" type="password" name="pin2" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="같은 숫자" required></div>' +
+      '<button class="btn-primary" type="submit">' + (on ? "비밀번호 바꾸기" : "잠금 켜기") + "</button></form>";
+    if (on) {
+      h += '<div style="height:10px"></div><button class="btn-line" data-act="lockOff">잠금 끄기</button>';
+      h += '<button class="btn-line" data-act="lockForgot" style="margin-top:8px;color:var(--ink-3)">비밀번호를 잊었어요</button>';
+    }
+    h += '<p class="cp-note" style="margin-top:14px">비밀번호는 이 기기에만 저장돼요. 두 사람이 같이 쓰는 앱이라면 서로 아는 숫자로 정해 두는 게 좋아요.</p>';
+    h += '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
+    return h;
+  }
+
+  /* ==========================================================================
+     v18: My 탭 — 기간을 골라 기록 PDF 내보내기 (인쇄 창 → PDF로 저장)
+     ========================================================================== */
+  function formExport() {
+    var y = today.slice(0, 4), m = today.slice(5, 7);
+    return sheetHead("기록 PDF 내보내기") +
+      '<p class="sheet-sub">기간을 고르면 투로그 기록장 모양으로 정리해 인쇄 창을 열어요. 인쇄 창에서 ‘PDF로 저장’을 고르면 돼요.</p>' +
+      '<div class="ex-list">' +
+      '<button class="ex-btn" data-act="exportRun" data-scope="month"><b>이번 달</b><span>' + Number(m) + "월 · 일정과 사진" + "</span></button>" +
+      '<button class="ex-btn" data-act="exportRun" data-scope="year"><b>올해</b><span>' + y + "년 · 1월부터 지금까지</span></button>" +
+      '<button class="ex-btn" data-act="exportRun" data-scope="all"><b>전체 기록</b><span>함께한 날부터 지금까지</span></button>' +
+      "</div>" +
+      '<p class="cp-note" style="margin-top:14px">사진은 화면에 보이는 그대로 담겨요. 인쇄 창에서 ‘PDF로 저장’을 고르면 파일로 남길 수 있어요.</p>' +
+      '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
+  }
+
+  function inScope(dateStr, scope) {
+    var d = String(dateStr || "").slice(0, 10);
+    if (!d) return false;
+    if (scope === "month") return d.slice(0, 7) === today.slice(0, 7);
+    if (scope === "year") return d.slice(0, 4) === today.slice(0, 4);
+    return true;
+  }
+
+  function buildPrint(scope) {
+    var c = S.couple || {};
+    var y = today.slice(0, 4), m = Number(today.slice(5, 7));
+    var title = scope === "month" ? m + "월의 기록" : scope === "year" ? y + "년의 기록" : "우리의 기록";
+    var dday = Math.max(0, diffDays(c.since, today));
+    var evs = S.events.filter(function (e) { return inScope(evStart(e), scope); })
+      .sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : byTimeAsc(a, b); });
+    var phs = S.photos.filter(function (p) { return inScope(p.date, scope); }).slice().sort(byDateAsc);
+    var logs = (S.logs || []).filter(function (x) { return inScope(x.date, scope); });
+    var todos = S.todos || [];
+    var buckets = S.bucket || [];
+
+    var h = '<div class="pr-page"><div class="pr-head"><div class="pr-brand"><i></i><i></i><b>투로그</b></div>' +
+      '<h1>' + esc(title) + "</h1>" +
+      '<p class="pr-sub">' + esc(c.me || "") + " · " + esc(c.you || "") + " · " +
+      (c.since ? c.since.replace(/-/g, ".") + "부터 " + dday + "일째" : "") + "</p>" +
+      '<p class="pr-date">' + today.replace(/-/g, ".") + " 기준</p></div>";
+
+    h += '<section class="pr-sec"><h2>일정</h2>';
+    if (evs.length) {
+      var lastD = "";
+      evs.forEach(function (e) {
+        if (e.date !== lastD) {
+          if (lastD) h += "</div>";
+          var ed = parse(e.date);
+          h += '<div class="pr-day"><div class="pr-dh">' + (ed.getMonth() + 1) + "월 " + ed.getDate() + "일 " + WD[ed.getDay()] + "요일</div>";
+          lastD = e.date;
+        }
+        var who = e.who === "me" ? c.me : e.who === "you" ? c.you : "함께";
+        h += '<div class="pr-ev"><span class="pr-t">' + esc(e.title) + "</span><span class=\"pr-m\">" + esc(who) +
+          (e.time ? " · " + esc(e.time) : "") + (evRange(e) ? " · " + esc(evRange(e)) : "") + "</span></div>";
+      });
+      h += "</div>";
+    } else h += '<p class="pr-empty">이 기간에 적어 둔 일정이 없어요.</p>';
+    h += "</section>";
+
+    h += '<section class="pr-sec"><h2>사진</h2>';
+    if (phs.length) {
+      h += '<div class="pr-photos">';
+      phs.forEach(function (p) {
+        h += '<figure class="pr-ph">' + photoImg(p) +
+          '<figcaption>' + esc(p.title || p.album || "") + "<em>" + String(p.date || "").replace(/-/g, ".") + "</em></figcaption></figure>";
+      });
+      h += "</div>";
+    } else h += '<p class="pr-empty">이 기간에 담아 둔 사진이 없어요.</p>';
+    h += "</section>";
+
+    h += '<section class="pr-sec"><h2>기록</h2>';
+    var dn = todos.filter(function (t) { return t.done; }).length;
+    h += '<div class="pr-stats"><span>메모 ' + dn + " / " + todos.length + " 완료</span><span>버킷리스트 " +
+      buckets.filter(function (b) { return b.done; }).length + " / " + buckets.length + " 이룸</span><span>영화·먹방 " + logs.length + "개</span></div>";
+    if (buckets.length) {
+      h += '<div class="pr-day"><div class="pr-dh">버킷리스트</div>';
+      buckets.forEach(function (b) {
+        h += '<div class="pr-ev"><span class="pr-t">' + (b.done ? "✓ " : "· ") + esc(b.title) + '</span><span class="pr-m">' + esc(b.cat || "") + "</span></div>";
+      });
+      h += "</div>";
+    }
+    if (logs.length) {
+      h += '<div class="pr-day"><div class="pr-dh">영화 · 먹방</div>';
+      logs.forEach(function (x) {
+        h += '<div class="pr-ev"><span class="pr-t">' + esc(x.title) + '</span><span class="pr-m">' +
+          (x.kind === "movie" ? "영화" : "먹방") + " · " + Number(x.rating || 0).toFixed(1) + "점" +
+          (x.review ? " · " + esc(x.review) : "") + "</span></div>";
+      });
+      h += "</div>";
+    }
+    h += '</section><div class="pr-foot">투로그 · 둘이 함께 쌓는 기록</div></div>';
+
+    var old = document.getElementById("printRoot");
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var root = document.createElement("div");
+    root.id = "printRoot";
+    root.innerHTML = h;
+    document.body.appendChild(root);
+    return root;
+  }
+
+  function exportRun(scope) {
+    var sc = scope === "month" || scope === "year" ? scope : "all";
+    closeSheet();
+    buildPrint(sc);
+    toast("인쇄 창에서 ‘PDF로 저장’을 골라 주세요");
+    setTimeout(function () { try { window.print(); } catch (e) {} }, 450);
+  }
+
+  function installHint() {    try {
       if (window.matchMedia("(display-mode: standalone)").matches || navigator.standalone) {
         return "홈 화면 앱으로 열려 있어요 · 투로그";
       }
@@ -2272,6 +2557,28 @@
     var act = el.getAttribute("data-act");
 
     if (act === "nav") { go(el.getAttribute("data-screen")); return; }
+
+    /* v18: 화면 잠금 · 기록 PDF */
+    if (act === "lockSheet") { openSheet(formLock()); return; }
+    if (act === "lockKey") { lockKey(el.getAttribute("data-k")); return; }
+    if (act === "lockOff") {
+      var cIn = sheet.querySelector('#lockForm input[name="cur"]');
+      var cVal = cIn ? String(cIn.value || "") : "";
+      if (!/^\d{4}$/.test(cVal)) { toast("지금 비밀번호 4자리를 적어 주세요"); return; }
+      if (cVal !== String(S.lock.pin)) { toast("비밀번호가 달라요"); return; }
+      S.lock = { on: false, pin: "" };
+      save(); closeSheet(); renderSet(); hideLock(); toast("화면 잠금을 껐어요");
+      return;
+    }
+    if (act === "lockForgot") {
+      askConfirm("비밀번호를 잊었다면 이 기기에서 잠금을 끌 수 있어요. 기록은 그대로 남고, 끄면 앱을 열 때 더 이상 묻지 않아요.", "잠금 끄기", function () {
+        S.lock = { on: false, pin: "" };
+        save(); closeSheet(); renderSet(); hideLock(); toast("화면 잠금을 껐어요");
+      }, "잠금 끄기");
+      return;
+    }
+    if (act === "exportSheet") { openSheet(formExport()); return; }
+    if (act === "exportRun") { exportRun(el.getAttribute("data-scope")); return; }
 
     if (act === "navSeg") {
       var ns = el.getAttribute("data-seg");
@@ -2808,6 +3115,8 @@
 
     if (act === "openPhoto") { openPhoto(el.getAttribute("data-id")); return; }
 
+    if (act === "photoStep") { photoStep(Number(el.getAttribute("data-step")) || 1); return; }
+
     if (act === "addPhoto") {
       var pi = $("#photoInput");
       if (pi) { pi.value = ""; pi.click(); }
@@ -2817,6 +3126,7 @@
     if (act === "photoEdit") {
       var pe = S.photos.filter(function (x) { return x.id === el.getAttribute("data-id"); })[0];
       if (!pe) return;
+      var pvKeep = !!photoView;
       openSheet(formEditPhoto(pe), function (fd) {
         var p2 = S.photos.filter(function (x) { return x.id === pe.id; })[0];
         if (!p2) return;
@@ -2826,18 +3136,31 @@
         p2.place = String(fd.get("place") || "").trim();
         p2.memo = String(fd.get("memo") || "").trim();
         save(); closeSheet(); renderAll(); toast("사진 정보를 저장했어요");
+        /* v18: 사진을 보던 중이었다면 수정 뒤에도 그 자리에서 계속 넘겨 볼 수 있게 */
+        if (pvKeep && photoShow(p2.id)) { openSheet(photoViewBody(), null); }
       });
       return;
     }
 
     if (act === "photoDelete") {
       var pdId = el.getAttribute("data-id");
+      var pdView = photoView ? { ids: photoView.ids.slice(), i: photoView.i } : null;
       askConfirm("이 사진을 지울까요? 사진과 캡션이 함께 사라져요.", "지우기", function () {
         var gone = S.photos.filter(function (x) { return x.id === pdId; })[0];
         S.photos = S.photos.filter(function (x) { return x.id !== pdId; });
         delete PHOTO_URLS[pdId];
         if (gone) { try { Store.photos.remove(gone).catch(function () {}); } catch (e) {} }
-        save(); closeSheet(); renderAll(); toast("사진을 지웠어요");
+        save(); renderAll(); toast("사진을 지웠어요");
+        /* v18: 지운 사진이 마지막이 아니면 그날 다음 사진을 이어서 보여 줘요 */
+        var left = pdView ? pdView.ids.filter(function (x) { return x !== pdId; }) : [];
+        if (left.length) {
+          var ni = Math.min(pdView.i, left.length - 1);
+          photoView = { ids: left, i: ni };
+          openSheet(photoViewBody(), null);
+        } else {
+          photoView = null;
+          closeSheet();
+        }
       }, "사진 삭제");
       return;
     }
@@ -2885,6 +3208,188 @@
     }
   });
 
+  /* ==========================================================================
+     v18: 꾹 눌러 순서 바꾸기 — 노트의 리스트 카드와 To-do 한 줄
+     · 320ms 동안 가만히 누르고 있으면 카드가 들려요
+     · 그 뒤에는 손가락/마우스를 움직여 원하는 자리에 놓으면 순서가 저장됩니다
+     · 스크롤하려고 바로 움직이면(8px 이상) 드래그를 포기하고 평소처럼 스크롤돼요
+     ========================================================================== */
+  var RZ_LONG = 320;
+  var rzState = null;
+  var rzMoved = false;
+
+  function rzTarget(t) {
+    if (!t || !t.closest) return null;
+    var card = t.closest("#s-diary .ngrid .ncard");
+    if (card && !card.classList.contains("new")) return { el: card, kind: "card", box: card.parentNode };
+    var row = t.closest(".todo-items .trow");
+    if (row) return { el: row, kind: "row", box: row.parentNode };
+    return null;
+  }
+
+  function rzSiblings(st) {
+    var sel = st.kind === "card" ? ".ncard:not(.new)" : ".trow";
+    return Array.prototype.slice.call(st.box.children).filter(function (n) {
+      return n !== st.el && n.matches && n.matches(sel);
+    });
+  }
+
+  function rzBegin(st) {
+    if (!st || st.active || !st.el.parentNode) return;
+    st.active = true;
+    st.el.classList.add("lift");
+    if (st.box.classList) st.box.classList.add("rz-on");
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
+  }
+
+  function rzMove(ev) {
+    var st = rzState;
+    if (!st || !st.active) return;
+    var x = ev.clientX, y = ev.clientY;
+    var sibs = rzSiblings(st);
+    if (!sibs.length) return;
+    var best = null, bestD = Infinity;
+    sibs.forEach(function (n) {
+      var r = n.getBoundingClientRect();
+      var d = Math.sqrt(Math.pow(x - (r.left + r.width / 2), 2) + Math.pow(y - (r.top + r.height / 2), 2));
+      if (d < bestD) { bestD = d; best = n; }
+    });
+    if (!best) return;
+    var r2 = best.getBoundingClientRect();
+    var after;
+    if (st.kind === "card") {
+      /* 같은 줄이면 좌우로, 다른 줄이면 위아래로 자리를 정해요 */
+      after = (Math.abs(y - (r2.top + r2.height / 2)) < r2.height / 2)
+        ? (x > r2.left + r2.width / 2)
+        : (y > r2.top + r2.height / 2);
+    } else {
+      after = y > r2.top + r2.height / 2;
+    }
+    if (after) {
+      if (best.nextSibling !== st.el) best.parentNode.insertBefore(st.el, best.nextSibling);
+    } else if (best !== st.el.nextSibling) {
+      best.parentNode.insertBefore(st.el, best);
+    }
+  }
+
+  function rzRows(st) {
+    var box = st.box;
+    var listId = box.getAttribute("data-list");
+    var gid = box.getAttribute("data-gid");
+    var tab = box.getAttribute("data-tab");
+    var arr;
+    if (listId) {
+      var l = findList(listId);
+      if (!l) return;
+      arr = l.items;
+    } else {
+      arr = itemsOf(tab);
+    }
+    var ids = Array.prototype.slice.call(box.querySelectorAll(".trow")).map(function (n) {
+      var b = n.querySelector("[data-id]");
+      return b ? b.getAttribute("data-id") : null;
+    });
+    var byId = {};
+    arr.forEach(function (it) { byId[it.id] = it; });
+    var slots = [];
+    arr.forEach(function (it, i) { if (!gid || it.gid === gid) slots.push(i); });
+    var seq = ids.map(function (id) { return byId[id]; }).filter(Boolean);
+    if (!seq.length || seq.length !== slots.length) return;
+    slots.forEach(function (pos, n) { arr[pos] = seq[n]; });
+    save();
+    if (box.closest("#sheet")) refreshCardSheet();
+    else renderDiary();
+  }
+
+  function rzCommit(st) {
+    if (st.kind === "card") {
+      var tab = st.el.getAttribute("data-tab");
+      var gs = groupsOf(tab);
+      var order = Array.prototype.slice.call(st.box.querySelectorAll(".ncard[data-gid]")).map(function (n) { return n.getAttribute("data-gid"); });
+      var byId = {};
+      gs.forEach(function (g) { byId[g.id] = g; });
+      var next = [];
+      order.forEach(function (id) { if (byId[id]) { next.push(byId[id]); delete byId[id]; } });
+      gs.forEach(function (g) { if (byId[g.id]) next.push(g); });
+      S.groups[tab] = next;
+      save();
+      renderDiary();
+    } else {
+      rzRows(st);
+    }
+    toast("순서를 바꿨어요");
+  }
+
+  function rzEnd() {
+    var st = rzState;
+    if (!st) return;
+    clearTimeout(st.timer);
+    if (st.active) {
+      st.el.classList.remove("lift");
+      if (st.box.classList) st.box.classList.remove("rz-on");
+      rzMoved = true;
+      setTimeout(function () { rzMoved = false; }, 500);
+      rzCommit(st);
+    }
+    rzState = null;
+  }
+
+  document.addEventListener("pointerdown", function (ev) {
+    if (ev.pointerType === "mouse" && ev.button !== 0) return;
+    /* 새로 누르는 손가락/마우스는 언제나 새 동작 — 드래그 직후의 click 만 한 번 막아요 */
+    rzMoved = false;
+    var hit = rzTarget(ev.target);
+    if (!hit) return;
+    var st = { el: hit.el, kind: hit.kind, box: hit.box, x: ev.clientX, y: ev.clientY, active: false, timer: null };
+    st.timer = setTimeout(function () { rzBegin(st); }, RZ_LONG);
+    rzState = st;
+  }, true);
+
+  window.addEventListener("pointermove", function (ev) {
+    var st = rzState;
+    if (!st) return;
+    if (!st.active) {
+      if (Math.abs(ev.clientX - st.x) > 8 || Math.abs(ev.clientY - st.y) > 8) {
+        clearTimeout(st.timer);
+        rzState = null;
+      }
+      return;
+    }
+    if (ev.cancelable) ev.preventDefault();
+    rzMove(ev);
+  }, { passive: false });
+
+  window.addEventListener("pointerup", rzEnd);
+  window.addEventListener("pointercancel", rzEnd);
+  window.addEventListener("blur", rzEnd);
+
+  /* 드래그하는 동안에는 화면이 따라 스크롤되지 않게, 길게 눌러 뜨는 메뉴·글자 선택도 막아요 */
+  document.addEventListener("touchmove", function (ev) {
+    if (rzState && rzState.active && ev.cancelable) ev.preventDefault();
+  }, { passive: false });
+  document.addEventListener("contextmenu", function (ev) {
+    if (rzState && rzState.active) ev.preventDefault();
+  });
+  document.addEventListener("click", function (ev) {
+    if (rzMoved) { ev.stopPropagation(); ev.preventDefault(); rzMoved = false; }
+  }, true);
+
+  /* 사진 크게 보기: 손가락으로 좌우 넘기기 */
+  var pvSwipe = null;
+  document.addEventListener("touchstart", function (ev) {
+    if (!photoView) return;
+    var v = ev.target.closest && ev.target.closest(".pview");
+    if (!v || !ev.touches || !ev.touches.length) return;
+    pvSwipe = { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
+  }, { passive: true });
+  document.addEventListener("touchend", function (ev) {
+    if (!pvSwipe || !ev.changedTouches || !ev.changedTouches.length) { pvSwipe = null; return; }
+    var t = ev.changedTouches[0];
+    var dx = t.clientX - pvSwipe.x, dy = t.clientY - pvSwipe.y;
+    pvSwipe = null;
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) photoStep(dx < 0 ? 1 : -1);
+  }, { passive: true });
+
   document.addEventListener("submit", function (ev) {
     if (ev.target.id === "personForm") {
       ev.preventDefault();
@@ -2899,24 +3404,43 @@
       return;
     }
 
+    if (ev.target.id === "lockForm") {
+      ev.preventDefault();
+      var lf = new FormData(ev.target);
+      var wasOn = lockOn();
+      var curPin = String(lf.get("cur") || "");
+      var nPin = String(lf.get("pin") || "").trim();
+      var nPin2 = String(lf.get("pin2") || "").trim();
+      if (wasOn && curPin !== String(S.lock.pin)) { toast("지금 비밀번호가 달라요"); return; }
+      if (!/^\d{4}$/.test(nPin)) { toast("숫자 4자리로 정해 주세요"); return; }
+      if (nPin !== nPin2) { toast("두 번 적은 숫자가 달라요"); return; }
+      S.lock = { on: true, pin: nPin };
+      save(); closeSheet(); renderSet();
+      toast(wasOn ? "비밀번호를 바꿨어요" : "화면 잠금을 켰어요");
+      return;
+    }
+
     if (ev.target.id === "noteForm") {
       ev.preventDefault();
       var nf = new FormData(ev.target);
+      /* v18: 한 칸에 적은 「이모지 + 이름」을 앞의 이모지와 나머지로 나눠 저장해요 */
       NOTE_BASE.forEach(function (k) {
+        var split = splitEmojiName(nf.get("t_" + k));
         S.note[k] = {
-          e: String(nf.get("t_" + k + "_e") || "").trim() || NOTE_DEF[k].e,
-          n: String(nf.get("t_" + k + "_n") || "").trim() || NOTE_DEF[k].n
+          e: split.n ? split.e : "",
+          n: split.n || NOTE_DEF[k].n
         };
       });
       S.lists.forEach(function (l) {
-        l.emoji = String(nf.get("l_" + l.id + "_e") || "").trim() || "📌";
-        l.title = String(nf.get("l_" + l.id + "_n") || "").trim() || l.title;
+        var ls = splitEmojiName(nf.get("l_" + l.id));
+        l.emoji = ls.n ? ls.e : "";
+        l.title = ls.n || l.title;
       });
-      var newName = String(nf.get("new_n") || "").trim();
-      if (newName) {
+      var newSplit = splitEmojiName(nf.get("new_n"));
+      if (newSplit.n) {
         var newList = {
-          id: uid(), title: newName,
-          emoji: String(nf.get("new_e") || "").trim() || "📌",
+          id: uid(), title: newSplit.n,
+          emoji: newSplit.e,
           kind: nf.get("new_kind") === "memo" ? "memo" : "check", items: []
         };
         S.lists.push(newList);
@@ -3140,6 +3664,8 @@
     renderAll();
     BOOTED = true;
     loadPhotoUrls();
+    /* v18: 잠금이 켜져 있으면 앱을 열 때 4자리 화면을 먼저 */
+    if (lockOn()) showLock();
   }
 
   /* 상대 기기에서 바뀐 내용 반영 */

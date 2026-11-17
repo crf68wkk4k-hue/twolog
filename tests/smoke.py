@@ -147,7 +147,7 @@ with sync_playwright() as p:
 
     page.locator("#s-photo .pola").first.click()
     page.wait_for_timeout(250)
-    check("사진 상세", page.locator(".pdetail").count() == 1)
+    check("사진 상세", page.locator(".pview").count() == 1)
     page.keyboard.press("Escape")
     page.wait_for_timeout(200)
 

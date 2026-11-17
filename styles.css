@@ -236,6 +236,18 @@ h1,h2,h3,p{margin:0}
   letter-spacing:-.02em; white-space:nowrap; transition:background .15s ease, color .15s ease, box-shadow .15s ease
 }
 .seg-btn.active{background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgba(28,28,30,.08), 0 0 0 1px rgba(28,28,30,.04)}
+/* v18: 노트 상단 탭 — 한 덩어리로 붙이지 않고 각각 독립된 네모 칸으로.
+   칸 안의 글씨는 한 단계 크게(11.5px → 15.5px), 높이도 글씨에 맞춰 44px */
+.segs{display:flex; gap:8px; margin:14px 20px 0}
+.segs .seg-btn{
+  flex:1 1 0; min-width:0; height:44px; padding:0 8px; border:1px solid var(--line);
+  background:var(--surface); font-size:15.5px; font-weight:700; letter-spacing:-.035em;
+  overflow:hidden; text-overflow:ellipsis
+}
+.segs .seg-btn.active{background:var(--ink); border-color:var(--ink); color:var(--bg); box-shadow:none}
+.segs .seg-btn:active{opacity:.88}
+html[data-mode="dark"] .segs .seg-btn{border-color:rgba(255,255,255,.14)}
+html[data-mode="dark"] .segs .seg-btn.active{background:var(--ink); border-color:var(--ink); color:#111}
 
 .dbody{margin-top:14px}
 
@@ -343,6 +355,23 @@ h1,h2,h3,p{margin:0}
 .pola:focus,.pola:focus-visible{outline:none}
 .pola .pola-pic{display:block; aspect-ratio:1/1; overflow:hidden; background:var(--surface-2)}
 .pola .pola-pic svg,.pola .pola-pic img{width:100%; height:100%; display:block; object-fit:cover}
+/* v18: 하루 사진이 3장을 넘으면 세 번째 폴라로이드에 +N — 하루는 한 줄(3개)로 */
+.pola .pola-more{position:absolute; inset:6px 6px 18px 6px; display:flex; align-items:center; justify-content:center;
+  background:rgba(17,17,17,.46); color:#FFFFFF; font-size:17px; font-weight:800; letter-spacing:-.02em}
+/* v18: 사진 크게 보기 — 잘리지 않고 화면에 담기게 */
+.pview{position:relative; margin-top:10px; background:var(--surface-2); height:clamp(240px, 48vh, 440px);
+  display:flex; align-items:center; justify-content:center; overflow:hidden}
+.pview img,.pview svg{width:100%; height:100%; display:block; object-fit:contain}
+.pview .pv-nav{position:absolute; top:50%; transform:translateY(-50%); width:38px; height:38px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.86); color:#1C1C1E;
+  box-shadow:0 2px 8px rgba(0,0,0,.16); border:0}
+.pview .pv-nav.prev{left:8px}
+.pview .pv-nav.next{right:8px}
+.pview .pv-nav:disabled{opacity:0; pointer-events:none}
+html[data-mode="dark"] .pview .pv-nav{background:rgba(40,40,44,.86); color:#F2F2F4}
+.pv-cap{margin-top:10px}
+.pv-cap .pd-cap{position:static; min-height:34px; box-shadow:none; border:1px solid var(--line)}
+.pv-count{margin:10px 0 0; text-align:center; font-size:11.5px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em; font-variant-numeric:tabular-nums}
 .pola .pola-chin{position:absolute; left:6px; right:6px; bottom:3px; height:12px; display:flex; align-items:center;
   justify-content:center; font-size:9.5px; font-weight:600; letter-spacing:-.01em; color:#4A4A4C;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -457,8 +486,8 @@ h1,h2,h3,p{margin:0}
 .lst-scroll{flex:1 1 auto; min-width:0; display:flex; gap:6px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; padding-bottom:1px}
 .lst-scroll::-webkit-scrollbar{display:none}
 .lchip{
-  flex:0 0 auto; height:30px; max-width:168px; padding:0 10px; border:1px solid var(--line); background:var(--surface);
-  display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:600; color:var(--ink-2); letter-spacing:-.015em
+  flex:0 0 auto; height:38px; max-width:190px; padding:0 12px; border:1px solid var(--line); background:var(--surface);
+  display:flex; align-items:center; gap:6px; font-size:14px; font-weight:700; color:var(--ink-2); letter-spacing:-.025em
 }
 .lchip span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .lchip .le{font-size:13px; line-height:1; flex:0 0 auto}
@@ -799,8 +828,8 @@ body{overscroll-behavior-y:contain}
 
 /* --- 홈: D-day 히어로 — 프사는 양옆에 크게, 가운데는 문구·D+N·배지 --- */
 .dday{
-  /* v16: 히어로를 네 줄만큼 더 아래로 */
-  margin:94px 20px 0; padding:34px 0 22px; position:relative; display:grid;
+  /* v18: 히어로를 한 줄 위로 (94px → 74px) */
+  margin:74px 20px 0; padding:34px 0 22px; position:relative; display:grid;
   grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px;
   text-align:center; border:0; background:transparent; box-shadow:none; overflow:visible;
 }
@@ -820,6 +849,8 @@ body{overscroll-behavior-y:contain}
 
 /* --- 홈: 섹션 — 바탕색은 제목 줄(캡션)에만, 목록·카드는 깨끗하게 --- */
 .home-sec{border:0; background:transparent; margin:26px 20px 0; padding:0}
+/* v18: 디데이 바로 아래 「다가오는 일정」은 두 줄 더 아래로 — 사이에 여유 간격 */
+.dday + .home-sec{margin-top:58px}
 .home-sec .sec{margin:0 0 10px}
 .home-sec .sec h2{font-size:16px; letter-spacing:-.025em}
 .home-sec .sec .more{font-size:12px}
@@ -923,7 +954,7 @@ html[data-mode="dark"] .ncard{background:var(--surface); border-color:rgba(255,2
   box-shadow:0 3px 12px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.05)}
 html[data-mode="dark"] .ncard:active{box-shadow:0 1px 5px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05)}
 /* 카테고리명(제목) — 카드 맨 윗줄, 가장 크고 진하게 (v17: 「주제」 줄은 없앰) */
-.nc-t{font-size:18px; font-weight:800; letter-spacing:-.035em; line-height:1.25; word-break:keep-all; margin-top:2px}
+.nc-t{font-size:17px; font-weight:800; letter-spacing:-.035em; line-height:1.25; word-break:keep-all; margin-top:2px}
 .nc-items{display:flex; flex-direction:column; gap:5px; margin-top:11px; min-width:0}
 .nc-empty{font-size:13px; color:var(--ink-3); margin-top:11px; letter-spacing:-.01em}
 .cti{display:flex; align-items:flex-start; gap:6px; width:100%; min-width:0; text-align:left; font:inherit; cursor:pointer;
@@ -938,6 +969,17 @@ html[data-mode="dark"] .ncard:active{box-shadow:0 1px 5px rgba(0,0,0,.5), 0 0 0 
   font-size:12px; font-weight:600; letter-spacing:-.01em; box-shadow:none}
 .ncard.new .ap{display:flex; align-items:center; justify-content:center; color:var(--ink-3)}
 .ncard.new:active{background:var(--surface-2); box-shadow:none; transform:none}
+
+/* --- 노트: 꾹 눌러 순서 바구기 (v18) --- */
+#s-diary .ngrid .ncard:not(.new){-webkit-touch-callout:none; -webkit-user-select:none; user-select:none}
+.todo-items .trow{-webkit-touch-callout:none; -webkit-user-select:none; user-select:none}
+.ngrid.rz-on,.todo-items.rz-on{touch-action:none}
+.ncard.lift{transform:scale(1.05); box-shadow:0 16px 30px rgba(0,0,0,.20), 0 2px 6px rgba(0,0,0,.10);
+  z-index:6; position:relative; opacity:.97; cursor:grabbing}
+.trow.lift{position:relative; z-index:6; background:var(--surface); box-shadow:0 12px 24px rgba(0,0,0,.16);
+  outline:1px solid var(--line)}
+html[data-mode="dark"] .ncard.lift{box-shadow:0 16px 30px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.12)}
+html[data-mode="dark"] .trow.lift{background:var(--surface); box-shadow:0 12px 24px rgba(0,0,0,.7)}
 
 /* --- D-day 시트: 주년·생일 목록 + 생일 달력 --- */
 .mile-hd{font-size:12px; font-weight:700; letter-spacing:-.01em; color:var(--ink-2); margin:22px 0 2px}
@@ -987,3 +1029,95 @@ html[data-mode="dark"] .todo-add-btn{background:var(--btn-bg, #F2F2F4); color:va
 .grp-del{margin-top:10px; font-size:11.5px; font-weight:600; color:var(--ink-3); background:none; border:0; padding:6px 0; cursor:pointer; letter-spacing:-.01em}
 .grp-del:active{color:var(--accent)}
 .grp-add{margin-left:20px; margin-right:20px; width:calc(100% - 40px)}
+
+/* ==========================================================================
+   v18 — 화면 잠금 · PDF 내보내기 · 캘린더 그날 타임라인
+   ========================================================================== */
+
+/* --- 4자리 화면 잠금 --- */
+.lock-screen{position:absolute; inset:0; z-index:90; background:var(--bg); color:var(--ink);
+  display:flex; align-items:center; justify-content:center; padding:24px}
+.lock-screen[hidden]{display:none}
+.lk-body{width:100%; max-width:340px; display:flex; flex-direction:column; align-items:center; text-align:center}
+.lk-body .mark{display:flex; gap:4px; margin-bottom:12px}
+.lk-body .mark i{width:9px; height:9px; background:var(--ink); display:block}
+.lk-body .mark i:last-child{background:var(--accent)}
+.lk-title{font-size:20px; font-weight:800; letter-spacing:-.04em}
+.lk-sub{font-size:12.5px; color:var(--ink-3); margin-top:8px; letter-spacing:-.01em; line-height:1.5}
+.lk-dots{display:flex; gap:14px; margin:24px 0 4px}
+.lk-dot{width:12px; height:12px; border:1px solid var(--line); border-radius:50%; background:transparent; transition:background .12s ease}
+.lk-dot.on{background:var(--ink); border-color:var(--ink)}
+.lk-msg{height:18px; font-size:11.5px; color:var(--accent); font-weight:600; letter-spacing:-.01em}
+.lk-pad{display:grid; grid-template-columns:repeat(3,1fr); gap:9px; width:100%; max-width:270px; margin-top:14px}
+.lk-key{height:54px; border:1px solid var(--line); background:var(--surface); color:var(--ink);
+  font:inherit; font-size:21px; font-weight:600; letter-spacing:-.02em; cursor:pointer}
+.lk-key:active{background:var(--surface-2)}
+.lk-key.ghost{font-size:12px; font-weight:600; color:var(--ink-3); letter-spacing:-.02em}
+.lk-shake{animation:lkShake .34s ease}
+@keyframes lkShake{
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-7px)} 40%{transform:translateX(7px)}
+  60%{transform:translateX(-4px)} 80%{transform:translateX(4px)}
+}
+
+/* --- 기간 고르기 (PDF) --- */
+.ex-list{display:flex; flex-direction:column; gap:8px; margin-top:14px}
+.ex-btn{display:flex; flex-direction:column; align-items:flex-start; gap:3px; padding:13px 14px;
+  border:1px solid var(--line); background:var(--surface); color:var(--ink); text-align:left; cursor:pointer}
+.ex-btn b{font-size:14.5px; font-weight:700; letter-spacing:-.02em}
+.ex-btn span{font-size:11.5px; color:var(--ink-3); letter-spacing:-.01em}
+.ex-btn:active{background:var(--surface-2)}
+
+/* --- 캘린더: 그날의 타임라인 (일정 · 기록 · 사진) --- */
+.daytl{position:relative}
+.dp-sec{margin:14px 0 0}
+.dp-hd{display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--ink-2); letter-spacing:-.01em; margin-bottom:8px}
+.dp-hd .c{font-size:11px; font-weight:500; color:var(--ink-3)}
+.dp-log{display:flex; align-items:center; gap:7px; padding:7px 0; border-bottom:1px solid var(--line-2); font-size:13px}
+.dp-log:last-child{border-bottom:0}
+.dp-log .dp-lt{flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-.015em}
+.dp-log .tag{flex:0 0 auto; font-size:9.5px; font-weight:700; padding:2px 5px; border:1px solid var(--line); color:var(--ink-2)}
+.dp-photos{display:grid; grid-template-columns:repeat(3,1fr); gap:7px}
+.dp-ph{position:relative; padding:0; border:1px solid var(--line); background:var(--surface-2);
+  aspect-ratio:1/1; overflow:hidden; cursor:pointer}
+.dp-ph img,.dp-ph svg{width:100%; height:100%; object-fit:cover; display:block}
+.dp-ph-more{display:flex; align-items:center; justify-content:center; font:inherit; font-size:15px; font-weight:800;
+  color:#FFFFFF; background:rgba(17,17,17,.45)}
+.dp-ph-cap{margin-top:7px; font-size:11px; color:var(--ink-3); letter-spacing:-.01em;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+
+/* ==========================================================================
+   인쇄 / PDF — 화면에서는 숨기고 인쇄할 때만 종이 한 장의 기록장
+   ========================================================================== */
+#printRoot{display:none}
+@media print{
+  @page{margin:14mm 14mm 16mm}
+  html,body{background:#FFFFFF !important; color:#111111 !important}
+  .phone,#printRoot ~ *,body > *:not(#printRoot){display:none !important}
+  #printRoot{display:block !important; font-family:"Pretendard","Apple SD Gothic Neo",-apple-system,"Noto Sans KR",sans-serif;
+    color:#111111; font-size:10.5pt; line-height:1.55}
+  #printRoot .pr-page{max-width:none}
+  #printRoot .pr-head{border-bottom:2px solid #111111; padding-bottom:10px; margin-bottom:16px}
+  #printRoot .pr-brand{display:flex; align-items:center; gap:5px; font-size:10pt; letter-spacing:.2em; text-transform:uppercase}
+  #printRoot .pr-brand i{width:7px; height:7px; background:#111111; display:block}
+  #printRoot .pr-brand i:last-child{background:#B4705F}
+  #printRoot .pr-head h1{font-size:24pt; font-weight:800; letter-spacing:-.04em; margin:8px 0 2px}
+  #printRoot .pr-sub{margin:0; font-size:10pt; color:#444444}
+  #printRoot .pr-date{margin:2px 0 0; font-size:8.5pt; color:#888888}
+  #printRoot .pr-sec{margin-top:20px; page-break-inside:auto}
+  #printRoot .pr-sec h2{font-size:12pt; font-weight:800; letter-spacing:-.02em; margin:0 0 8px;
+    border-bottom:1px solid #DDDDDD; padding-bottom:5px}
+  #printRoot .pr-day{margin-top:10px; page-break-inside:avoid}
+  #printRoot .pr-dh{font-size:9pt; font-weight:700; color:#666666; letter-spacing:-.01em; margin-bottom:3px}
+  #printRoot .pr-ev{display:flex; gap:8px; align-items:baseline; padding:2.5px 0; border-bottom:1px dotted #EEEEEE}
+  #printRoot .pr-t{font-size:10.5pt; font-weight:600; letter-spacing:-.01em}
+  #printRoot .pr-m{margin-left:auto; font-size:8.5pt; color:#777777; white-space:nowrap}
+  #printRoot .pr-empty{font-size:9.5pt; color:#999999; margin:0}
+  #printRoot .pr-photos{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+  #printRoot .pr-ph{margin:0; page-break-inside:avoid}
+  #printRoot .pr-ph img,#printRoot .pr-ph svg{width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:#F4F4F2}
+  #printRoot .pr-ph figcaption{font-size:8.5pt; letter-spacing:-.01em; color:#333333; padding-top:3px; display:block; line-height:1.35}
+  #printRoot .pr-ph figcaption em{display:block; font-style:normal; font-size:7.5pt; color:#999999}
+  #printRoot .pr-stats{display:flex; gap:14px; font-size:9pt; color:#444444; margin-bottom:6px}
+  #printRoot .pr-foot{margin-top:22px; padding-top:8px; border-top:1px solid #DDDDDD; font-size:8pt; color:#999999; letter-spacing:.04em}
+}
