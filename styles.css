@@ -620,7 +620,7 @@ select.field{appearance:none; background-image:url("data:image/svg+xml;charset=u
 .seg-sm{margin:0; padding:3px; background:var(--surface-2); border-radius:0; display:flex; gap:2px}
 .seg-sm .seg-btn{height:30px; font-size:12px}
 .btn-primary{
-  height:50px; border-radius:0; background:var(--btn-bg, var(--accent)); color:var(--btn-ink, #FFFFFF);
+  height:50px; border-radius:0; background:var(--btn-bg, var(--accent)); color:var(--btn-ink, #111111);
   font-size:14.5px; font-weight:700;
   letter-spacing:-.01em; width:100%; margin-top:4px; transition:background .15s ease, transform .12s ease
 }

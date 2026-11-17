@@ -286,14 +286,26 @@
   /* 일정·프로필 색 팔레트 (12색) */
   var OWNER_COLORS = ["#9E636B", "#BD6C48", "#A68C53", "#5B7048", "#537B67",
     "#3D5C82", "#625A7F", "#745A4A", "#9B816C", "#4A4A4C"];
-  function inkOn(hex) {
+  /* v19: 밝기 계산을 한 곳으로 — 제목 줄 글씨(inkOn)와 버튼 글씨(btnInk)가 같은 값을 씁니다 */
+  function lumOf(hex) {
     var h = String(hex || "").replace("#", "");
     if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
-    if (!/^[0-9a-fA-F]{6}$/.test(h)) return "#111111";
+    if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
     var n = parseInt(h, 16);
     var lin = function (c) { return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
-    var L = 0.2126 * lin(((n >> 16) & 255) / 255) + 0.7152 * lin(((n >> 8) & 255) / 255) + 0.0722 * lin((n & 255) / 255);
+    return 0.2126 * lin(((n >> 16) & 255) / 255) + 0.7152 * lin(((n >> 8) & 255) / 255) + 0.0722 * lin((n & 255) / 255);
+  }
+  function inkOn(hex) {
+    var L = lumOf(hex);
+    if (L === null) return "#111111";
     return L > 0.5 ? "#111111" : "#FFFFFF";
+  }
+  /* v19: 확인·기본 버튼(완료·저장하기·추가하기 …) 글씨는 테라코타·파스텔·뮤트 12색 어느 쪽이든
+     검정으로 또렷하게. 배경이 검정에 가까운 아주 어두운 색(L ≤ 0.09)일 때만 흰 글씨로 둡니다. */
+  function btnInk(hex) {
+    var L = lumOf(hex);
+    if (L === null) return "#111111";
+    return L <= 0.09 ? "#FFFFFF" : "#111111";
   }
   function setOwnerColor(who, hex) {
     var v = String(hex || "").toUpperCase();
@@ -422,11 +434,12 @@
     } else {
       ["--log", "--log-soft", "--log-line", "--log-sw"].forEach(function (k) { root.style.removeProperty(k); });
     }
-    /* v16: 홈 제목 색을 골랐다면 저장·완료 같은 기본 버튼도 같은 색으로 — 글씨는 색에 맞춰 또렷하게(inkOn) */
+    /* v16: 홈 제목 색을 골랐다면 저장·완료 같은 기본 버튼도 같은 색으로
+       v19: 글씨는 늘 검정으로 또렷하게(btnInk) */
     var htb = String(t.homeTitleBg || "").toUpperCase();
     if (/^#[0-9A-F]{6}$/.test(htb)) {
       root.style.setProperty("--btn-bg", htb);
-      root.style.setProperty("--btn-ink", inkOn(htb));
+      root.style.setProperty("--btn-ink", btnInk(htb));
     } else {
       ["--btn-bg", "--btn-ink"].forEach(function (k) { root.style.removeProperty(k); });
     }
@@ -1668,28 +1681,36 @@
     return h + "</div>";
   }
 
-  function cpBlock(title, target, cur, pal, fallback) {
+  /* v19: 팔레트 알맹이만(제목 줄·헥스 코드 없이) — 컬러 시트에서 씁니다 */
+  function cpGrid(target, cur, pal, fallback) {
     var curU = cur ? String(cur).toUpperCase() : "";
-    return '<div class="cp"><div class="cp-hd"><span>' + title + '</span><span class="cp-val" data-val="' + target + '">' +
-      (cur ? curU : "기본") + "</span></div>" + swRow(target, curU, pal) +
+    return swRow(target, curU, pal) +
       '<div class="cp-foot"><label class="cp-pick"><input type="color" class="js-color" data-target="' + target + '" value="' +
       (curU || fallback) + '"><span>컬러</span></label>' +
-      '<button class="cp-reset' + (cur ? "" : " on") + '" data-act="pickColor" data-target="' + target + '" data-color="">기본</button></div></div>';
+      '<button class="cp-reset' + (cur ? "" : " on") + '" data-act="pickColor" data-target="' + target + '" data-color="">기본</button></div>';
+  }
+
+  function cpBlock(title, target, cur, pal, fallback) {
+    return '<div class="cp"><div class="cp-hd"><span>' + title + '</span><span class="cp-val" data-val="' + target + '">' +
+      (cur ? String(cur).toUpperCase() : "기본") + "</span></div>" + cpGrid(target, cur, pal, fallback) + "</div>";
   }
 
   function formTheme() {
     var t = S.theme || {};
     var dark = t.mode === "dark";
-    var monthNo = Number(today.slice(5, 7));
+    /* v19: 위 안내 문구·팔레트 제목 라벨(다가오는 일정 · N월의 우리)·헥스 코드를 지웠어요.
+       화면(라이트/다크) → 컬러(12색 팔레트 · 컬러/기본) → 설명 → 완료 순서이고,
+       두 섹션 제목 「화면」·「컬러」는 같은 .cp-hd 캡션으로 크기·굵기를 똑같이 맞춥니다. */
     return sheetHead("컬러") +
-      '<p class="sheet-sub">화면 밝기와 홈 제목 줄 색을 골라 주세요.</p>' +
       '<div class="cp"><div class="cp-hd"><span>화면</span><span class="cp-val">' + (dark ? "다크" : "라이트") + '</span></div>' +
       '<div class="seg seg-sm" data-group="mode">' +
       '<button type="button" class="seg-btn' + (dark ? "" : " active") + '" data-act="mode" data-mode="light">라이트</button>' +
       '<button type="button" class="seg-btn' + (dark ? " active" : "") + '" data-act="mode" data-mode="dark">다크</button>' +
       "</div></div>" +
-      cpBlock("다가오는 일정 · " + monthNo + "월의 우리", "homeTitleBg", t.homeTitleBg, MUTED, "#F2CFC9") +
-      '<p class="cp-note">고른 색은 두 섹션의 제목 줄(문구) 바탕과 저장·완료 같은 기본 버튼에 함께 칠해지고, 글씨는 색에 맞춰 또렷하게 바뀌어요. 바로 적용되고 앱을 다시 열어도 그대로 남아 있어요. ‘기본’으로 두면 원래대로 돌아가요.</p>' +
+      '<div class="cp" role="group" aria-label="홈 제목 줄·버튼 색">' +
+      '<div class="cp-hd"><span>컬러</span></div>' +
+      cpGrid("homeTitleBg", t.homeTitleBg, MUTED, "#F2CFC9") + "</div>" +
+      '<p class="cp-note">고른 색은 두 섹션의 제목 줄(문구) 바탕과 저장·완료 같은 기본 버튼에 함께 칠해지고, 제목 줄 글씨는 색에 맞춰, 버튼 글씨는 검정으로 또렷하게 보여요. 바로 적용되고 앱을 다시 열어도 그대로 남아 있어요. ‘기본’으로 두면 원래대로 돌아가요.</p>' +
       '<button class="btn-primary" data-close="1">완료</button>';
   }
 
