@@ -351,7 +351,7 @@ with sync_playwright() as p:
           th.get("w") == 20 and th.get("h") == 20 and ("999px" in str(th.get("radius")) or "50%" in str(th.get("radius"))), th)
     check("테마 컬러판이 시트 안·컬러/기본 아래", th.get("inSheet") and th.get("footBelow"), th)
     page.wait_for_timeout(400)
-    page.screenshot(path=os.path.join(SHOT, "theme-sheet-v22.png"))
+    page.screenshot(path=os.path.join(SHOT, "theme-manager-v22.png"))
     page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw[data-color="#D2CBE3"]').click()
     page.wait_for_timeout(450)
     check("테마에서 고른 색이 저장됨",
@@ -359,6 +359,30 @@ with sync_playwright() as p:
           page.evaluate("window.__app.state.theme.homeTitleBg"))
     page.locator('#sheet .cp-reset[data-target="homeTitleBg"]').click()
     page.wait_for_timeout(300)
+    page.locator("#sheet [data-close]").first.click()
+    page.wait_for_timeout(400)
+
+    # 홈에서 여는 「컬러」 시트(formTheme)도 같은 모양인지
+    page.locator("#tabbar .tab").nth(0).click()
+    page.wait_for_timeout(500)
+    page.locator('#s-home [data-act="openTheme"]').click()
+    page.wait_for_timeout(500)
+    ts = page.evaluate("""(() => {
+      const g = document.querySelector('#sheet .sw-grid[data-sw="homeTitleBg"]');
+      if (!g) return {ok: false};
+      const els = Array.from(g.querySelectorAll('.sw'));
+      const rs = els.map(e => e.getBoundingClientRect());
+      const cs = getComputedStyle(g), scs = getComputedStyle(els[0]);
+      return {ok: true, n: els.length, display: cs.display, wrap: cs.flexWrap,
+              rows: new Set(rs.map(r => Math.round(r.top))).size,
+              w: Math.round(rs[0].width), h: Math.round(rs[0].height), radius: scs.borderTopLeftRadius,
+              title: document.querySelector('#sheet .sheet-hd h2').textContent.trim()};
+    })()""")
+    check("홈 「컬러」 시트도 12색 동그라미 한 줄",
+          ts.get("ok") and ts.get("n") == 12 and ts.get("display") == "flex"
+          and ts.get("rows") == 1 and ts.get("w") == 20, ts)
+    page.wait_for_timeout(400)
+    page.screenshot(path=os.path.join(SHOT, "theme-sheet-v22.png"))
     page.locator("#sheet [data-close]").first.click()
     page.wait_for_timeout(400)
 
