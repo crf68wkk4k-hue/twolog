@@ -235,8 +235,11 @@ with sync_playwright() as p:
     check("카드에 날짜 없음", page.locator("#s-diary .ncard .nc-d").count() == 0)
     check("카드 입체 그림자", page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard')).boxShadow")
           not in ("none", ""))
-    check("카드 각진 모서리", page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard')).borderTopLeftRadius")
-          in ("0px", "0"), page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard')).borderTopLeftRadius"))
+    # v21: 카드 끝을 둥글게(16px) 다듬고 테두리선은 지웠어요 — 예전 「각진 모서리」 기준을 현행에 맞춥니다
+    check("카드 둥근 모서리(16px)", page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard')).borderTopLeftRadius")
+          == "16px", page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard')).borderTopLeftRadius"))
+    check("카드 바깥 테두리선 없음", page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard')).borderTopWidth")
+          == "0px", page.evaluate("() => getComputedStyle(document.querySelector('#s-diary .ncard')).borderTopWidth"))
     check("새 리스트 카드", page.locator("#s-diary .ncard.new").count() == 1)
 
     # 카드 안에서 바로 체크

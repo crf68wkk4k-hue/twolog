@@ -210,7 +210,8 @@ with sync_playwright() as p:
     check("카드에 날짜 없음", page.locator("#s-diary .ncard .nc-d").count() == 0 and
           not re.search(r"\d{4}\.\s*\d{1,2}\.\s*\d{1,2}", card_txt), card_txt.replace("\n", " / "))
     card_css = page.evaluate(CSS_OF, "#s-diary .ncard")
-    check("카드 각진 모서리", px(card_css["br"]) == 0, card_css["br"])
+    # v21: 카드 끝을 둥글게(16px) 다듬었어요 — 예전 「각진 모서리」 기준을 현행에 맞춥니다
+    check("카드 둥근 모서리(16px)", px(card_css["br"]) == 16, card_css["br"])
     check("카드 입체 그림자", card_css["sh"] not in ("none", ""), card_css["sh"])
     check("카드 그림자 두 겹", card_css["sh"].count("rgb") + card_css["sh"].count("rgba") >= 2, card_css["sh"])
     t_css = page.evaluate(CSS_OF, "#s-diary .ncard .nc-t")

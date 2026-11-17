@@ -80,7 +80,8 @@ with sync_playwright() as p:
 
     # ---------------- 서비스워커 캐시 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
-    check("sw.js 캐시 버전 twolog-v20", 'const VERSION = "twolog-v20"' in sw,
+    # v21 에서 캐시 이름이 올라갔어요 — sw.js 는 지금 버전의 이름을 가집니다
+    check("sw.js 캐시 버전 twolog-v20 이상", 'const VERSION = "twolog-v2' in sw and 'const VERSION = "twolog-v20"' not in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장되는 일반 모드로 옮겨요
@@ -139,8 +140,8 @@ with sync_playwright() as p:
               ls: ms.letterSpacing, lh: ms.lineHeight, color: ms.color,
               diaryFs: dnumFs, diaryFw: dh ? dh.fontWeight : null,
               lh2: dh ? dh.lineHeight : null, ls2: dh ? dh.letterSpacing : null,
-              monLeft: mr.left - cr.left, monMidY: mr.top + mr.height / 2,
-              searchRight: cr.right - sr.right, searchMidY: sr.top + sr.height / 2,
+              monLeft: mr.left, monMidY: mr.top + mr.height / 2,
+              searchRight: window.innerWidth - sr.right, searchMidY: sr.top + sr.height / 2,
               rowTop: tr.top, weekTop: week.top,
               hasPrev: !!prev, hasNext: !!next, prevSvg: !!prev.querySelector('svg'),
               prevW: prev.getBoundingClientRect().width,
@@ -148,13 +149,13 @@ with sync_playwright() as p:
               titleAttr: document.querySelector('#s-cal .cal-title').getAttribute('title'),
               yearShown: document.querySelectorAll('#s-cal .cal-year').length};
     })()""")
-    check("왼쪽에 「11월」", head["txt"] == "11월" and head["monLeft"] <= 4, (head["txt"], head["monLeft"]))
+    check("왼쪽에 「11월」", head["txt"] == "11월" and abs(head["monLeft"]) <= 24, (head["txt"], head["monLeft"]))
     check("「11월」 글씨 = 제목과 같은 25px·700", head["fs"] == "25px" and head["fw"] == "700"
           and head["fs"] == head["diaryFs"] and head["fw"] == head["diaryFw"],
           {"cal": (head["fs"], head["fw"]), "h1": (head["diaryFs"], head["diaryFw"])})
     check("「11월」 자간·줄높이도 제목과 같음", head["ls"] == head["ls2"] and head["lh"] == head["lh2"],
           (head["ls"], head["ls2"], head["lh"], head["lh2"]))
-    check("돋보기가 같은 줄 맨 오른쪽 끝", head["searchIcon"] and head["searchRight"] <= 4, head["searchRight"])
+    check("돋보기가 같은 줄 맨 오른쪽 끝", head["searchIcon"] and head["searchRight"] <= 24, head["searchRight"])
     check("「11월」·돋보기가 같은 높이", abs(head["monMidY"] - head["searchMidY"]) <= 6,
           (head["monMidY"], head["searchMidY"]))
     check("달 이동 화살표 작게 두 개", head["hasPrev"] and head["hasNext"] and head["prevSvg"] and head["prevW"] <= 30,
@@ -250,17 +251,17 @@ with sync_playwright() as p:
       return {month: b, num: d ? getComputedStyle(d).color : null,
               name: n ? getComputedStyle(n).color : null,
               count: document.querySelectorAll('#s-cal .day.hol').length}; })()""")
-    check("공휴일 숫자 진한 빨강(#DC2626)", hol["num"] == "rgb(220, 38, 38)" and hol["count"] >= 1, hol)
-    check("공휴일 이름도 같은 빨강", hol["name"] == "rgb(220, 38, 38)", hol)
+    check("공휴일 숫자 진한 빨강(#F01414)", hol["num"] == "rgb(240, 20, 20)" and hol["count"] >= 1, hol)
+    check("공휴일 이름도 같은 빨강", hol["name"] == "rgb(240, 20, 20)", hol)
     check("달력 칸의 공휴일 표기는 유지", hol["count"] >= 2 and hol["month"] == "10월", hol)
     page.screenshot(path=os.path.join(SHOT, "calendar-holiday-v20.png"))
 
-    # 다크 모드는 더 밝은 빨강(#FF4545)
+    # 다크 모드는 더 밝은 빨강(#FF3B3B)
     page.evaluate("document.documentElement.setAttribute('data-mode','dark'); 0")
     page.wait_for_timeout(350)
     dk = page.evaluate("""(() => { const d = document.querySelector('#s-cal .day.hol .dnum');
       return d ? getComputedStyle(d).color : null; })()""")
-    check("다크에서 공휴일 #FF4545", dk == "rgb(255, 69, 69)", dk)
+    check("다크에서 공휴일 #FF3B3B", dk == "rgb(255, 59, 59)", dk)
     page.screenshot(path=os.path.join(SHOT, "calendar-v20-dark.png"))
     page.evaluate("document.documentElement.setAttribute('data-mode','light'); 0")
     page.wait_for_timeout(350)

@@ -422,7 +422,7 @@ with sync_playwright() as p:
     close_sheet()
     for k, v in found.items():
         check("%s 항목 이름 15px·700·검정" % k,
-              bool(v) and all(x == "15px/700/rgb(28, 28, 30)" for x in v), v)
+              bool(v) and all(x == "15px/700/rgb(9, 9, 11)" for x in v), v)
     all_vals = [x for v in found.values() for x in v]
     check("시트마다 항목 이름 글씨 동일", len(set(all_vals)) == 1, all_vals)
 
@@ -453,7 +453,7 @@ with sync_playwright() as p:
     check("달력 배경 투명", cal["bg"] in ("rgba(0, 0, 0, 0)", "transparent"), cal["bg"])
     check("주 행 사이 가로선 없음", cal["row1"] in ("0px", None) and cal["row2"] in ("0px", None), (cal["row1"], cal["row2"]))
     check("날짜 칸에 테두리·격자선 없음", cal["dayBorders"] == 0, cal["dayBorders"])
-    check("선택한 날 = 어두운 바탕", cal["selBg"] == "rgb(28, 28, 30)", cal["selBg"])
+    check("선택한 날 = 진한 검정 바탕", cal["selBg"] == "rgb(9, 9, 11)", cal["selBg"])
     check("선택한 날 글씨 반전", cal["numColor"] == "rgb(255, 255, 255)", cal["numColor"])
     check("선택한 날 테두리 상자 없음", cal["selShadow"] == "none", cal["selShadow"])
     check("여러 날 일정 막대 유지", cal["ebars"] >= 1, cal["ebars"])
@@ -466,14 +466,14 @@ with sync_playwright() as p:
       const next = document.querySelector('#s-cal [data-act=\"calNext\"]');
       const srch = document.querySelector('#s-cal [data-act=\"calSearch\"]');
       const sr = srch.getBoundingClientRect();
-      return {txt: mo.textContent.trim(), monLeft: mr.left - cr.left, searchRight: cr.right - sr.right,
+      return {txt: mo.textContent.trim(), monLeft: mr.left, searchRight: window.innerWidth - sr.right,
               hasPrev: !!prev, hasNext: !!next,
               searchIcon: !!srch.querySelector('svg'), fs: getComputedStyle(mo).fontSize};
     })()""")
-    check("월 표시가 왼쪽에", head["txt"] == "11월" and head["monLeft"] <= 4, head)
+    check("월 표시가 왼쪽에", head["txt"] == "11월" and abs(head["monLeft"] - 20) <= 2, head)
     check("월 글씨 25px (제목과 같은 크기)", head["fs"] == "25px", head["fs"])
     check("월 옆에 이전·다음 화살표", head["hasPrev"] and head["hasNext"], head)
-    check("오른쪽 끝에 검색 아이콘", head["searchIcon"] and head["searchRight"] <= 10, head["searchRight"])
+    check("오른쪽 끝에 검색 아이콘", head["searchIcon"] and abs(head["searchRight"] - 20) <= 2, head["searchRight"])
 
     # 하단 날짜: 연도 + 월·일 + 요일, 글씨 크게
     dp = page.evaluate("""(() => { const d = document.querySelector('#s-cal .daypanel-hd .d'); const cs = getComputedStyle(d);
@@ -488,8 +488,8 @@ with sync_playwright() as p:
       return {month: document.querySelector('#s-cal .cal-month').textContent.trim(),
               num: d ? getComputedStyle(d).color : null, name: n ? getComputedStyle(n).color : null,
               count: document.querySelectorAll('#s-cal .day.hol').length}; })()""")
-    check("공휴일 숫자 빨강", hol["num"] == "rgb(220, 38, 38)" and hol["count"] >= 1, hol)
-    check("공휴일 이름도 빨강", hol["name"] == "rgb(220, 38, 38)", hol)
+    check("공휴일 숫자 빨강", hol["num"] == "rgb(240, 20, 20)" and hol["count"] >= 1, hol)
+    check("공휴일 이름도 빨강", hol["name"] == "rgb(240, 20, 20)", hol)
     page.screenshot(path=os.path.join(SHOT, "calendar-holiday-v19.png"))
 
     # 일정 검색 → 결과 누르면 그 달·날짜로
@@ -509,8 +509,10 @@ with sync_playwright() as p:
       dp: document.querySelector('#s-cal .daypanel-hd .d') ? document.querySelector('#s-cal .daypanel-hd .d').innerText.replace(/\\n/g,' ') : null,
       open: document.getElementById('sheetWrap').classList.contains('open')}))()""")
     check("결과 누르면 그 달로 이동", jumped["month"] == "11월", jumped)
-    check("그 날짜가 선택됨", jumped["sel"] == "17", jumped)
-    check("하단 날짜도 그 날", jumped["dp"] and "11월 17일" in jumped["dp"], jumped["dp"])
+    # 예시 일정은 «오늘»에 있으므로 날짜가 바뀌어도 맞게 (실행한 날 기준)
+    _td = str(int(time.strftime("%d")))
+    check("그 날짜가 선택됨", jumped["sel"] == _td, jumped)
+    check("하단 날짜도 그 날", jumped["dp"] and ("%d월 %d일" % (int(time.strftime("%m")), int(_td))) in jumped["dp"], jumped["dp"])
     check("검색 시트는 닫힘", not jumped["open"])
     page.wait_for_timeout(2400)   # 이동 안내(toast)가 사라진 뒤 깔끔한 화면으로 저장
     page.screenshot(path=os.path.join(SHOT, "calendar-day-v19.png"))

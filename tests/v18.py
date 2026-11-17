@@ -234,7 +234,7 @@ with sync_playwright() as p:
     else:
         check("내 리스트 칩", False)
 
-    # ---------------- 캘린더: 그날 타임라인 ----------------
+    # ---------------- 캘린더: 그날 «일정만» (v21 에서 메모·기록·사진 묶음 삭제) ----------------
     page.locator("#tabbar .tab").nth(1).click()
     page.wait_for_timeout(450)
     day = page.evaluate("(() => { const p = window.__app.state.photos[0]; return p ? p.date.slice(0,10) : null; })()")
@@ -242,11 +242,15 @@ with sync_playwright() as p:
     page.wait_for_timeout(400)
     tl = page.evaluate("""(() => {
       const ph = document.querySelectorAll('#s-cal .dp-ph').length;
-      const cap = document.querySelector('#s-cal .dp-ph-cap');
-      return {ph, cap: cap ? cap.textContent : null};
+      const memo = document.querySelectorAll('#s-cal .dp-memo').length;
+      const sec = document.querySelectorAll('#s-cal .dp-sec').length;
+      const empty = document.querySelector('#s-cal .daylist .empty');
+      return {ph, memo, sec, empty: empty ? empty.textContent.trim() : null};
     })()""")
-    check("그날 사진이 캘린더에 함께", tl["ph"] >= 3, tl)
-    # 같은 날 일정을 하나 더해 일정 + 사진이 한 타임라인에 보이는지
+    check("사진이 있는 날에도 사진 묶음은 안 보임", tl["ph"] == 0, tl)
+    check("기록·메모 묶음도 안 보임", tl["memo"] == 0 and tl["sec"] == 0, tl)
+    check("일정이 없는 날은 안내 문구만", tl["empty"] == "이 날은 아직 일정이 없어요.", tl)
+    # 일정을 하나 더해 그날에는 일정만 보이는지
     page.locator("#s-cal [data-act='addEvent']").first.click()
     page.wait_for_timeout(300)
     page.fill("#sheetForm input[name='title']", "그날의 데이트")
@@ -255,16 +259,18 @@ with sync_playwright() as p:
     tl2 = page.evaluate("""(() => {
       const ev = document.querySelectorAll('#s-cal .daylist .ev').length;
       const ph = document.querySelectorAll('#s-cal .dp-ph').length;
-      return {ev, ph};
+      const sec = document.querySelectorAll('#s-cal .dp-sec').length;
+      return {ev, ph, sec};
     })()""")
-    check("그날 일정도 타임라인에 함께", tl2["ev"] >= 1 and tl2["ph"] >= 3, tl2)
+    check("그날 일정은 그대로 보임", tl2["ev"] >= 1, tl2)
+    check("일정 외 다른 묶음은 없음", tl2["ph"] == 0 and tl2["sec"] == 0, tl2)
 
-    # 오늘 만든 메모 카드도 그날 타임라인에
+    # 오늘 만든 메모 카드도 캘린더 날짜 칸에는 나오지 않음
     today_str = time.strftime("%Y-%m-%d")
     page.locator("#s-cal .day[data-date='%s']" % today_str).click()
     page.wait_for_timeout(450)
     memo_rows = page.evaluate("document.querySelectorAll('#s-cal .dp-memo').length")
-    check("그날 메모도 타임라인에", memo_rows >= 1, memo_rows)
+    check("그날 메모는 캘린더에 없음", memo_rows == 0, memo_rows)
     page.screenshot(path=os.path.join(SHOT, "calendar-day-v18.png"))
 
     # ---------------- My: 4자리 잠금 ----------------

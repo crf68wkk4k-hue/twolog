@@ -4,7 +4,7 @@
    홈 화면에서 열 때 바로 뜨고, 비행기 모드에서도 열리게 합니다.
    기록 자체는 sync.js 가 localStorage / IndexedDB / Supabase 에 보관합니다.
    ========================================================================= */
-const VERSION = "twolog-v20";
+const VERSION = "twolog-v21";
 const SHELL = "shell-" + VERSION;
 
 const ASSETS = [
@@ -20,6 +20,8 @@ const ASSETS = [
   "./icons/apple-touch-icon.png",
   "./icons/favicon.svg",
   "./icons/favicon-32.png",
+  "./assets/fonts/nixgon-m.woff",   /* v21: 캘린더 글씨 — 닉스곤체 */
+  "./assets/fonts/nixgon-b.woff",
   "./assets/fonts/pretendard-400.woff2",
   "./assets/fonts/pretendard-500.woff2",
   "./assets/fonts/pretendard-600.woff2",
