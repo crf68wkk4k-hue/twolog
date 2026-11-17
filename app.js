@@ -961,6 +961,13 @@
     /* v18: 그날의 타임라인 — 일정에 더해 그날 찍은 폴라로이드·기록도 함께 */
     var dayPhotos = S.photos.filter(function (p) { return String(p.date || "").slice(0, 10) === sel; });
     var dayLogs = (S.logs || []).filter(function (x) { return String(x.date || "").slice(0, 10) === sel; });
+    /* 그날 만든 메모(리스트 카드)도 타임라인에 — 카드를 누르면 바로 열려요 */
+    var dayMemos = [];
+    ["todo", "bucket", "log"].forEach(function (k) {
+      groupsOf(k).forEach(function (g) {
+        if (String(g.date || "").slice(0, 10) === sel) dayMemos.push({ k: k, g: g });
+      });
+    });
     html += '<div class="daypanel"><div class="daypanel-hd"><div class="d">' + (sd.getMonth() + 1) + "월 " + sd.getDate() + "일<em>" + WD[sd.getDay()] + "요일</em>" +
       (selHol ? '<span class="hol-badge">' + esc(selHol) + "</span>" : "") + "</div>" +
       '<span class="more" style="font-size:11.5px;color:var(--ink-3)">' + selEvents.length + "개</span></div>";
@@ -977,7 +984,7 @@
           '<button class="x" data-act="delEvent" data-id="' + e.id + '" aria-label="삭제">' + IC.x + "</button></div>";
       });
     }
-    if (!selEvents.length && !dayPhotos.length && !dayLogs.length) {
+    if (!selEvents.length && !dayPhotos.length && !dayLogs.length && !dayMemos.length) {
       html += '<div class="empty">이 날은 아직 비어 있어요.</div>';
     }
     html += "</div>";
@@ -987,6 +994,15 @@
         html += '<div class="dp-log"><span class="tag ' + (x.kind === "movie" ? "movie" : "food") + '">' +
           (x.kind === "movie" ? "영화" : "먹방") + "</span><span class=\"dp-lt\">" + esc(x.title) + "</span>" +
           stars(x.rating) + "</div>";
+      });
+      html += "</div>";
+    }
+    if (dayMemos.length) {
+      html += '<div class="dp-sec"><div class="dp-hd">📝 메모<span class="c">' + dayMemos.length + "개</span></div>";
+      dayMemos.forEach(function (m) {
+        var cnt = itemsOf(m.k).filter(function (x) { return x.gid === m.g.id; }).length;
+        html += '<button type="button" class="dp-log dp-memo" data-act="openGroup" data-tab="' + m.k + '" data-gid="' + m.g.id + '">' +
+          '<span class="dp-lt">' + esc(m.g.title || GROUP_DEF[m.k]) + '</span><span class="dp-n">' + cnt + "개 ›</span></button>";
       });
       html += "</div>";
     }

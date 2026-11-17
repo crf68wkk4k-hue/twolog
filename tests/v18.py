@@ -258,6 +258,13 @@ with sync_playwright() as p:
       return {ev, ph};
     })()""")
     check("그날 일정도 타임라인에 함께", tl2["ev"] >= 1 and tl2["ph"] >= 3, tl2)
+
+    # 오늘 만든 메모 카드도 그날 타임라인에
+    today_str = time.strftime("%Y-%m-%d")
+    page.locator("#s-cal .day[data-date='%s']" % today_str).click()
+    page.wait_for_timeout(450)
+    memo_rows = page.evaluate("document.querySelectorAll('#s-cal .dp-memo').length")
+    check("그날 메모도 타임라인에", memo_rows >= 1, memo_rows)
     page.screenshot(path=os.path.join(SHOT, "calendar-day-v18.png"))
 
     # ---------------- My: 4자리 잠금 ----------------

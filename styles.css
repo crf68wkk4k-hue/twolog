@@ -1121,3 +1121,6 @@ html[data-mode="dark"] .todo-add-btn{background:var(--btn-bg, #F2F2F4); color:va
   #printRoot .pr-stats{display:flex; gap:14px; font-size:9pt; color:#444444; margin-bottom:6px}
   #printRoot .pr-foot{margin-top:22px; padding-top:8px; border-top:1px solid #DDDDDD; font-size:8pt; color:#999999; letter-spacing:.04em}
 }
+.dp-memo{width:100%; border:0; border-bottom:1px solid var(--line-2); background:none; font:inherit; text-align:left; cursor:pointer; color:var(--ink)}
+.dp-memo:active{opacity:.7}
+.dp-memo .dp-n{flex:0 0 auto; font-size:11px; color:var(--ink-3); letter-spacing:-.01em}
