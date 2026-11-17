@@ -181,25 +181,32 @@ with sync_playwright() as p:
     page.wait_for_timeout(500)
     after = page.evaluate("""(() => {
       const g = window.__app.state.groups.todo[0];
-      const t = document.querySelector('#s-diary .ngrid .ncard:not(.new) .nc-t');
-      const cs = getComputedStyle(t);
+      const card = document.querySelector('#s-diary .ngrid .ncard:not(.new)');
+      const hd = card.querySelector('.nc-hd'), t = card.querySelector('.nc-t');
+      const cr = card.getBoundingClientRect(), hr = hd.getBoundingClientRect();
+      const cs = getComputedStyle(hd), ts = getComputedStyle(t);
       const cp = document.querySelector('#sheet .cp.ccp');
       const sel = cp ? cp.querySelector('.sw.sel') : null;
+      const item = card.querySelector('.cti .cx');
+      const ics = item ? getComputedStyle(item) : null;
       return {titleBg: g ? g.titleBg : null,
               val: cp.querySelector('.cp-val') ? cp.querySelector('.cp-val').textContent.trim() : null,
               sel: sel ? sel.getAttribute('data-color') : null,
-              cls: t ? t.className : null, bg: cs.backgroundColor, col: cs.color,
-              radius: cs.borderTopLeftRadius, pl: cs.paddingLeft, pt: cs.paddingTop,
+              cls: hd.className, bg: cs.backgroundColor, col: ts.color,
+              full: Math.abs(hr.width - cr.width) < 0.6 && Math.abs(hr.left - cr.left) < 0.6
+                    && Math.abs(hr.top - cr.top) < 0.6,
+              cardPad: getComputedStyle(card).paddingTop,
+              itemFs: ics ? ics.fontSize : null, itemFw: ics ? ics.fontWeight : null,
               sheetStillOpen: document.getElementById('sheetWrap').classList.contains('open')};
     })()""")
     check("고른 색이 카드 데이터에 저장(titleBg)", after["titleBg"] == "#EFD353", after["titleBg"])
     check("고른 칸에 선택 테두리", after["sel"] == "#EFD353", after["sel"])
-    check("카드 제목에 고른 색이 바탕으로", after["bg"] == "rgb(239, 211, 83)", after["bg"])
-    check("제목 바탕이 둥근 블록", after["cls"] and "tint" in after["cls"]
-          and float(after["radius"].replace("px", "")) >= 6, (after["cls"], after["radius"]))
-    check("제목 바탕에 패딩 있음", float(after["pl"].replace("px", "")) > 0
-          and float(after["pt"].replace("px", "")) >= 0, (after["pl"], after["pt"]))
+    check("카드 위쪽 띠가 고른 색으로", after["bg"] == "rgb(239, 211, 83)", after["bg"])
+    check("색 띠가 카드 위·좌우 끝까지 꽉 참", after["cls"] and "tint" in after["cls"] and after["full"] and after["cardPad"] == "0px",
+          (after["cls"], after["full"], after["cardPad"]))
     check("색 위 글씨는 선명한 어두운 색", after["col"] == "rgb(17, 17, 17)", after["col"])
+    check("카드 안 항목 글씨 14px·가볍게(400)", after["itemFs"] == "14px" and after["itemFw"] == "400",
+          (after["itemFs"], after["itemFw"]))
     check("색을 골라도 시트가 닫히지 않음", after["sheetStillOpen"])
     page.wait_for_timeout(1700)   # 안내(toast)가 사라진 뒤
     page.screenshot(path=os.path.join(SHOT, "note-detail-v21.png"))
@@ -214,10 +221,11 @@ with sync_playwright() as p:
     keep = page.evaluate("""(() => {
       const g = window.__app.state.groups.todo[0];
       const cards = Array.from(document.querySelectorAll('#s-diary .ngrid .ncard:not(.new)'));
-      const tinted = cards.filter(c => c.querySelector('.nc-t.tint'));
+      const tinted = cards.filter(c => c.querySelector('.nc-hd.tint'));
+      const hd = tinted[0] ? tinted[0].querySelector('.nc-hd') : null;
       const t = tinted[0] ? tinted[0].querySelector('.nc-t') : null;
       return {titleBg: g ? g.titleBg : null, n: tinted.length,
-              bg: t ? getComputedStyle(t).backgroundColor : null,
+              bg: hd ? getComputedStyle(hd).backgroundColor : null,
               txt: t ? t.textContent : null};
     })()""")
     check("앱을 다시 열어도 카드 색 유지", keep["titleBg"] == "#EFD353" and keep["n"] == 1
@@ -244,20 +252,22 @@ with sync_playwright() as p:
       const g = window.__app.state.groups.todo.filter(x => x.title === '주말 장보기')[0];
       const c = Array.from(document.querySelectorAll('#s-diary .ngrid .ncard:not(.new)'))
         .filter(n => n.innerText.indexOf('주말 장보기') >= 0)[0];
-      const t = c ? c.querySelector('.nc-t') : null;
-      return {titleBg: g ? (g.titleBg || null) : 'none', cls: t ? t.className : null,
-              bg: t ? getComputedStyle(t).backgroundColor : null};
+      const hd = c ? c.querySelector('.nc-hd') : null;
+      return {titleBg: g ? (g.titleBg || null) : 'none', cls: hd ? hd.className : null,
+              bg: hd ? getComputedStyle(hd).backgroundColor : null};
     })()""")
-    check("「기본」이면 색 없이 깔끔", back["titleBg"] in ("", None) and back["cls"] == "nc-t", back)
+    check("「기본」이면 은은한 기본 띠로", back["titleBg"] in ("", None) and back["cls"] == "nc-hd"
+          and back["bg"] == "rgb(245, 245, 247)", back)
 
     # ---------------- 6. 다크 모드에서도 그대로 ----------------
     page.evaluate("document.documentElement.setAttribute('data-mode','dark'); 0")
     page.wait_for_timeout(400)
     dk = page.evaluate("""(() => {
-      const t = document.querySelector('#s-diary .ncard .nc-t.tint');
+      const hd = document.querySelector('#s-diary .ncard .nc-hd.tint');
+      const t = hd ? hd.querySelector('.nc-t') : null;
       const c = document.querySelector('#s-diary .ncard');
       const cs = getComputedStyle(c);
-      return {bg: t ? getComputedStyle(t).backgroundColor : null, col: t ? getComputedStyle(t).color : null,
+      return {bg: hd ? getComputedStyle(hd).backgroundColor : null, col: t ? getComputedStyle(t).color : null,
               cardBorder: cs.borderTopWidth, cardR: cs.borderTopLeftRadius, cardBg: cs.backgroundColor};
     })()""")
     check("다크에서도 제목 색 유지", dk["bg"] == "rgb(239, 211, 83)" and dk["col"] == "rgb(17, 17, 17)", dk)
@@ -354,12 +364,16 @@ with sync_playwright() as p:
               loaded: document.fonts.check("600 15px 'Nixgon'"),
               monthFamily: getComputedStyle(document.querySelector('#s-cal .cal-month')).fontFamily,
               weekFamily: getComputedStyle(document.querySelector('#s-cal .cal-week span')).fontFamily,
+              bodyFamily: getComputedStyle(document.body).fontFamily,
+              titleFamily: getComputedStyle(document.querySelector('#s-cal .daypanel-hd .d')).fontFamily,
               cellW: cells[0] ? cells[0].getBoundingClientRect().width : null};
     })()""")
     check("달력이 화면 양끝 가까이 넓어짐(좌우 9px)", calw["left"] <= 10.5 and calw["right"] <= 10.5, calw)
     check("캘린더 숫자도 닉스곤체", "Nixgon" in calw["family"] and calw["loaded"], (calw["family"], calw["loaded"]))
-    check("캘린더 화면 전체가 닉스곤체", "Nixgon" in calw["monthFamily"] and "Nixgon" in calw["weekFamily"],
-          (calw["monthFamily"], calw["weekFamily"]))
+    check("캘린더 한글은 설정한 앱 폰트 그대로", calw["monthFamily"] == calw["bodyFamily"]
+          and calw["weekFamily"] == calw["bodyFamily"] and calw["titleFamily"] == calw["bodyFamily"]
+          and "Nixgon" not in calw["monthFamily"],
+          (calw["monthFamily"], calw["bodyFamily"]))
     check("숫자 굵기·자릿수 고정", calw["weight"] == "600" and calw["tnum"] == "tabular-nums", (calw["weight"], calw["tnum"]))
 
     # 「일」 요일 헤더와 모든 일요일 숫자도 공휴일과 같은 진한 빨강
@@ -371,6 +385,16 @@ with sync_playwright() as p:
     })()""")
     check("「일」 요일 헤더도 진한 빨강", sun["wdTxt"] == "일" and sun["wd"] == "rgb(240, 20, 20)", sun)
     check("일요일 날짜 숫자 모두 진한 빨강", sun["n"] >= 4 and sun["cols"] == ["rgb(240, 20, 20)"], sun)
+
+    # My 에서 고른 폰트를 바꾸면 캘린더 한글도 같이 따라오는지
+    page.evaluate("document.documentElement.style.setProperty('--font', \"'BM Jua', Pretendard, sans-serif\"); 0")
+    page.wait_for_timeout(250)
+    inh = page.evaluate("""(() => ({m: getComputedStyle(document.querySelector('#s-cal .cal-month')).fontFamily,
+      d: getComputedStyle(document.querySelector('#s-cal .day .dnum')).fontFamily}))()""")
+    check("설정 폰트를 바꾸면 캘린더 한글도 따라감", "BM Jua" in inh["m"], inh["m"])
+    check("숫자는 그대로 닉스곤체", inh["d"].startswith("Nixgon"), inh["d"])
+    page.evaluate("document.documentElement.style.removeProperty('--font'); 0")
+    page.wait_for_timeout(200)
 
     page.locator('#s-cal [data-act="calPrev"]').click()
     page.wait_for_timeout(650)
@@ -419,11 +443,24 @@ with sync_playwright() as p:
     })()""")
     check("검색 시트 처음엔 입력칸만", sr["open"] and sr["rows"] == 0 and sr["empty"] == 0
           and sr["outVisible"] is False, sr)
+    pos = page.evaluate("""(() => {
+      const sh = document.querySelector('#sheet'); const r = sh.getBoundingClientRect();
+      const w = document.getElementById('sheetWrap');
+      return {center: r.top + r.height / 2, vh: window.innerHeight, top: r.top,
+              bottom: window.innerHeight - r.bottom, radius: getComputedStyle(sh).borderTopLeftRadius,
+              cls: w.className, width: Math.round(r.width)};
+    })()""")
+    check("검색창이 화면 가운데에 뜸", abs(pos["center"] - pos["vh"] / 2) <= 60, pos)
+    check("아래에 붙지 않음(위·아래 여백 비슷)", abs(pos["top"] - pos["bottom"]) <= 80 and pos["top"] > 90, pos)
+    check("검색 모달은 둥글고 좁게", "sheet-center" in pos["cls"] and pos["radius"] != "0px" and pos["width"] <= 350, pos)
     check("처음부터 결과 목록·안내 문구 없음", "일정이 없어요" not in sr["text"] and sr["labels"] == 0, sr["text"][:120])
     check("검색칸은 안내를 플레이스홀더로", sr["ph"] and "검색" in sr["ph"], sr["ph"])
 
+    page.wait_for_timeout(300)
+    page.screenshot(path=os.path.join(SHOT, "calendar-search-v21.png"))
     page.fill("#calSearchIn", "성")
     page.wait_for_timeout(400)
+    page.screenshot(path=os.path.join(SHOT, "calendar-search-result-v21.png"))
     r1 = page.evaluate("""(() => ({rows: document.querySelectorAll('#sheet .sres').length,
       empty: document.querySelectorAll('#sheet .sres-empty').length,
       out: getComputedStyle(document.querySelector('#calSearchOut')).display,
@@ -486,7 +523,7 @@ with sync_playwright() as p:
       const chk = sh.querySelector('#evSave');
       const cs = chk ? getComputedStyle(chk) : null;
       const g = s => { const e = sh.querySelector(s); return e ? e.getBoundingClientRect() : null; };
-      const cp = g('.sw-grid[data-sw="evColor"]'), ti = g('#sheetForm input[name="title"]');
+      const cp = g('[data-sw="evColor"]'), ti = g('#sheetForm input[name="title"]');
       const when = g('.ev-when'), who = g('.wsel'), sub = g('#sheetForm .btn-primary');
       const bigs = Array.from(sh.querySelectorAll('.ev-dbig')).map(e => ({t: e.textContent.trim(), fs: getComputedStyle(e).fontSize, fw: getComputedStyle(e).fontWeight}));
       const tilde = sh.querySelector('.ev-tilde');
@@ -494,10 +531,19 @@ with sync_playwright() as p:
               chk: !!chk, chkColor: cs ? cs.color : null, chkSvg: !!(chk && chk.querySelector('svg')),
               types: sh.querySelectorAll('select[name="type"]').length,
               typeLabel: Array.from(sh.querySelectorAll('.f > label')).map(l => l.textContent.trim()),
+              order2: (() => { const t = sh.querySelector('.ev-title'), c = sh.querySelector('.sw-row');
+                return !!(t && c) && t.getBoundingClientRect().bottom <= c.getBoundingClientRect().top + 1; })(),
+              titleStyle: (() => { const cs = getComputedStyle(sh.querySelector('.ev-title'));
+                return {bt: cs.borderTopWidth, bl: cs.borderLeftWidth, bb: cs.borderBottomWidth, r: cs.borderTopLeftRadius,
+                        fs: cs.fontSize}; })(),
+              swSize: (() => { const b = sh.querySelector('.sw-row .sw');
+                const r = b.getBoundingClientRect(); const cs = getComputedStyle(b);
+                return {w: Math.round(r.width), h: Math.round(r.height), radius: cs.borderTopLeftRadius}; })(),
+              timeLabels: Array.from(sh.querySelectorAll('.ev-time-btn')).map(b => b.textContent.trim()),
               hasStartEnd: Array.from(sh.querySelectorAll('label')).map(l => l.textContent.trim()).join('|'),
               note: sh.innerText.indexOf('여러 날') >= 0,
               whoLabel: Array.from(sh.querySelectorAll('.f > label, .set-lbl')).map(l => l.textContent.trim()).indexOf('담당') >= 0,
-              sw: sh.querySelectorAll('.sw-grid[data-sw="evColor"] .sw').length,
+              sw: sh.querySelectorAll('[data-sw="evColor"] .sw').length,
               reset: !!sh.querySelector('.cp-reset[data-act="pickEvColor"]'),
               bottomBtn: !!(sh.querySelector('#sheetForm .btn-primary')
                             && sh.querySelector('#sheetForm .btn-primary').textContent.trim() === '추가하기'),
@@ -505,7 +551,7 @@ with sync_playwright() as p:
               bigs, tildeFs: tilde ? getComputedStyle(tilde).fontSize : null, tildeTxt: tilde ? tilde.textContent.trim() : null,
               who3: sh.querySelectorAll('.wsel .wopt').length,
               times: sh.querySelectorAll('.ev-time-btn').length,
-              order: [cp, ti, when, who, sub].every(Boolean) && cp.top < ti.top && ti.top < when.top
+              order: [cp, ti, when, who, sub].every(Boolean) && ti.top < cp.top && cp.top < when.top
                      && when.bottom <= who.top + 1 && who.top < sub.top};
     })()""")
     check("일정 시트 열림", ef["open"], ef)
@@ -516,16 +562,26 @@ with sync_playwright() as p:
           and not ef["whoLabel"], (ef["hasStartEnd"], ef["whoLabel"]))
     check("여러 날 설명 문구 삭제", not ef["note"], ef["note"])
     check("컬러 12색 + 기본", ef["sw"] == 12 and ef["reset"], (ef["sw"], ef["reset"]))
-    check("순서: 컬러 → 제목 → 날짜 → 함께/나/준영 → 추가하기", ef["order"] and ef["who3"] == 3, (ef["order"], ef["who3"]))
+    check("순서: 제목 → 컬러 → 날짜 → 함께/나/준영 → 추가하기", ef["order"] and ef["order2"] and ef["who3"] == 3,
+          (ef["order"], ef["order2"], ef["who3"]))
+    check("제목 칸은 밑줄만 (네모 테두리 없음)", ef["titleStyle"]["bt"] == "0px" and ef["titleStyle"]["bl"] == "0px"
+          and ef["titleStyle"]["bb"] != "0px" and ef["titleStyle"]["r"] == "0px", ef["titleStyle"])
+    check("컬러는 작은 동그라미(24px·둥글게)", ef["swSize"]["w"] <= 26 and ef["swSize"]["h"] <= 26
+          and "50%" in ef["swSize"]["radius"], ef["swSize"])
+    check("기본 시간은 오전 12:00 · 오후 09:00", ef["timeLabels"] == ["오전 12:00", "오후 09:00"], ef["timeLabels"])
     check("큰 날짜 두 개 + 가운데 ~", len(ef["bigs"]) == 2 and ef["tildeTxt"] == "~", (ef["bigs"], ef["tildeTxt"]))
     import re as _re
     check("날짜는 26.11.17(화) 형식·크게", all(_re.match(r"^\d{2}\.\d{2}\.\d{2}\([일월화수목금토]\)$", b["t"]) for b in ef["bigs"])
           and all(b["fs"] == "20px" and b["fw"] == "800" for b in ef["bigs"]), ef["bigs"])
     check("~ 도 큼직하게", ef["tildeFs"] and float(ef["tildeFs"].replace("px", "")) >= 20, ef["tildeFs"])
-    check("날짜마다 「시간 설정」", ef["times"] == 2, ef["times"])
+    til = page.evaluate("""(() => { const t = document.querySelector('#sheet .ev-tilde').getBoundingClientRect();
+      const l = document.querySelector('#sheet .ev-side').getBoundingClientRect();
+      return {tMid: t.top + t.height / 2, lMid: l.top + l.height / 2}; })()""")
+    check("물결이 두 날짜 사이 세로 가운데", abs(til["tMid"] - til["lMid"]) <= 2, til)
+    check("날짜마다 시간 버튼", ef["times"] == 2, ef["times"])
 
     # 색·제목·날짜·시간을 넣고 헤더 ✓ 로 저장
-    page.locator('#sheet .sw-grid[data-sw="evColor"] .sw[data-color="#80A4AA"]').click()
+    page.locator('#sheet [data-sw="evColor"] .sw[data-color="#80A4AA"]').click()
     page.wait_for_timeout(250)
     page.fill('#sheetForm input[name="title"]', "치과 예약 (저녁)")
     page.locator('#sheet .js-evdate[data-side="start"]').fill("2026-11-22")
@@ -537,7 +593,7 @@ with sync_playwright() as p:
     page.fill('#sheet .js-evtime[data-side="start"]', "19:00")
     page.wait_for_timeout(250)
     tbtn = page.evaluate("Array.from(document.querySelectorAll('#sheet .ev-time-btn')).map(b => b.textContent.trim())")
-    check("시간을 고르면 버튼에 시간이 남음", tbtn[0] == "19:00", tbtn)
+    check("시간을 고르면 오전/오후 표기로 남음", tbtn[0] == "오후 07:00", tbtn)
     page.wait_for_timeout(1200)
     page.screenshot(path=os.path.join(SHOT, "event-sheet-v21.png"))
     page.locator("#evSave").click()
@@ -570,12 +626,14 @@ with sync_playwright() as p:
       const e0 = (window.__app.state.events.filter(e => e.title === '색 없이 저장')[0]) || {};
       const rows = Array.from(document.querySelectorAll('#s-cal .daylist .ev'));
       const row = rows.filter(r => r.innerText.indexOf('색 없이 저장') >= 0)[0];
-      return {color: e0.color, who: e0.who,
+      return {color: e0.color, who: e0.who, time: e0.time, endTime: e0.endTime,
               bar: row ? getComputedStyle(row.querySelector('.bar')).backgroundColor : null,
               meta: row && row.querySelector('.m') ? row.querySelector('.m').textContent.trim() : null};
     })()""")
     check("색을 안 고르면 담당자 색", ev2["color"] == "" and ev2["bar"] not in (None, ""), ev2)
-    check("시간 없어도 목록엔 아무 표시 없음", ev2["meta"] is None, ev2["meta"])
+    check("일정 줄엔 작은 표시 없음", ev2["meta"] is None, ev2["meta"])
+    check("기본 시간도 함께 저장", ev2.get("time") == "00:00" and ev2.get("endTime") == "21:00",
+          (ev2.get("time"), ev2.get("endTime")))
     page.wait_for_timeout(1200)
     page.screenshot(path=os.path.join(SHOT, "calendar-event-v21.png"))
 
@@ -597,6 +655,27 @@ with sync_playwright() as p:
     check("머리줄 높이 적당(60px 이하)", ph["h"] <= 60, ph["h"])
     page.wait_for_timeout(400)
     page.screenshot(path=os.path.join(SHOT, "photo-v21.png"))
+
+    # ---------------- 7-8. 라이트 모드는 완전한 순백 ----------------
+    page.locator("#tabbar .tab").nth(0).click()
+    page.wait_for_timeout(700)
+    wh = page.evaluate("""(() => {
+      const cs = getComputedStyle(document.body);
+      const root = getComputedStyle(document.documentElement);
+      const phone = getComputedStyle(document.querySelector('.phone'));
+      const screen = getComputedStyle(document.querySelector('#s-home'));
+      const tb = getComputedStyle(document.querySelector('.tabbar'));
+      return {body: cs.backgroundColor, phone: phone.backgroundColor, screen: screen.backgroundColor,
+              tabbar: tb.backgroundColor, bg: root.getPropertyValue('--bg').trim(),
+              surface: root.getPropertyValue('--surface').trim(), surface2: root.getPropertyValue('--surface-2').trim(),
+              line: root.getPropertyValue('--line').trim()};
+    })()""")
+    check("바탕이 완전한 순백(#FFFFFF)", wh["bg"].upper() == "#FFFFFF" and wh["body"] == "rgb(255, 255, 255)"
+          and wh["phone"] == "rgb(255, 255, 255)"
+          and wh["screen"] in ("rgb(255, 255, 255)", "rgba(0, 0, 0, 0)"), wh)
+    check("탭바도 순백 계열", wh["tabbar"].startswith("rgba(255, 255, 255"), wh["tabbar"])
+    check("카드 회색은 쿨한 뉴트럴(#F5F5F7)", wh["surface2"].upper() == "#F5F5F7", wh["surface2"])
+    page.screenshot(path=os.path.join(SHOT, "home-v21.png"))
 
     # ---------------- 8. 다른 화면은 그대로 ----------------
     page.locator("#tabbar .tab").nth(0).click()

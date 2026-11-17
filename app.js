@@ -706,14 +706,14 @@
     todayEvents.slice(0, 2).forEach(function (e) {
       slist.push({
         e: e,
-        when: mdText(evStart(e)) + (evRange(e) ? " ~ " + mdText(evEnd(e)) : "") + (evWhen(e) ? " " + evWhen(e) : "") + " · " + (TYPE[e.type] || TYPE.etc).label,
+        when: mdText(evStart(e)) + (evRange(e) ? " ~ " + mdText(evEnd(e)) : "") + (evWhenK(e) ? " " + evWhenK(e) : "") + " · " + (TYPE[e.type] || TYPE.etc).label,
         left: "오늘"
       });
     });
     upcoming.slice(0, 3).forEach(function (e) {
       slist.push({
         e: e,
-        when: mdText(evStart(e)) + (evRange(e) ? " ~ " + mdText(evEnd(e)) : "") + (evWhen(e) ? " " + evWhen(e) : "") + " · " + (TYPE[e.type] || TYPE.etc).label,
+        when: mdText(evStart(e)) + (evRange(e) ? " ~ " + mdText(evEnd(e)) : "") + (evWhenK(e) ? " " + evWhenK(e) : "") + " · " + (TYPE[e.type] || TYPE.etc).label,
         left: "D-" + diffDays(today, evStart(e))
       });
     });
@@ -825,6 +825,21 @@
     var t2 = String((e && e.endTime) || "").slice(0, 5);
     if (t && t2) return t + "~" + t2;
     return t || "";
+  }
+  /* v21: 시간은 한국어 12시간제로 — «오전 09:45» «오후 09:00» */
+  function timeK(hhmm) {
+    var s2 = String(hhmm || "").slice(0, 5);
+    if (!/^\d{2}:\d{2}$/.test(s2)) return "";
+    var h = Number(s2.slice(0, 2)), mi = s2.slice(3, 5);
+    var am = h < 12, h12 = h % 12;
+    if (h12 === 0) h12 = 12;
+    return (am ? "오전 " : "오후 ") + (h12 < 10 ? "0" : "") + h12 + ":" + mi;
+  }
+  /* 홈·PDF 처럼 글자로 보여 줄 때 쓰는 시간 표기 */
+  function evWhenK(e) {
+    var a = timeK(e && e.time), b = timeK(e && e.endTime);
+    if (a && b) return a + "~" + b.replace(/^오[전후] /, "");
+    return a || b || "";
   }
   /* v21: «26.11.17(화)» — 일정 시트의 큰 날짜 */
   function evDateBig(ds) {
@@ -1243,10 +1258,12 @@
     var tBg = String(g.titleBg || "").toUpperCase();
     var h = '<div class="ncard" role="button" tabindex="0" data-act="openGroup" data-tab="' + k + '" data-gid="' + g.id +
       '" aria-label="' + esc(gTitle) + ' 목록 열기">';
-    /* v21: 카드마다 고른 색이 있으면 제목 글씨에만 둥근 바탕 블록으로 깔려요 */
-    h += '<div class="nc-hd"><div class="nc-t' + (tBg ? " tint" : "") + '"' +
-      (tBg ? ' style="background:' + tBg + ';color:' + inkOn(tBg) + '"' : "") + '>' + esc(gTitle) + "</div>" +
-      '<div class="nc-meta">' + (items.length ? '<span class="nc-n">' + items.length + "</span>" : "") +
+    /* v21: 카드 위쪽은 색이 꽉 차는 제목 띠 — 고른 색이 없으면 은은한 기본 회색 띠 */
+    var ink = tBg ? inkOn(tBg) : "";
+    h += '<div class="nc-hd' + (tBg ? " tint" : "") + '"' + (tBg ? ' style="background:' + tBg + '"' : "") + ">" +
+      '<div class="nc-t"' + (tBg ? ' style="color:' + ink + '"' : "") + ">" + esc(gTitle) + "</div>" +
+      '<div class="nc-meta"' + (tBg ? ' style="color:' + ink + '"' : "") + ">" +
+      (items.length ? '<span class="nc-n">' + items.length + "</span>" : "") +
       '<span class="nc-go" aria-hidden="true">›</span></div></div>';
     if (items.length) {
       h += '<div class="nc-items">' + items.slice(0, 4).map(function (x) { return cardItem(k, x); }).join("") +
@@ -1493,9 +1510,12 @@
 
   /* ------------------------------------------------------------------ sheet */
   var sheetWrap = $("#sheetWrap"), sheet = $("#sheet"), sheetSubmit = null;
+  var sheetCenter = false;   /* v21: 일정 검색처럼 화면 가운데 모달로 띄울 때 */
   function openSheet(html, onSubmit) {
     personSheetWho = null;
     openCard = null;
+    sheetWrap.classList.toggle("sheet-center", !!sheetCenter);
+    sheetCenter = false;
     sheet.innerHTML = '<div class="grab"></div>' + html;
     sheetSubmit = onSubmit || null;
     sheetWrap.classList.add("open");
@@ -1505,6 +1525,7 @@
   function closeSheet() {
     personSheetWho = null;
     openCard = null;
+    sheetWrap.classList.remove("sheet-center");
     sheetWrap.classList.remove("open");
     sheetWrap.setAttribute("aria-hidden", "true");
     sheetSubmit = null;
@@ -1607,14 +1628,17 @@
      종류·시작일/종료일 라벨·여러 날 설명은 지우고, 저장은 헤더 오른쪽 검정 ✓ 로 해요. */
   var IC_CHK = '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.4l4.4 4.4L19 6.8"/></svg>';
 
+  /* v21: 기본 세팅 시간 — 왼쪽(시작) 오전 12:00 · 오른쪽(종료) 오후 09:00 */
+  var EV_TIME_DEF = { start: "00:00", end: "21:00" };
   function evSideHtml(side, label, ds) {
+    var tv = EV_TIME_DEF[side];
     return '<div class="ev-side">' +
       '<label class="ev-datewrap">' +
       '<span class="ev-dbig" data-dbig="' + side + '">' + evDateBig(ds) + "</span>" +
       '<input type="date" class="ev-date-in js-evdate" data-side="' + side + '" name="' + side + '" value="' + ds + '" required aria-label="' + label + '">' +
       "</label>" +
-      '<button type="button" class="ev-time-btn" data-act="evTime" data-side="' + side + '">시간 설정</button>' +
-      '<input type="time" class="ev-time-in js-evtime" data-side="' + side + '" name="' + side + 'Time" hidden aria-label="' + label + ' 시간">' +
+      '<button type="button" class="ev-time-btn on" data-act="evTime" data-side="' + side + '">' + timeK(tv) + "</button>" +
+      '<input type="time" class="ev-time-in js-evtime" data-side="' + side + '" name="' + side + 'Time" value="' + tv + '" hidden aria-label="' + label + ' 시간">' +
       "</div>";
   }
 
@@ -1635,10 +1659,10 @@
       "</div>" +
       '<form class="form eform" id="sheetForm">' +
       '<input type="hidden" name="color" value="">' +
-      '<div class="f"><label>컬러</label>' +
-      '<div class="sw-grid" data-sw="evColor">' + sw + "</div>" +
-      '<div class="cp-foot"><span></span><button type="button" class="cp-reset on" data-act="pickEvColor" data-color="">기본</button></div></div>' +
-      '<div class="f"><label>제목</label><input class="field" name="title" placeholder="예) 성수 데이트" required autocomplete="off"></div>' +
+      '<div class="f"><label>제목</label><input class="field ev-title" name="title" placeholder="예) 성수 데이트" required autocomplete="off"></div>' +
+      '<div class="cp ccp ev-cp"><div class="cp-hd"><span>컬러</span>' +
+      '<button type="button" class="cp-reset on" data-act="pickEvColor" data-color="">기본</button></div>' +
+      '<div class="sw-row" data-sw="evColor">' + sw + "</div></div>" +
       '<div class="ev-when">' + evSideHtml("start", "시작 날짜", ds) + '<span class="ev-tilde">~</span>' +
       evSideHtml("end", "종료 날짜", ds) + "</div>" +
       '<div class="wsel" data-group="who" aria-label="누구와">' + wopts + "</div>" +
@@ -2560,7 +2584,7 @@
         }
         var who = e.who === "me" ? c.me : e.who === "you" ? c.you : "함께";
         h += '<div class="pr-ev"><span class="pr-t">' + esc(e.title) + "</span><span class=\"pr-m\">" + esc(who) +
-          (evWhen(e) ? " · " + esc(evWhen(e)) : "") + (evRange(e) ? " · " + esc(evRange(e)) : "") + "</span></div>";
+          (evWhenK(e) ? " · " + esc(evWhenK(e)) : "") + (evRange(e) ? " · " + esc(evRange(e)) : "") + "</span></div>";
       });
       h += "</div>";
     } else h += '<p class="pr-empty">이 기간에 적어 둔 일정이 없어요.</p>';
@@ -2777,6 +2801,7 @@
 
     /* v19: 일정 검색 → 결과를 누르면 그 달·날짜로 */
     if (act === "calSearch") {
+      sheetCenter = true;   /* v21: 아래가 아니라 화면 가운데에 떠요 */
       openSheet(formCalSearch(""));
       /* 바로 칠 수 있게 검색칸에 커서를 둡니다 */
       var si = document.getElementById("calSearchIn");
@@ -3159,7 +3184,7 @@
       var ecol = String(el.getAttribute("data-color") || "").toUpperCase();
       var ehid = document.querySelector('#sheet input[name="color"]');
       if (ehid) ehid.value = ecol;
-      var egrid = el.closest(".sw-grid");
+      var egrid = el.closest('[data-sw="evColor"]');
       if (egrid) egrid.querySelectorAll(".sw").forEach(function (b) { b.classList.toggle("sel", b === el); });
       var ereset = document.querySelector('#sheet .cp-reset[data-act="pickEvColor"]');
       if (ereset) ereset.classList.toggle("on", !ecol);
@@ -3894,7 +3919,7 @@
       var tside = t.getAttribute("data-side");
       var tbtn = document.querySelector('#sheet .ev-time-btn[data-side="' + tside + '"]');
       if (tbtn) {
-        tbtn.textContent = t.value ? t.value : "시간 설정";
+        tbtn.textContent = t.value ? timeK(t.value) : "시간 설정";
         tbtn.classList.toggle("on", !!t.value);
       }
       return;
