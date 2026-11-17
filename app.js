@@ -4103,7 +4103,9 @@
       reloaded = true;
       location.reload();
     });
-    navigator.serviceWorker.register("sw.js").then(function (reg) {
+    /* v22: sw.js 자쳴는 브라우저 HTTP 캐시를 거치지 않게(updateViaCache:"none") —
+       홈 화면 앱이 예전 서비스워커에 머물러 화면이 안 바뀌는 일을 줄입니다. */
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(function (reg) {
       /* 앱을 열거나 다시 앞으로 꺼낼 때마다 새 sw.js 가 있는지 확인 */
       function check() {
         if (document.visibilityState !== "visible") return;
