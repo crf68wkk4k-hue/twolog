@@ -1329,6 +1329,38 @@
         });
       });
 
+      /* ---- 2-2. 커스텀 리스트(kind=list) — 항목 상세 메모도 채우고, 빠진 리스트는 더합니다 ---- */
+      var localLists = arr(local.lists);
+      var usedLists = {};
+      live.filter(function (r) { return r.kind === "list"; }).forEach(function (r) {
+        var p = r.payload || {};
+        var l = localLists.filter(function (x) { return x && String(x.id) === String(r.id); })[0];
+        if (!l) l = localLists.filter(function (x) { return x && String(x.title || "") === String(p.title || ""); })[0];
+        if (!l) return;
+        usedLists[l.id] = true;
+        var srcItems = arr(p.items);
+        var touched = false;
+        var items = srcItems.map(function (it) {
+          var mine = arr(l.items).filter(function (x) { return x && String(x.id) === String(it.id); })[0] ||
+            arr(l.items).filter(function (x) { return x && String(x.text || "") === String(it.text || ""); })[0];
+          if (!mine) return it;
+          if (it.memo === undefined && mine.memo) { touched = true; return Object.assign({}, it, { memo: String(mine.memo) }); }
+          return it;
+        });
+        if (!touched) return;
+        patches.push({
+          id: r.id, couple_id: r.couple_id || cid, kind: "list", sort: r.sort || 0, deleted: !!r.deleted,
+          payload: Object.assign({}, p, { items: items })
+        });
+      });
+      localLists.forEach(function (l) {
+        if (!l || typeof l !== "object" || usedLists[l.id]) return;
+        added.push({
+          id: String(l.id || freshId()), couple_id: cid, kind: "list", sort: ++sortMax,
+          deleted: false, payload: notePayload("list", l, flip, whoToken)
+        });
+      });
+
       var jobs = [];
       if (groupsMissing && localGroupTotal) {
         jobs.push(client.from("settings").upsert({ couple_id: cid, key: K_GROUPS, value: localGroups }, { onConflict: "couple_id,key" }).then(function (r) {

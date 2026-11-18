@@ -288,6 +288,10 @@ with sync_playwright() as p:
       const logs = [];
       for (let i = 1; i <= 4; i++) logs.push({ id: 'lg' + i, kind: (i % 2 ? 'movie' : 'food'),
         title: '영화·먹방 ' + i, rating: 4, date: today, review: '한 줄 평 ' + i, place: '', done: true, gid: 'g-l1' });
+      /* 커스텀 리스트도 폰에만 상세 메모가 남아 있는 상태 (v26 은 항목 memo 를 올리지 않았어요) */
+      const lists = [{ id: 'ls1', title: '여행 준비물', emoji: '🧳', kind: 'check', items: [
+        { id: 'li1', text: '여권', memo: '유효기간 확인', done: false },
+        { id: 'li2', text: '충전기', memo: '', done: false } ] }];
 
       localStorage.setItem('twolog:v1:state', JSON.stringify({
         couple: { me: '박소영', you: '이준영', since: '2024-05-01', fmt: 'D', phrase: '함께한 지',
@@ -296,7 +300,7 @@ with sync_playwright() as p:
         auth: { out: false, email: '' },
         theme: { name: null, log: null, mode: 'light' },
         groups: groups, todos: todos, bucket: bucket, logs: logs,
-        lists: [], expenses: [], photos: [],
+        lists: lists, expenses: [], photos: [],
         ui: { seg: 'todo', expMonth: today.slice(0, 7), calMonth: today.slice(0, 7), selDate: today }
       }));
 
@@ -309,6 +313,9 @@ with sync_playwright() as p:
         payload: { title: b.title, cat: b.cat, done: !!b.done, status: '' } }));
       logs.forEach(l => notes.push({ id: l.id, couple_id: CID, kind: 'log', sort: s++, deleted: false,
         payload: { kind: l.kind, title: l.title, rating: l.rating, date: l.date, review: l.review, place: '' } }));
+      lists.forEach(l => notes.push({ id: l.id, couple_id: CID, kind: 'list', sort: s++, deleted: false,
+        payload: { title: l.title, emoji: l.emoji, kind: l.kind,
+                   items: l.items.map(i => ({ id: i.id, text: i.text, done: !!i.done })) } }));
 
       localStorage.setItem('stub-sb-db', JSON.stringify({
         users: { 'user-me': { id: 'user-me', email: 'repair@twolog.app', password: 'twolog1234' } },
@@ -360,7 +367,7 @@ with sync_playwright() as p:
     flag = page.evaluate("(k) => JSON.parse(localStorage.getItem(k))", keys[0]) if keys else {}
     check("플래그에 카드 개수·고친 항목 수",
           (flag.get("groups") or {}).get("todo") == 2 and (flag.get("groups") or {}).get("bucket") == 3 and
-          flag.get("fixed") == 38 and flag.get("added") == 0, flag)
+          flag.get("fixed") == 39 and flag.get("added") == 0, flag)
 
     g_rows = [r for r in stub(page, "settings") if r.get("key") == "groups"]
     check("settings 에 groups 행 하나", len(g_rows) == 1, [r.get("key") for r in stub(page, "settings")])
@@ -377,14 +384,26 @@ with sync_playwright() as p:
           gb1.get("caption") == "여름에 갈 곳" and gb1.get("who") == "you" and gb1.get("titleBg") == "#EA994D", gb1)
 
     rows_now = stub(page, "notes")
-    bad_gid = [r["id"] for r in rows_now if not (r.get("payload") or {}).get("gid")]
-    check("원격 notes 38개 모두 payload.gid 를 가짐", len(rows_now) == 38 and not bad_gid, bad_gid[:5])
+    note_kinds = [r for r in rows_now if r["kind"] in ("todo", "bucket", "log")]
+    bad_gid = [r["id"] for r in note_kinds if not (r.get("payload") or {}).get("gid")]
+    check("원격 notes 38개 모두 payload.gid 를 가짐", len(note_kinds) == 38 and not bad_gid, bad_gid[:5])
     lt3 = [r for r in rows_now if r["id"] == "lt3"]
     check("원격 notes 에 상세 메모도 채워짐", lt3 and lt3[0]["payload"].get("memo") == "상세 메모 3",
           (lt3[0]["payload"] if lt3 else None))
     lg1 = [r for r in rows_now if r["id"] == "lg1"]
     check("원격 notes(영화·먹방)에 done 도 채워짐", lg1 and lg1[0]["payload"].get("done") is True,
           (lg1[0]["payload"] if lg1 else None))
+
+    ls1 = [r for r in rows_now if r["kind"] == "list"]
+    ls_memo = (ls1[0]["payload"]["items"][0].get("memo") if ls1 else None)
+    check("복구: 커스텀 리스트 항목의 상세 메모도 서버에 채워짐", ls1 and ls_memo == "유효기간 확인",
+          (ls1[0]["payload"] if ls1 else None))
+    ls_state = page.evaluate("""() => {
+      const L = (window.TwoLogUI.state.lists || [])[0];
+      return L ? {title: L.title, items: L.items.map(i => i.text + '|' + (i.memo || ''))} : null;
+    }""")
+    check("복구: 리스트가 화면 상태에도 살아 있음",
+          ls_state and ls_state["title"] == "여행 준비물" and ls_state["items"][0] == "여권|유효기간 확인", ls_state)
 
     # 화면 — 메모 탭 카드 2개
     go_note(page)
@@ -502,7 +521,8 @@ with sync_playwright() as p:
       const st = window.__stub;
       const notes = st.notes || [];
       const g = (st.settings || []).filter(r => r.key === 'groups')[0];
-      return {notes: notes.length, noGid: notes.filter(r => !(r.payload || {}).gid).length,
+      return {notes: notes.length,
+              noGid: notes.filter(r => r.kind !== 'list' && !(r.payload || {}).gid).length,
               groups: g ? {todo: (g.value.todo || []).length, bucket: (g.value.bucket || []).length,
                            log: (g.value.log || []).length, bg: (g.value.todo[0] || {}).titleBg} : null};
     }""")
