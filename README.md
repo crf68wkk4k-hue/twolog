@@ -3,8 +3,10 @@
 둘이 함께 쌓는 캘린더 · 노트 · 사진첩. 순수 HTML/CSS/JS 로 만든 설치형 웹앱(PWA)입니다.
 빌드 도구도, 프레임워크도 없습니다. 폴더를 웹에 올리면 그대로 앱이 됩니다.
 
-- **지금 바로** — 이 기기에서 혼자 쓰는 **로컬 모드**로 완전히 동작합니다(인터넷·가입 필요 없음, 기록은 기기에 저장).
+- **지금 바로** — 이 기기에서 혼자 쓰는 **로컬 모드**로도 완전히 동작합니다(인터넷·가입 필요 없음, 기록은 기기에 저장).
 - **두 대 동기화** — `sync.js` 의 `CONFIG` 두 칸에 Supabase 주소/키를 넣으면 **실시간 동기화 모드**로 바뀝니다(무료 플랜으로 충분).
+- **v25 부터**는 소영·준영의 프로젝트(`qvhupdivtfzhzymovtyy`)가 `CONFIG` 에 들어 있어 **배포 주소는 동기화 모드가 기본**입니다(로그인 화면 → 이메일 계정).
+  기기에만 저장하는 예전 방식으로 열어 보려면 주소 뒤에 `?sync=local` 을 붙입니다(테스트도 이 통로를 씁니다).
 
 ---
 
@@ -100,19 +102,21 @@ Safari 로 배포 주소를 연 뒤:
   (켜 두면 가입 후 메일의 확인 링크를 먼저 눌러야 로그인됩니다.)
 
 ### 5-4. 주소와 키 넣기
-Supabase → **Project Settings → API** 에서 두 값을 복사해 `sync.js` 맨 위를 채웁니다.
+**v25 에서 이미 채워 두었습니다** — `sync.js` 맨 위가 아래처럼 되어 있습니다(이 프로젝트 값).
+다른 프로젝트로 옮길 때만 Supabase → **Project Settings → API** 에서 두 값을 다시 복사해 바꿉니다.
 
 ```js
 var CONFIG = {
-  supabaseUrl: "https://abcdefghijkl.supabase.co",
-  supabaseAnonKey: "eyJhbGciOi...",   // anon / public 키 (공개되어도 되는 키)
+  supabaseUrl: "https://qvhupdivtfzhzymovtyy.supabase.co",
+  supabaseAnonKey: "sb_publishable_...",   // publishable(anon) 키 — 공개되어도 되고 RLS 가 지킵니다
   ...
 };
 ```
 
-> `service_role` 키는 절대 넣지 마세요. anon 키는 RLS 로 보호되므로 앱에 넣어도 됩니다.
+- 두 값을 **비우면** 예전처럼 local 모드(이 기기에만 저장)로 돌아갑니다.
+- 화면 확인용으로 잠깐 모드를 바꿀 때는 주소에 `?sync=local` 또는 `?sync=remote` 를 붙입니다.
 
-수정한 파일을 다시 배포합니다(3장 반복).
+> `service_role`(secret) 키는 절대 넣지 마세요. anon 키는 RLS 로 보호되므로 앱에 넣어도 됩니다.
 
 ### 5-5. 두 사람 연결하기
 1. **A 폰**: 앱 열기 → 로그인 화면 → **처음이에요 · 계정 만들기** → 이메일/비밀번호 → 계정 생성
@@ -181,6 +185,7 @@ store.couple.myCode() / join(code) / leave()
 | 홈 화면에 추가했는데 주소창이 보임 | `manifest.json` 의 `display` 가 `standalone` 인지, 배포 주소가 https 인지 |
 | 서비스 워커가 등록되지 않음 | `https` 또는 `localhost` 인지 (`http://아이피:8080` 은 등록 안 됨) |
 | 로그인 후 "로그인이 필요해요" 만 보임 | Supabase Email Provider 켜짐 여부, Confirm email 설정, `CONFIG` 값 오타 |
+| 동기화가 「오프라인 · 다시 연결하는 중」 | 5-2 의 스키마 SQL 을 아직 실행하지 않았을 수 있습니다(`public.couples` 없음). 앱은 멈추지 않고 이 기기 기록으로 계속 열립니다. SQL 실행 뒤 앱을 다시 열면 붙습니다. |
 | 두 폰이 안 맞춰짐 | 두 사람이 **같은 커플**인지(설정 → 연결됨), Realtime 발행에 5개 테이블이 들어갔는지 |
 | 사진이 안 보임 | Storage 버킷 `photos` 가 **비공개**이고 정책 4개가 생성됐는지, 서명 URL 만료(6일) 후 자동 갱신 |
 | 예전 프로토타입 데이터가 보임 | `localStorage["couple-app-v1"]` 을 한 번 읽어 `twolog:v1:state` 로 옮깁니다(자동) |
@@ -189,14 +194,16 @@ store.couple.myCode() / join(code) / leave()
 
 ```bash
 pip install playwright && playwright install chromium
+python3 tests/v25.py       # v25: Supabase 연결(remote) — 로그인 화면 · 가입/로그인 · 초대 코드/연결 · 스키마 없을 때 · local 회귀
 python3 tests/smoke.py      # 5탭 · 일정 · 할일 · 사진 업로드/저장 · manifest · 서비스워커 · 새로 열어도 유지
 python3 tests/v19.py        # v19: 컬러 시트 · 항목 이름 15px 검정 통일 · 확인 버튼 글씨 검정 · 노트 카드 탭→목록 · 꾹 눌러 이동 · 완료 항목 아래로 · 테두리 없는 달력 · 일정 검색 · 공휴일 빨강
 python3 tests/v18.py        # v18: 홈 간격 · 사진첩 하루 3폴라로이드+뷰어 · 노트 탭 분리/글씨 · 이모지+이름 한 칸 · 꾹 눌러 순서 · 그날 타임라인 · 4자리 잠금 · PDF
 python3 tests/v17.py        # (v17 기록용) 노트 「주제」 삭제 · 12색 팔레트 — v18 에서 바뀐 화면이라 지금은 일부 실패가 정상
 ```
 
-마지막 확인 결과(v19): **390×844 헤드리스 Chromium 에서 콘솔/페이지 오류 0**,
-스모크 18 · v19 흐름 98 · v18 회귀 42 = **총 158개 항목 통과**.
+마지막 확인 결과(v25): **390×844 헤드리스 Chromium 에서 콘솔/페이지 오류 0**,
+v25(동기화·로그인·초대 코드) 43 · 스모크 18 · v18~v24 회귀 모두 **실패 0**.
+v13~v17 은 그 뒤 화면이 바뀌어 지금은 일부 실패가 정상입니다(v25 이전에도 같은 항목이 실패).
 
 ---
 

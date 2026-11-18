@@ -90,6 +90,7 @@ def px(v):
 with sync_playwright() as p:
     browser = launch(p)
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    ctx.add_init_script("window.__TWOLOG_MODE = 'local';")  # v25: 이 테스트는 로컬 모드 고정
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -307,6 +308,7 @@ with sync_playwright() as p:
 
     # ---------- 5. 좁은 화면(375px)에서 카드가 넘치지 않는지 ----------
     ctx2 = browser.new_context(viewport={"width": 375, "height": 812}, is_mobile=True, has_touch=True)
+    ctx2.add_init_script("window.__TWOLOG_MODE = 'local';")  # v25: 이 테스트는 로컬 모드 고정
     page2 = ctx2.new_page()
     errs2 = []
     page2.on("pageerror", lambda e: errs2.append(str(e)))

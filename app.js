@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v24";
+  var APP_VERSION = "v25";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -3282,6 +3282,7 @@
           var remote = Store && Store.mode === "remote";
           S.auth.out = true;
           S.auth.email = "";
+          loginMode = "in";          /* v25: 로그아웃 다음에는 가입 화면이 아니라 로그인 화면 */
           closeSheet();
           renderAll();
           toast("로그아웃했어요");
@@ -3296,6 +3297,24 @@
 
     if (act === "newCode") {
       S.link = S.link || {};
+      /* v25: remote 모드의 초대 코드는 서버(couples.invite_code)가 원본 —
+         기기에만 적어 두면 화면이 그대로라 서버 값을 바꿉니다. */
+      if (Store && Store.mode === "remote") {
+        var freshCode = newInviteCode();
+        var codeBtn = el;
+        if (codeBtn) { codeBtn.disabled = true; codeBtn.textContent = "만드는 중"; }
+        Store.couple.setCode(freshCode).then(function (res) {
+          if (codeBtn) { codeBtn.disabled = false; codeBtn.textContent = "코드 새로 만들기"; }
+          if (!res || res.error) { toast("코드를 새로 만들지 못했어요"); return; }
+          S.link.code = freshCode;
+          openSheet(formLink());
+          toast("초대 코드를 새로 만들었어요");
+        }).catch(function () {
+          if (codeBtn) { codeBtn.disabled = false; codeBtn.textContent = "코드 새로 만들기"; }
+          toast("코드를 새로 만들지 못했어요");
+        });
+        return;
+      }
       S.link.code = newInviteCode();
       save();
       openSheet(formLink());

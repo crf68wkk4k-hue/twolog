@@ -123,6 +123,7 @@ def goto_note(page):
 with sync_playwright() as p:
     browser = launch(p)
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    ctx.add_init_script("window.__TWOLOG_MODE = 'local';")  # v25: 이 테스트는 로컬 모드 고정
     page = ctx.new_page()
     errors = []
     navs = []
@@ -383,6 +384,7 @@ with sync_playwright() as p:
     # 7. 사진첩 — 날짜별 폴라로이드 (IMG_4511)
     # ==================================================================
     ctx3 = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    ctx3.add_init_script("window.__TWOLOG_MODE = 'local';")  # v25: 이 테스트는 로컬 모드 고정
     page3 = ctx3.new_page()
     errs3 = []
     page3.on("pageerror", lambda e: errs3.append(str(e)))
@@ -482,6 +484,7 @@ with sync_playwright() as p:
     # 8. 좁은 화면(375px) — 팔레트 4열 유지·넘침 없음
     # ==================================================================
     ctx2 = browser.new_context(viewport={"width": 375, "height": 812}, is_mobile=True, has_touch=True)
+    ctx2.add_init_script("window.__TWOLOG_MODE = 'local';")  # v25: 이 테스트는 로컬 모드 고정
     page2 = ctx2.new_page()
     errs2 = []
     page2.on("pageerror", lambda e: errs2.append(str(e)))

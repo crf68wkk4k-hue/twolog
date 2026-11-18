@@ -23,10 +23,11 @@
 
   /* ------------------------------------------------------------------ config */
   var CONFIG = {
-    /* ↓↓↓ 여기 두 줄만 채우면 실시간 동기화가 켜집니다 (README 참고) ↓↓↓ */
-    supabaseUrl: "",
-    supabaseAnonKey: "",
-    /* ↑↑↑ 비워 두면 local 모드로 동작합니다 ↑↑↑ */
+    /* v25: 소영·준영의 Supabase 프로젝트 (README 5장).
+       anon(publishable) 키는 앱에 들어가도 되는 공개 키 — 데이터는 RLS 가 지킵니다. */
+    supabaseUrl: "https://qvhupdivtfzhzymovtyy.supabase.co",
+    supabaseAnonKey: "sb_publishable_X4eO7AgGT5DnrxPdR5A3MA__hCxIqhD",
+    /* 두 값을 비우면 local 모드(이 기기에만 저장)로 돌아갑니다. */
 
     supabaseModule: "https://esm.sh/@supabase/supabase-js@2.45.4", // 버전 고정
     photoBucket: "photos",
@@ -42,6 +43,22 @@
   var K_LEGACY = "couple-app-v1";
 
   function isRemote() { return !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey); }
+
+  /* 모드 강제(테스트·확인용) — 기본값은 위 CONFIG 그대로.
+       · 주소에 ?sync=local / ?sync=remote 를 붙이거나
+       · 첫 스크립트보다 먼저 window.__TWOLOG_MODE = "local" | "remote" 를 정해 두면
+     그 모드로 열립니다. (로컬 모드 테스트가 실제 서버에 붙지 않게 하는 통로) */
+  function forcedMode() {
+    try {
+      var g = global.__TWOLOG_MODE;
+      if (g === "local" || g === "remote") return g;
+    } catch (e) {}
+    try {
+      var v = new URLSearchParams(global.location.search).get("sync");
+      if (v === "local" || v === "remote") return v;
+    } catch (e) {}
+    return null;
+  }
   function nowIso() {
     var d = new Date();
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -357,6 +374,7 @@
   LocalBackend.prototype.signOut = function () { return Promise.resolve(); };
   LocalBackend.prototype.joinCouple = function () { return Promise.resolve({ error: "local_mode" }); };
   LocalBackend.prototype.leaveCouple = function () { return Promise.resolve({ error: "local_mode" }); };
+  LocalBackend.prototype.setInviteCode = function () { return Promise.resolve({ error: "local_mode" }); };
   LocalBackend.prototype.subscribe = function () { return function () {}; };
 
   /* =====================================================================
@@ -689,6 +707,22 @@
     });
   };
 
+  /* v25: 초대 코드 새로 만들기 — 서버(couples.invite_code)를 바꿔야 두 기기가 같은 코드를 봅니다. */
+  SupabaseBackend.prototype.setInviteCode = function (code) {
+    var self = this;
+    if (!this.couple) return Promise.resolve({ error: "no_couple" });
+    var nextCode = String(code || "");
+    if (!/^[0-9]{6}$/.test(nextCode)) return Promise.resolve({ error: "bad_code" });
+    return this.connect().then(function (client) {
+      return client.from("couples").update({ invite_code: nextCode }).eq("id", self.couple.id);
+    }).then(function (r) {
+      if (r && r.error) return { error: r.error.message || "update_failed" };
+      self.couple.invite_code = nextCode;
+      if (self.prev && self.prev.couple) self.prev.couple.invite_code = nextCode;
+      return { ok: true, code: nextCode };
+    }).catch(function (e) { return { error: String(e && e.message || e) }; });
+  };
+
   /* Realtime: 상대가 바꾸면 다시 읽어서 화면에 반영 */
   SupabaseBackend.prototype.subscribe = function (onRemote) {
     var self = this;
@@ -718,7 +752,8 @@
      store 파사드
      ===================================================================== */
   function createStore() {
-    var remote = isRemote();
+    var forced = forcedMode();
+    var remote = forced ? forced === "remote" : isRemote();
     var backend = remote ? new SupabaseBackend() : new LocalBackend();
     var listener = null;
     var subscribed = false;
@@ -842,6 +877,7 @@
       /* 커플 연결 */
       couple: {
         myCode: function () { return backend.couple ? String(backend.couple.invite_code || "") : ""; },
+        setCode: function (code) { return backend.setInviteCode(code); },
         join: function (code) { return backend.joinCouple(code); },
         leave: function () { return backend.leaveCouple(); },
         memberCount: function () { return backend.couple && backend.couple.members ? backend.couple.members.length : 1; }

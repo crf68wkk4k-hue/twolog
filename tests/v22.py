@@ -77,6 +77,7 @@ with sync_playwright() as p:
     browser = launch(p)
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True,
                               has_touch=True, device_scale_factor=2)
+    ctx.add_init_script("window.__TWOLOG_MODE = 'local';")  # v25: 이 테스트는 로컬 모드 고정
     page = ctx.new_page()
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
@@ -84,10 +85,10 @@ with sync_playwright() as p:
     # ---------------- 0. 서비스워커 캐시 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
     # v24: 캐시 버전은 배포마다 올라가므로 v24 으로
-    check("sw.js 캐시 버전 twolog-v24", 'const VERSION = "twolog-v24"' in sw,
+    check("sw.js 캐시 버전 twolog-v25", 'const VERSION = "twolog-v25"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
     app_js = page.request.get(URL + "app.js").text()
-    check("app.js 버전 상수 v24", 'var APP_VERSION = "v24"' in app_js)
+    check("app.js 버전 상수 v25", 'var APP_VERSION = "v25"' in app_js)
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장되는 일반 모드로 옮겨요
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -405,7 +406,7 @@ with sync_playwright() as p:
     })()""")
     check("My 탭에 버전 표시 있음", my.get("ok"), my)
     # v24: 화면에 찍히는 버전도 배포마다 올라가므로 v24
-    check("버전 문구가 v24", "v24" in str(my.get("txt")), my.get("txt"))
+    check("버전 문구가 v25", "v25" in str(my.get("txt")), my.get("txt"))
     check("버전이 My 머리줄 맨 위에", my.get("vTop", 999) <= my.get("hTop", 0) + 40 and my.get("topOfPage"), my)
     check("버전이 오른쪽 끝", 12 <= my.get("right", 999) <= 26, my.get("right"))
     check("버전이 계정 목록보다 위", bool(my.get("aboveList")), my.get("aboveList"))
