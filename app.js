@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v28";
+  var APP_VERSION = "v29";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -1193,26 +1193,24 @@
     S.ui.seg = seg;
 
     var html = "";
-    html += '<header class="hdr' + capCls("diary") + '"' + capStyle("diary") + ' data-pg="diary"><div><h1><span class="eh">📖</span> 노트</h1></div>' +
-      '<div class="hdr-acts"><button class="round-btn" data-act="noteSettings" aria-label="노트 설정">' + IC.gear + "</button></div></header>";
+    /* v29: 맨 윗줄 오른쪽의 네모 설정 버튼을 지우고, 그 자리에 새 카테고리 탭 추가 + (동그란) 를 둡니다.
+       탭 이름 바꾸기(노트 설정)는 「📖 노트」 제목을 꾹 눌러 엽니다. */
+    html += '<header class="hdr' + capCls("diary") + '"' + capStyle("diary") + ' data-pg="diary"><div>' +
+      '<h1 class="note-h1" title="꾹 누르면 탭 이름을 바꿀 수 있어요"><span class="eh">📖</span> 노트</h1></div>' +
+      '<div class="hdr-acts"><button type="button" class="round-btn note-add" data-act="newList" aria-label="새 카테고리 탭 추가" title="새 카테고리 탭 추가">' + IC.listPlus + "</button></div></header>";
     html += '<div class="segs">';
     NOTE_BASE.forEach(function (k) { html += segBtn(seg, k, noteLabel(k)); });
     html += "</div>";
-    /* v28: 카테고리 칩 줄 오른쪽 끝의 동그란 + — 누르면 새 카테고리 탭을 만드는 시트가 열립니다.
-       (칩이 하나도 없어도 + 는 보이도록 이 줄은 늘 그립니다) */
-    html += '<div class="lstbar">';
+    /* v29: + 는 맨 윗줄 오른쪽으로 옮겼고, 이 줄에는 내가 만든 카테고리 칩만 둡니다 */
     if (S.lists.length) {
-      html += '<div class="lst-scroll">';
+      html += '<div class="lstbar"><div class="lst-scroll">';
       S.lists.forEach(function (l) {
         var on = seg === "list:" + l.id;
         html += '<button class="lchip' + (on ? " active" : "") + '" data-act="seg" data-seg="list:' + l.id + '" aria-label="' + esc(listLabel(l)) + '">' +
           (l.emoji ? '<span class="le">' + esc(l.emoji) + "</span>" : "") + "<span>" + esc(l.title) + "</span></button>";
       });
-      html += "</div>";
+      html += "</div></div>";
     }
-    html += '<button type="button" class="lst-new" data-act="newList" aria-label="새 카테고리 탭 추가" title="새 카테고리 탭 추가">' +
-      IC.listPlus + "</button>";
-    html += "</div>";
     var body;
     if (seg === "todo") body = viewTodo();
     else if (seg === "bucket") body = viewBucket();
@@ -1230,6 +1228,35 @@
     /* 카드 상세가 열려 있으면 그 안의 To-do 목록도 같이 맞춰 줍니다 */
     if (openCard) refreshCardSheet();
   }
+
+  /* v29: 노트 맨 윗줄의 네모 설정 버튼이 없어져, 「📖 노트」 제목을 600ms 꾹 누르면
+     탭 이름 바꾸기(노트 설정) 시트가 열립니다. 화면에는 아무 버튼도 늘지 않아요. */
+  var ntHold = null;
+  function ntHoldCancel() {
+    if (ntHold && ntHold.timer) clearTimeout(ntHold.timer);
+    ntHold = null;
+  }
+  document.addEventListener("pointerdown", function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest || !t.closest("#s-diary .hdr .note-h1")) return;
+    ntHoldCancel();
+    var st = { x: ev.clientX, y: ev.clientY, fired: false };
+    st.timer = setTimeout(function () {
+      st.fired = true;
+      try { if (navigator.vibrate) navigator.vibrate(10); } catch (e) {}
+    }, 600);
+    ntHold = st;
+  }, true);
+  window.addEventListener("pointermove", function (ev) {
+    if (!ntHold) return;
+    if (Math.abs(ev.clientX - ntHold.x) > 8 || Math.abs(ev.clientY - ntHold.y) > 8) ntHoldCancel();
+  }, true);
+  window.addEventListener("pointerup", function () {
+    var st = ntHold;
+    ntHoldCancel();
+    if (st && st.fired) setTimeout(function () { openNoteSettings(); }, 0);
+  }, true);
+  window.addEventListener("pointercancel", ntHoldCancel, true);
 
   /* 노트 공통: 맨 아래 + 추가 줄 */
   function addRow(act, attrs, label) {

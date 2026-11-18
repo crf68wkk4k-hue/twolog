@@ -68,6 +68,17 @@ def launch(p):
 URL = "http://127.0.0.1:%d/" % PORT
 errors = []
 
+
+def open_note_settings(page):
+    """v29: 노트 맨 윗줄의 네모 설정 버튼이 없어져, 「📖 노트」 제목을 600ms 꾹 눌러 노트 설정을 엽니다."""
+    box = page.locator("#s-diary .note-h1").bounding_box()
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.mouse.down()
+    page.wait_for_timeout(720)
+    page.mouse.up()
+    page.wait_for_timeout(500)
+
+
 with sync_playwright() as p:
     browser = launch(p)
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, device_scale_factor=2)
@@ -145,16 +156,16 @@ with sync_playwright() as p:
               bw: btns[0].getBoundingClientRect().width, bg: cs.backgroundColor};
     })()""")
     check("탭이 각각 네모 칸으로 분리", segs is not None and segs["n"] == 3 and segs["gap"] == "8px", segs)
-    check("탭 글씨 확대 (15.5px)", segs is not None and segs["fs"] == "15.5px", segs.get("fs") if segs else None)
-    check("탭 칸 높이 44px", segs is not None and round(segs["h"]) == 44, segs.get("h") if segs else None)
+    # v29: 알약 탭을 조금 줄였어요 (15.5px·44px → 14px·40px)
+    check("탭 글씨 14px", segs is not None and segs["fs"] == "14px", segs.get("fs") if segs else None)
+    check("탭 칸 높이 40px", segs is not None and round(segs["h"]) == 40, segs.get("h") if segs else None)
     nct = page.evaluate("getComputedStyle(document.querySelector('#s-diary .ncard .nc-t')).fontSize")
     # v22: 사용자 요청으로 카드 제목을 더 작게(13.5px) 줄였어요
     check("카드 제목 13.5px", nct == "13.5px", nct)
     page.screenshot(path=os.path.join(SHOT, "note-v18.png"))
 
     # ---------------- 노트 설정: 이모지 + 이름 한 칸 ----------------
-    page.locator("#s-diary [data-act='noteSettings']").click()
-    page.wait_for_timeout(400)
+    open_note_settings(page)
     emo_inputs = page.locator("#sheet .nt-emo").count()
     names = page.evaluate("Array.from(document.querySelectorAll('#sheet #noteForm .nt-nm')).map(i => i.name + '=' + i.value)")
     check("이모지 칸이 사라짐", emo_inputs == 0, emo_inputs)
@@ -167,8 +178,7 @@ with sync_playwright() as p:
     labels = page.evaluate("Array.from(document.querySelectorAll('#s-diary .segs .seg-btn')).map(b => b.textContent)")
     check("이모지 없이 적은 이름 그대로", labels[2] == "함께 보는 기록", labels)
     # 다시 이모지 + 이름
-    page.locator("#s-diary [data-act='noteSettings']").click()
-    page.wait_for_timeout(350)
+    open_note_settings(page)
     page.fill("#sheet input[name='t_log']", "🍿 함께 보는 기록")
     page.click("#sheet #noteForm button[type='submit']")
     page.wait_for_timeout(400)

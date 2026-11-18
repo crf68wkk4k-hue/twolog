@@ -67,6 +67,17 @@ def launch(p):
 URL = "http://127.0.0.1:%d/" % PORT
 errors = []
 
+
+def open_note_settings(page):
+    """v29: 노트 맨 윗줄의 네모 설정 버튼이 없어져, 「📖 노트」 제목을 600ms 꾹 눌러 노트 설정을 엽니다."""
+    box = page.locator("#s-diary .note-h1").bounding_box()
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.mouse.down()
+    page.wait_for_timeout(720)
+    page.mouse.up()
+    page.wait_for_timeout(500)
+
+
 with sync_playwright() as p:
     browser = launch(p)
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, device_scale_factor=2)
@@ -418,8 +429,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(450)
     found["노트 카드 시트"] = label_css("#sheet .f > label") + label_css("#sheet .todo-label")
     close_sheet()
-    page.locator("#s-diary [data-act='noteSettings']").click()
-    page.wait_for_timeout(450)
+    open_note_settings(page)
     found["노트 설정"] = label_css("#sheet .set-lbl")
     close_sheet()
     page.locator("#tabbar .tab").nth(4).click()

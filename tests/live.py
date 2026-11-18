@@ -3,7 +3,7 @@
     python3 tests/live.py
 
 - 주요 파일 HTTP 200 (index · app.js · sync.js · sw.js · styles.css · manifest · 아이콘)
-- sw.js 캐시 이름 = app.js 버전 상수 (지금은 twolog-v28 / v28)
+- sw.js 캐시 이름 = app.js 버전 상수 (지금은 twolog-v29 / v29)
 - 라이브 첫 화면이 remote 모드 로그인 화면으로 뜨고 콘솔 오류·4xx/5xx 없음
 - ?sync=local 로는 예전 로컬 모드로 열림
 """
@@ -48,9 +48,9 @@ with sync_playwright() as p:
         check("HTTP 200 " + (path or "/"), r.status == 200, r.status)
 
     sw = page.request.get(LIVE + "sw.js").text()
-    check("라이브 sw.js 가 twolog-v28", 'const VERSION = "twolog-v28"' in sw,
+    check("라이브 sw.js 가 twolog-v29", 'const VERSION = "twolog-v29"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:1])
-    check("라이브 app.js 가 v28", 'var APP_VERSION = "v28"' in page.request.get(LIVE + "app.js").text())
+    check("라이브 app.js 가 v29", 'var APP_VERSION = "v29"' in page.request.get(LIVE + "app.js").text())
 
     page.goto(LIVE, wait_until="domcontentloaded")
     page.wait_for_selector("#s-login .login", timeout=25000)
@@ -65,10 +65,10 @@ with sync_playwright() as p:
     check("로그인 화면이 흰 화면 없이 렌더", st["h1"] == "다시, 우리" and st["textLen"] > 30 and st["tabs"] == 0, st)
     page.wait_for_timeout(2500)
     cache = page.evaluate("""navigator.serviceWorker.ready.then(() => caches.keys())""")
-    check("서비스워커 캐시 shell-twolog-v28", any("twolog-v28" in c for c in (cache or [])), cache)
+    check("서비스워커 캐시 shell-twolog-v29", any("twolog-v29" in c for c in (cache or [])), cache)
     check("라이브 콘솔/스크립트 오류 없음", len(errs) == 0, errs[:4])
     check("라이브에서 4xx/5xx 응답 없음", len(badresp) == 0, badresp[:4])
-    page.screenshot(path="/workspace/downloads/twolog-screens/live-v28-login.png")
+    page.screenshot(path="/workspace/downloads/twolog-screens/live-v29-login.png")
 
     page.goto(LIVE + "?sync=local", wait_until="domcontentloaded")
     page.wait_for_selector("#tabbar .tab", timeout=20000)

@@ -88,7 +88,7 @@ with sync_playwright() as p:
     # ---------------- 서비스워커 캐시 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
     # v24: 캐시 버전은 배포마다 올라가므로 v24 으로 (앱 버전 상수와 같은 값)
-    check("sw.js 캐시 버전 twolog-v28", 'const VERSION = "twolog-v28"' in sw,
+    check("sw.js 캐시 버전 twolog-v29", 'const VERSION = "twolog-v29"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장되는 일반 모드로 옮겨요
@@ -113,7 +113,8 @@ with sync_playwright() as p:
     })()""")
     check("노트 위 탭 끝이 둥글게(12px)", tabs["tl"] == "12px" and tabs["tr"] == "12px", tabs)
     check("노트 탭 세 칸 모두 둥글게", set(tabs["all"]) == {"12px"}, tabs["all"])
-    check("노트 탭 높이는 그대로 44px", abs(tabs["h"] - 44) <= 0.5, tabs["h"])
+    # v29: 알약 탭을 조금 줄여 44px → 40px
+    check("노트 탭 높이 40px", abs(tabs["h"] - 40) <= 0.5, tabs["h"])
 
     chip = page.evaluate("""(() => {
       const c = document.querySelector('#s-diary .lchip');

@@ -288,25 +288,24 @@ h1,h2,h3,p{margin:0}
 .seg-btn.active{background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgba(28,28,30,.08), 0 0 0 1px rgba(28,28,30,.04)}
 /* v18: 노트 상단 탭 — 한 덩어리로 붙이지 않고 각각 독립된 네모 칸으로.
    칸 안의 글씨는 한 단계 크게(11.5px → 15.5px), 높이도 글씨에 맞춰 44px */
-.segs{display:flex; gap:8px; margin:14px 20px 0}
+.segs{display:flex; gap:8px; margin:12px 20px 0}
 .segs .seg-btn{
-  flex:1 1 0; min-width:0; height:44px; padding:0 8px; border:1px solid var(--line);
+  flex:1 1 0; min-width:0; height:40px; padding:0 7px; border:1px solid var(--line);
   border-radius:12px;   /* v21: 노트 위 탭 칸의 끝을 둥글게 */
-  background:var(--surface); font-size:15.5px; font-weight:700; letter-spacing:-.035em;
+  background:var(--surface); font-size:14px; font-weight:700; letter-spacing:-.035em;
   overflow:hidden; text-overflow:ellipsis
 }
 .segs .seg-btn.active{background:var(--ink); border-color:var(--ink); color:var(--bg); box-shadow:none}
 .segs .seg-btn:active{opacity:.88}
 html[data-mode="dark"] .segs .seg-btn{border-color:rgba(255,255,255,.14)}
 html[data-mode="dark"] .segs .seg-btn.active{background:var(--ink); border-color:var(--ink); color:#111}
-/* v28: 카테고리 칩 줄 오른쪽 끝의 동그란 + — 새 카테고리 탭 추가 */
-.lst-new{
-  flex:0 0 auto; width:38px; height:38px; margin-left:auto; display:flex; align-items:center; justify-content:center;
-  border:1px dashed rgba(28,28,30,.26); background:var(--surface); color:var(--ink-2);
+/* v29: 노트 맨 윗줄 오른쪽 — 예전 네모 설정 버튼 자리에 동그란 점선 + （새 카테고리 탭 추가） */
+.hdr .note-add{
+  border-radius:50%; border-style:dashed; border-color:rgba(28,28,30,.26); color:var(--ink-2);
   transition:transform .12s ease, opacity .12s ease
 }
-.lst-new:active{transform:scale(.94); opacity:.9}
-html[data-mode="dark"] .lst-new{border-color:rgba(255,255,255,.26)}
+.hdr .note-add:active{transform:scale(.94); opacity:.9}
+html[data-mode="dark"] .hdr .note-add{border-color:rgba(255,255,255,.26)}
 
 .dbody{margin-top:14px}
 
@@ -841,7 +840,7 @@ svg [rx]{rx:0}
 
 /* ---------- 프로필 사진만 동그랗게 (사각 잠금 예외) ---------- *//* ---------- v21: 노트의 탭·카드·제목 색 블록은 둥근 끝 (사각 잠금 예외) ---------- */
 #s-diary .segs .seg-btn{border-radius:12px !important}
-#s-diary .lstbar .lst-new{border-radius:50% !important}
+#s-diary .hdr .note-add{border-radius:50% !important}
 #s-diary .lchip{border-radius:12px !important}
 #s-diary .ncard{border-radius:16px !important}
 #s-diary .nc-t.tint{border-radius:8px !important}

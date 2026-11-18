@@ -1,6 +1,6 @@
 """투로그 v28 확인 — 캘린더는 열 때 이번 달 · 일정 시트 날짜+요일 · 하단 일정 수정 · 노트 + 탭 추가.
 
-1) 버전: sw.js 캐시 twolog-v28 · APP_VERSION v28
+1) 버전: sw.js 캐시 twolog-v29 · APP_VERSION v29
 2) 앱을 새로 켜면(새로고침) 저장해 둔 지난달 대신 이번 달로
 3) 탭에서 캘린더로 들어오면 이번 달 + 오늘 날짜 (다른 달 → 다른 탭 → 돌아오면 이번 달)
 4) 달 안에서 화살표·손가락 밀기로 넘기는 이동은 그대로 (그 달에 머무는 동안 유지)
@@ -170,11 +170,11 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v28", 'const VERSION = "twolog-v28"' in sw,
+    check("sw.js 캐시 버전 twolog-v29", 'const VERSION = "twolog-v29"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v28", 'var APP_VERSION = "v28"' in app_js,
+    check("app.js 버전 상수 v29", 'var APP_VERSION = "v29"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v28", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v29", 'const SHELL = "shell-" + VERSION' in sw)
 
     # ==================================================================
     # 2. 앱을 새로 켜면 이번 달 (저장된 지난달은 무시)
@@ -494,18 +494,17 @@ with sync_playwright() as p:
     tab(page, 2, 600)
     nb = page.evaluate("""() => {
       const segs = document.querySelector('#s-diary .segs').getBoundingClientRect();
-      const pills = Array.from(document.querySelectorAll('#s-diary .segs .seg-btn')).map(e => e.getBoundingClientRect());
-      const btn = document.querySelector('#s-diary .lst-new');
+      const btn = document.querySelector('#s-diary .note-add');
       if (!btn) return {ok: false};
       const r = btn.getBoundingClientRect();
       const cs = getComputedStyle(btn);
-      const lastPill = pills[pills.length - 1];
+      const h1 = document.querySelector('#s-diary .note-h1').getBoundingClientRect();
       return {ok: true, x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height),
               radius: cs.borderTopLeftRadius, border: cs.borderTopStyle,
               right: Math.round(window.innerWidth - r.right),
-              underPills: r.top >= segs.bottom - 1,
-              afterPills: r.left >= lastPill.right - 1,
-              segRight: Math.round(window.innerWidth - segs.right),
+              abovePills: r.bottom <= segs.top + 1,
+              sameRow: Math.abs((r.top + r.height / 2) - (h1.top + h1.height / 2)) <= 12,
+              gear: !!document.querySelector("#s-diary [data-act='noteSettings']"),
               svg: !!btn.querySelector('svg'),
               act: btn.getAttribute('data-act'),
               label: btn.getAttribute('aria-label'),
@@ -514,13 +513,14 @@ with sync_playwright() as p:
     }""")
     check("노트에 동그란 + 버튼이 있음", nb["ok"] and nb["act"] == "newList", nb)
     check("+ 버튼이 완전한 동그라미(50%)", "50%" in str(nb["radius"]), nb["radius"])
-    # v28: 알약 탭 줄 바로 아래, 같은 오른쪽 여백(20px)에 붙은 동그란 +
-    check("+ 버튼은 알약 탭 줄 바로 아래 오른쪽", nb["underPills"] and abs(nb["right"] - nb["segRight"]) <= 1,
-          (nb["underPills"], nb["right"], nb["segRight"]))
+    # v29: + 는 알약 탭 아래가 아니라 맨 윗줄(📖 노트) 오른쪽 — 예전 네모 설정 버튼 자리
+    check("+ 버튼은 알약 탭 위 맨 윗줄 오른쪽", nb["abovePills"] and nb["sameRow"] and abs(nb["right"] - 20) <= 1,
+          (nb["abovePills"], nb["sameRow"], nb["right"]))
+    check("네모 설정 버튼은 사라짐", nb["gear"] is False, nb["gear"])
     check("+ 버튼 아이콘은 목록+ 모양", nb["svg"])
     check("알약 탭 글씨는 잘리지 않음", not nb["pillsTrunc"])
 
-    page.locator("#s-diary .lst-new").click()
+    page.locator("#s-diary .note-add").click()
     page.wait_for_timeout(600)
     sheet = page.evaluate("""() => ({open: document.getElementById('sheetWrap').classList.contains('open'),
       head: (document.querySelector('#sheet .sheet-hd h2') || {}).textContent})""")
@@ -562,7 +562,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(2000)
 
     tab(page, 2, 600)
-    page.locator("#s-diary .lst-new").click()
+    page.locator("#s-diary .note-add").click()
     page.wait_for_timeout(500)
     page.fill('#sheet input[name="title"]', "여행 준비")
     page.locator('#sheet [data-act="lpick"][data-emoji="🧳"]').click()
