@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v22";
+  var APP_VERSION = "v23";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -55,7 +55,8 @@
     palette: svg('<path d="M12 3.4a8.6 8.6 0 1 0 0 17.2c1.1 0 1.9-.8 1.9-1.8 0-.9-.6-1.4-.6-2.1 0-.8.7-1.4 1.5-1.4h1.4a4.3 4.3 0 0 0 4.3-4.3c0-4.2-3.7-7.6-8.5-7.6z"/><circle cx="8.3" cy="9.8" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.8" r="1" fill="currentColor" stroke="none"/><circle cx="15.7" cy="9.7" r="1" fill="currentColor" stroke="none"/>', 17),
     gear: svg('<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="1.9"/><circle cx="9" cy="12" r="1.9"/><circle cx="17.5" cy="17" r="1.9"/>', 21),
     person: svg('<circle cx="12" cy="8.3" r="3.5"/><path d="M5.2 20c0-3.4 3.1-5.7 6.8-5.7s6.8 2.3 6.8 5.7"/>', 21),
-    search: svg('<circle cx="10.8" cy="10.8" r="6.2"/><path d="M15.4 15.4l4.1 4.1"/>', 20)
+    search: svg('<circle cx="10.8" cy="10.8" r="6.2"/><path d="M15.4 15.4l4.1 4.1"/>', 20),
+    grid: svg('<rect x="3.6" y="3.6" width="7" height="7"/><rect x="13.4" y="3.6" width="7" height="7"/><rect x="3.6" y="13.4" width="7" height="7"/><rect x="13.4" y="13.4" width="7" height="7"/>', 18)
   };
   var STAR = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.8l2.86 5.94 6.54.9-4.77 4.55 1.18 6.5L12 17.6l-5.81 3.09 1.18-6.5L2.6 9.64l6.54-.9z"/></svg>';
 
@@ -626,13 +627,6 @@
     return null;
   }
 
-  var BI = {
-    todo: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.6 5.2h3.2v3.2H3.6zM9.8 6.8h10.6M3.6 15.2h3.2v3.2H3.6zM9.8 16.8h10.6"/></svg>',
-    cal: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3.6" y="5.4" width="16.8" height="15"/><path d="M8.2 3.4v3.4M15.8 3.4v3.4M3.6 10.2h16.8"/></svg>',
-    photo: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3.4" y="4.6" width="17.2" height="14.8"/><path d="M4.2 17.2l4.4-4.3 2.6 2.4 3-2.7 5.6 5"/></svg>',
-    heart: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20.3 5 13.2a4.6 4.6 0 0 1 6.5-6.5l.5.5.5-.5a4.6 4.6 0 0 1 6.5 6.5z"/></svg>'
-  };
-
   function bktStatus(b) {
     if (b.done) return { t: "완료", k: "done" };
     return b.status === "doing" ? { t: "진행 중", k: "doing" } : { t: "미완료", k: "todo" };
@@ -653,36 +647,6 @@
     var ann = nextAnniversary();
     var todayEvents = S.events.filter(function (e) { return evCovers(e, today); }).sort(byTimeAsc);
     var upcoming = S.events.filter(function (e) { return evStart(e) > today; }).sort(byDateAsc).slice(0, 3);
-    var ym = today.slice(0, 7);
-    var monthNo = Number(ym.slice(5, 7));
-    var logs = S.logs.slice().sort(byDateDesc).slice(0, 2);
-
-    /* ---- figures for {month}월의 우리 ---- */
-    var todoTotal = S.todos.length, todoDone = S.todos.filter(function (t) { return t.done; }).length;
-    S.lists.forEach(function (l) {
-      if (l.kind !== "check") return;
-      todoTotal += l.items.length;
-      todoDone += l.items.filter(function (i) { return i.done; }).length;
-    });
-    var todoLeft = Math.max(0, todoTotal - todoDone);
-    var todoPct = todoTotal ? Math.round(todoDone / todoTotal * 1000) / 10 : 0;
-
-    var monthEvents = S.events.filter(function (e) { return e.date.slice(0, 7) === ym; });
-    var typeCount = {};
-    monthEvents.forEach(function (e) { typeCount[e.type] = (typeCount[e.type] || 0) + 1; });
-    var typeKeys = Object.keys(TYPE).filter(function (k) { return typeCount[k]; })
-      .sort(function (a, b) { return typeCount[b] - typeCount[a]; });
-    var typeLine = typeKeys.slice(0, 2).map(function (k) { return TYPE[k].label + " " + typeCount[k]; }).join(" · ");
-    if (typeKeys.length > 2) typeLine += " · 외 " + (typeKeys.length - 2);
-    var monthPhotos = S.photos.filter(function (p) { return p.date.slice(0, 7) === ym; }).length;
-    var monthLogs = S.logs.filter(function (l) { return String(l.date || "").slice(0, 7) === ym; }).length;
-    var pastEvents = monthEvents.filter(function (e) { return e.date < today; }).length;
-    var memories = monthLogs + pastEvents;
-
-    var bktTop = S.bucket.slice().sort(function (a, b) {
-      var rank = function (x) { return x.done ? 2 : x.status === "doing" ? 0 : 1; };
-      return rank(a) - rank(b);
-    }).slice(0, 3);
 
     var html = "";
     var nmOn = S.theme && S.theme.name;
@@ -739,36 +703,7 @@
     } else { html += '<div class="empty">예정된 일정이 없어요.</div>'; }
     html += "</div></div></div>";
 
-    /* ---- 3. {month}월의 우리 dashboard ---- */
-    html += '<div class="home-sec" data-sec="our">';
-    html += '<div class="sec sec-tint"' + secTintStyle(titleBg) + '><h2>🗓️ ' + monthNo + '월의 우리</h2><span class="more">' + ym.replace("-", ".") + "</span></div>";
-    html += '<div class="pad">';
-    html += '<div class="bento">';
-
-    html += '<button type="button" class="bcard" data-act="nav" data-screen="diary" aria-label="메모 열기">' +
-      '<div class="bcard-hd"><span class="bi">' + BI.todo + '</span><span class="lb">메모</span></div>' +
-      '<div class="bm">' + todoDone + " / " + todoTotal + "</div>" +
-      '<div class="bs">' + esc(noteTab("todo").n) + " 완료</div>" +
-      '<div class="bbar"><i style="width:' + todoPct + '%"></i></div></button>';
-
-    html += '<button type="button" class="bcard" data-act="nav" data-screen="cal" aria-label="캘린더 열기">' +
-      '<div class="bcard-hd"><span class="bi">' + BI.cal + '</span><span class="lb">캘린더</span></div>' +
-      '<div class="bm">' + monthEvents.length + "<em>개</em></div>" +
-      '<div class="bs">이번 달 일정</div>' +
-      (typeLine ? '<div class="bx">' + esc(typeLine) + "</div>" : "") + "</button>";
-
-    html += '<button type="button" class="bcard" data-act="nav" data-screen="photo" aria-label="사진첩 열기">' +
-      '<div class="bcard-hd"><span class="bi">' + BI.photo + '</span><span class="lb">사진</span></div>' +
-      '<div class="bm">' + monthPhotos + "<em>장</em></div>" +
-      '<div class="bs">이번 달 사진</div></button>';
-
-    html += '<button type="button" class="bcard" data-act="nav" data-screen="photo" aria-label="추억 열기">' +
-      '<div class="bcard-hd"><span class="bi">' + BI.heart + '</span><span class="lb">추억</span></div>' +
-      '<div class="bm">' + memories + "<em>개</em></div>" +
-      '<div class="bs">함께한 추억</div></button>';
-
-    html += "</div></div></div>";
-
+    /* v23: 「{월}월의 우리」 대시보드는 지웠어요 — 홈은 D-day 다음에 다가오는 일정만 */
     html += '<div style="height:18px"></div>';
 
     $("#s-home").innerHTML = html;
@@ -982,7 +917,9 @@
       return evEnd(e) >= monthStart && evStart(e) <= monthEnd;
     });
 
-    var LANE_H = 18, TOP_H = 26, ROW_MIN = 64, MAX_LANE = 2;
+    /* v23: 일정 막대를 16px + 사이 3px(19px)로 띄우고, 한 주에 세 줄까지 펼칩니다.
+       네 줄을 넘는 일정만 날짜 칸의「외 N」으로 알려 줘요. */
+    var LANE_H = 19, TOP_H = 26, ROW_MIN = 64, MAX_LANE = 3;
     html += '<div class="cal-grid">';
     for (var w = 0; w < cells.length / 7; w++) {
       var wk = cells.slice(w * 7, w * 7 + 7);
@@ -1009,7 +946,7 @@
         (lanes[li] = lanes[li] || []).push(b);
         b.lane = li;
       });
-      /* 한 주에 보이는 막대는 두 줄까지 — 넘치는 일정은 날짜 칸에 '외 N' 으로 알려 줍니다 */
+      /* 한 주에 보이는 막대는 세 줄까지 — 넘치는 일정은 날짜 칸에 '외 N' 으로 알려 줍니다 */
       var shown = bars.filter(function (b) { return b.lane < MAX_LANE; });
       var ovf = {};
       bars.forEach(function (b) {
@@ -1049,8 +986,9 @@
           var edge = evColor(b.e);
           /* 여러 칸에 걸친 일정은 막대 전체 폭의 가운데에 제목을 놓습니다 */
           var mid = b.eCol > b.sCol ? " mid" : "";
+          /* v23: 이웃한 칸의 막대끼리 붙어 보이지 않게 좌우로 1.5px씩 비웁니다 */
           html += '<span class="ebar' + (b.openL ? " openl" : "") + (b.openR ? " openr" : "") + mid +
-            '" style="left:' + left + "%; width:" + width + "%; top:" + top + "px; background:" + edge +
+            '" style="left:calc(' + left + "% + 1.5px); width:calc(" + width + "% - 3px); top:" + top + "px; background:" + edge +
             "; color:" + inkOn(edge) + '">' + esc(b.e.title) + "</span>";
         });
         html += "</div>";
@@ -1468,11 +1406,76 @@
       '<span class="w">· ' + WD[d.getDay()] + '요일</span>';
   }
 
+  /* v23: 사진첩 달력 보기 — 한 달만 보이고 화살표·좌우 밀기로 달을 넘깁니다.
+     날짜 칸은 그날 대표 사진으로 가득 차고, 왼쪽 위 날짜 · 오른쪽 아래 장수가 붙어요. */
+  function photoMonthYM() {
+    var ym = String((S.ui && S.ui.photoMonth) || "");
+    return /^\d{4}-\d{2}$/.test(ym) ? ym : today.slice(0, 7);
+  }
+  function shiftYm(ym, step) {
+    var y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7)) - 1 + step;
+    var d = new Date(y, m, 1);
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1);
+  }
+  function photoCalHtml() {
+    var ym = photoMonthYM();
+    var y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7));
+    var daysIn = new Date(y, m, 0).getDate();
+    var startDow = new Date(y, m - 1, 1).getDay();
+    var byDay = {};
+    S.photos.forEach(function (p) {
+      var d = String(p.date || "").slice(0, 10);
+      if (d.slice(0, 7) !== ym) return;
+      (byDay[d] = byDay[d] || []).push(p);
+    });
+    var cells = [];
+    for (var i = 0; i < startDow; i++) cells.push(0);
+    for (var d = 1; d <= daysIn; d++) cells.push(d);
+    while (cells.length % 7) cells.push(0);
+
+    var h = '<div class="pcal"><div class="pcal-hd">' +
+      '<div class="pcal-ym" aria-label="' + y + "년 " + m + '월">' + y + "년 " + m + '월</div>' +
+      '<div class="pcal-nav">' +
+      '<button type="button" class="cal-arrow" data-act="pcalPrev" aria-label="이전 달">' + IC.left + "</button>" +
+      '<button type="button" class="cal-arrow" data-act="pcalNext" aria-label="다음 달">' + IC.right + "</button>" +
+      "</div></div>" +
+      '<div class="pcal-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>' +
+      '<div class="pcal-grid" data-pcal="1">';
+
+    cells.forEach(function (dayNo) {
+      if (!dayNo) { h += '<div class="pcell blank"></div>'; return; }
+      var ds = ym + "-" + pad(dayNo);
+      var list = (byDay[ds] || []).slice().sort(byDateDesc);
+      if (!list.length) {
+        h += '<div class="pcell' + (ds === today ? " today" : "") + '"><span class="pn">' + dayNo + "</span></div>";
+        return;
+      }
+      h += '<button type="button" class="pcell has' + (ds === today ? " today" : "") + '" data-act="pcalDay" data-date="' + ds +
+        '" aria-label="' + m + "월 " + dayNo + "일 사진 " + list.length + '장 열기">' +
+        photoImg(list[0]) + '<span class="pn">' + dayNo + "</span>" +
+        (list.length > 1 ? '<span class="pc">' + list.length + "</span>" : "") + "</button>";
+    });
+    h += "</div>";
+    if (!Object.keys(byDay).length) h += '<div class="pcal-empty">이 달에 담은 사진이 없어요.</div>';
+    h += '<div style="height:24px"></div></div>';
+    return h;
+  }
+
   function renderPhoto() {
     /* v21: 사진첩은 제목·「N장의 순간」 없이 오른쪽 + 버튼만 — 상단 여백도 군더더기 없이 */
+    /* v23: + 옆에 달력 아이콘 — 누르면 그 달 사진을 달력으로 (다시 누르면 목록으로) */
+    var pcOn = !!(S.ui && S.ui.photoCal);
     var h = '<header class="hdr hdr-min' + capCls("photo") + '"' + capStyle("photo") + ' data-pg="photo">' +
       '<div class="hdr-empty"></div>' +
-      '<div class="hdr-acts"><button class="round-btn" data-act="addPhoto" aria-label="사진 추가" title="사진 추가">' + IC.plus + "</button></div></header>";
+      '<div class="hdr-acts">' +
+      '<button class="round-btn" data-act="togglePhotoCal" aria-label="' + (pcOn ? "사진 목록으로" : "사진 달력 보기") +
+      '" title="' + (pcOn ? "사진 목록으로" : "사진 달력 보기") + '">' + (pcOn ? IC.grid : IC.cal) + "</button>" +
+      '<button class="round-btn" data-act="addPhoto" aria-label="사진 추가" title="사진 추가">' + IC.plus + "</button></div></header>";
+    if (pcOn) {
+      h += photoCalHtml();
+      $("#s-photo").innerHTML = h;
+      return;
+    }
     /* 앨범 대신 날짜로 묶어요 — 하루에 담은 순간이 한 줄에 모입니다 */
     var groups = [];
     var map = {};
@@ -1868,7 +1871,7 @@
       '<div class="cp" role="group" aria-label="홈 제목 줄·버튼 색">' +
       '<div class="cp-hd"><span>컬러</span></div>' +
       cpGrid("homeTitleBg", t.homeTitleBg, MUTED, "#F2CFC9") + "</div>" +
-      '<p class="cp-note">고른 색은 두 섹션의 제목 줄(문구) 바탕과 저장·완료 같은 기본 버튼에 함께 칠해지고, 제목 줄 글씨는 색에 맞춰, 버튼 글씨는 검정으로 또렷하게 보여요. 바로 적용되고 앱을 다시 열어도 그대로 남아 있어요. ‘기본’으로 두면 원래대로 돌아가요.</p>' +
+      '<p class="cp-note">고른 색은 홈 제목 줄(문구) 바탕과 저장·완료 같은 기본 버튼에 함께 칠해지고, 제목 줄 글씨는 색에 맞춰, 버튼 글씨는 검정으로 또렷하게 보여요. 바로 적용되고 앱을 다시 열어도 그대로 남아 있어요. ‘기본’으로 두면 원래대로 돌아가요.</p>' +
       '<button class="btn-primary" data-close="1">완료</button>';
   }
 
@@ -2370,7 +2373,6 @@
   /* 테마 관리 — 화면·캡션 색·일정 색·홈 제목 색·폰트를 한 곳에서 */
   function themeManagerHtml() {
     var t = S.theme || {}, dark = t.mode === "dark";
-    var monthNo = Number(today.slice(5, 7));
     var h = sheetHead("테마 관리");
     h += '<div class="cp"><div class="cp-hd"><span>화면</span><span class="cp-val">' + (dark ? "다크" : "라이트") + '</span></div>' +
       '<div class="seg seg-sm" data-group="mode">' +
@@ -2382,9 +2384,10 @@
       '<p class="cp-note" style="margin-top:10px">홈·노트·사진첩·My 제목 줄에 한 번에 적용돼요. 글씨는 늘 검정으로 또렷하게 보여요.</p></div>';
     h += '<div class="cp"><div class="cp-hd"><span>일정 색</span><span class="cp-val">소영 · 준영 · 공동</span></div>' +
       colorPickRow("me") + colorPickRow("you") + colorPickRow("both") + "</div>";
+    /* v23: 「{월}월의 우리」 섹션이 홈에서 사라져 색 이름도 「다가오는 일정」 하나로 */
     h += '<div class="cp"><div class="cp-hd"><span>홈 제목 색</span><span class="cp-val">뮤트 톤</span></div>' +
-      cpBlock("다가오는 일정 · " + monthNo + "월의 우리", "homeTitleBg", t.homeTitleBg, MUTED, "#F2CFC9") +
-      '<p class="cp-note" style="margin-top:10px">두 섹션의 제목 줄과 저장·완료 버튼에 같은 색이 칠해져요. 일정 목록과 카드는 흰 바탕으로 남아요.</p></div>';
+      cpBlock("다가오는 일정", "homeTitleBg", t.homeTitleBg, MUTED, "#F2CFC9") +
+      '<p class="cp-note" style="margin-top:10px">제목 줄과 저장·완료 버튼에 같은 색이 칠해져요. 일정 목록은 흰 바탕으로 남아요.</p></div>';
     h += '<div class="cp"><div class="cp-hd"><span>폰트</span><span class="cp-val">' + esc(fontOf(t.font).n) + '</span></div>' +
       '<div class="font-list">' + fontRows() + "</div></div>";
     h += '<div style="height:16px"></div><button class="btn-primary" data-close="1">완료</button>';
@@ -3374,6 +3377,25 @@
 
     if (act === "openPhoto") { openPhoto(el.getAttribute("data-id")); return; }
 
+    /* v23: 사진첩 달력 보기 — 켜고 끄기, 달 넘기기, 날짜 칸 열기 */
+    if (act === "togglePhotoCal") {
+      S.ui = S.ui || {};
+      S.ui.photoCal = !S.ui.photoCal;
+      if (S.ui.photoCal) S.ui.photoMonth = today.slice(0, 7);
+      save(); renderPhoto(); return;
+    }
+    if (act === "pcalPrev" || act === "pcalNext") {
+      S.ui = S.ui || {};
+      S.ui.photoMonth = shiftYm(photoMonthYM(), act === "pcalPrev" ? -1 : 1);
+      save(); renderPhoto(); return;
+    }
+    if (act === "pcalDay") {
+      var pcds = el.getAttribute("data-date");
+      var pcp = S.photos.filter(function (x) { return String(x.date || "").slice(0, 10) === pcds; }).sort(byDateDesc)[0];
+      if (pcp) openPhoto(pcp.id);
+      return;
+    }
+
     if (act === "photoStep") { photoStep(Number(el.getAttribute("data-step")) || 1); return; }
 
     if (act === "addPhoto") {
@@ -3692,6 +3714,31 @@
     pvSwipe = null;
     if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) photoStep(dx < 0 ? 1 : -1);
   }, { passive: true });
+
+  /* v23: 사진첩 달력에서도 손가락으로 좌우로 밀면 이전/다음 달 */
+  var pcalSwipe = null, pcalSwiped = false;
+  document.addEventListener("touchstart", function (ev) {
+    pcalSwipe = null;
+    if (current !== "photo" || photoView || !(S.ui && S.ui.photoCal)) return;
+    var g = ev.target.closest && ev.target.closest("#s-photo .pcal-grid");
+    if (!g || !ev.touches || !ev.touches.length) return;
+    pcalSwipe = { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
+  }, { passive: true });
+  document.addEventListener("touchend", function (ev) {
+    if (!pcalSwipe || !ev.changedTouches || !ev.changedTouches.length) { pcalSwipe = null; return; }
+    var t = ev.changedTouches[0];
+    var dx = t.clientX - pcalSwipe.x, dy = t.clientY - pcalSwipe.y;
+    pcalSwipe = null;
+    if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
+    pcalSwiped = true;
+    setTimeout(function () { pcalSwiped = false; }, 400);
+    S.ui.photoMonth = shiftYm(photoMonthYM(), dx < 0 ? 1 : -1);
+    save(); renderPhoto();
+  }, { passive: true });
+  /* 밀어서 달을 넘긴 직후의 click 은 날짜 열기로 이어지지 않게 */
+  document.addEventListener("click", function (ev) {
+    if (pcalSwiped) { ev.stopPropagation(); ev.preventDefault(); pcalSwiped = false; }
+  }, true);
 
   /* v21: 달력에서 손가락으로 좌우로 밀면 이전/다음 달 — 사진 크게 보기의 넘기기와 같은 방식.
      왼쪽으로 밀면 다음 달, 오른쪽으로 밀면 이전 달. 탭(날짜 선택)과 세로 스크롤은 그대로 둡니다. */

@@ -104,7 +104,8 @@ with sync_playwright() as p:
 
     # ---------- 캘린더: 글씨 크기 (v15 에서 생일 줄은 지웠어요) ----------
     eb = page.evaluate(CSS_OF, ".ebar")
-    check("캘린더 일정 글씨 9.5px", eb and eb["fs"] == "9.5px", eb)
+    # v23: 달력 일정 글씨를 1포인트 키워 11px
+    check("캘린더 일정 글씨 11px", eb and eb["fs"] == "11px", eb)
     check("캘린더 일정 막대 높이", eb and float(eb["h"].replace("px", "")) >= 14, eb)
     check("생일 줄 없음", page.locator("#s-cal .bday-note").count() == 0,
           page.locator("#s-cal .bday-note").count())
@@ -130,13 +131,14 @@ with sync_playwright() as p:
     check("D-day 테두리 없음", dd and dd["bw"] == "0px", dd)
     check("D-day 바탕 없음", dd and dd["bg"] in ("rgba(0, 0, 0, 0)", "transparent"), dd)
     check("D-day 위 여백", dd and float(dd["mt"].replace("px", "")) >= 30, dd)
-    check("홈 섹션 두 개", page.locator(".home-sec").count() == 2, page.locator(".home-sec").count())
+    # v23: 「N월의 우리」 섹션이 빠져 다가오는 일정 하나만
+    check("홈 섹션은 다가오는 일정 하나", page.locator(".home-sec").count() == 1, page.locator(".home-sec").count())
     secs = page.evaluate(CSS_OF, ".home-sec[data-sec='sched']")
     check("홈 섹션 테두리 없음", secs and secs["bw"] == "0px", secs)
     h2 = page.evaluate(CSS_OF, ".home-sec[data-sec='sched'] .sec h2")
     check("섹션 제목 16px", h2 and h2["fs"] == "16px", h2)
-    lb = page.evaluate(CSS_OF, ".bcard .lb")
-    check("카드 라벨 확대", lb and float(lb["fs"].replace("px", "")) >= 10, lb)
+    # v23: 대시보드 카드(.bcard)는 홈에서 사라짐
+    check("홈 대시보드 카드 없음", page.locator(".bcard").count() == 0, page.locator(".bcard").count())
     t = page.evaluate(CSS_OF, ".row.sched .t")
     check("일정 글씨 확대", t and float(t["fs"].replace("px", "")) >= 14, t)
     check("일정 색 띠", page.locator(".row.sched .bar").count() >= 1, page.locator(".row.sched .bar").count())
@@ -148,7 +150,8 @@ with sync_playwright() as p:
     page.locator('#s-home [data-act="openTheme"]').click()
     page.wait_for_timeout(350)
     sheet_txt = page.locator("#sheet").inner_text()
-    check("테마 시트 항목", ("다가오는 일정" in sheet_txt) and ("월의 우리" in sheet_txt), sheet_txt[:120])
+    # v19 이후 팔레트 라벨은 지웠고, v23 에서 「월의 우리」 자체가 홈에서 빠짐
+    check("테마 시트에 컬러 팔레트", page.locator('#sheet .sw-grid[data-sw="homeTitleBg"]').count() == 1, sheet_txt[:120])
     check("테마 시트 뮤트 12색", page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw').count() == 12,
           page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw').count())
     check("컬러 라벨", page.locator('#sheet .js-color[data-target="homeTitleBg"]').count() == 1)

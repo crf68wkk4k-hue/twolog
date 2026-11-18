@@ -147,7 +147,8 @@ with sync_playwright() as p:
     check("제목 줄 둥글게(20px 이상)", t_sched and px(t_sched["br"]) >= 20, t_sched and t_sched["br"])
     check("제목 줄 알약(높이의 절반 이상)", t_sched and px(t_sched["br"]) >= t_sched["h"] / 2 - 1,
           (t_sched and t_sched["br"], t_sched and round(t_sched["h"], 1)))
-    check("두 제목 줄 모두 둥글게", t_our and px(t_our["br"]) >= 20, t_our and t_our["br"])
+    # v23: 「N월의 우리」 섹션이 빠져 제목 줄은 하나만 남음
+    check("남은 제목 줄도 둥글게", not t_our, t_our)
     check("제목 줄 좌우 여백 16px", t_sched and px(t_sched["pl"]) >= 15, t_sched and t_sched["pl"])
     check("제목 줄 색 그대로", t_sched and t_sched["bg"] not in ("rgba(0, 0, 0, 0)", "transparent"),
           t_sched and t_sched["bg"])
@@ -216,7 +217,8 @@ with sync_playwright() as p:
     check("카드 그림자 두 겹", card_css["sh"].count("rgb") + card_css["sh"].count("rgba") >= 2, card_css["sh"])
     t_css = page.evaluate(CSS_OF, "#s-diary .ncard .nc-t")
     check("카테고리명 16px", px(t_css["fs"]) >= 16, t_css["fs"])
-    check("카테고리명 진하게(700 이상)", int(t_css["fw"]) >= 700, t_css["fw"])
+    # v23: 카드 제목은 얇게(400) · 가운데 정렬로 바뀜
+    check("카테고리명 얇게(400)", int(t_css["fw"]) <= 400, t_css["fw"])
     body_fs = page.evaluate("() => getComputedStyle(document.body).fontSize")
     topic_fs = page.evaluate(
         "() => { const el = document.createElement('span'); el.className = 'nc-topic';"

@@ -86,7 +86,8 @@ with sync_playwright() as p:
 
     # ---------------- 서비스워커 캐시 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
-    check("sw.js 캐시 버전 twolog-v22", 'const VERSION = "twolog-v22"' in sw,
+    # v23: 캐시 버전은 배포마다 올라가므로 v23 으로 (앱 버전 상수와 같은 값)
+    check("sw.js 캐시 버전 twolog-v23", 'const VERSION = "twolog-v23"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장되는 일반 모드로 옮겨요
@@ -575,8 +576,9 @@ with sync_playwright() as p:
     check("기본 시간은 오전 12:00 · 오후 09:00", ef["timeLabels"] == ["오전 12:00", "오후 09:00"], ef["timeLabels"])
     check("큰 날짜 두 개 + 가운데 ~", len(ef["bigs"]) == 2 and ef["tildeTxt"] == "~", (ef["bigs"], ef["tildeTxt"]))
     import re as _re
-    check("날짜는 26.11.17(화) 형식·크게", all(_re.match(r"^\d{2}\.\d{2}\.\d{2}\([일월화수목금토]\)$", b["t"]) for b in ef["bigs"])
-          and all(b["fs"] == "20px" and b["fw"] == "800" for b in ef["bigs"]), ef["bigs"])
+    # v23: 날짜와 시간 글씨를 같은 크기(16px)로 맞춰서 날짜 크기 기준을 현행에 맞춤
+    check("날짜는 26.11.17(화) 형식·큰 글씨", all(_re.match(r"^\d{2}\.\d{2}\.\d{2}\([일월화수목금토]\)$", b["t"]) for b in ef["bigs"])
+          and all(b["fs"] == "16px" and b["fw"] == "800" for b in ef["bigs"]), ef["bigs"])
     check("~ 도 큼직하게", ef["tildeFs"] and float(ef["tildeFs"].replace("px", "")) >= 20, ef["tildeFs"])
     til = page.evaluate("""(() => { const t = document.querySelector('#sheet .ev-tilde').getBoundingClientRect();
       const l = document.querySelector('#sheet .ev-side').getBoundingClientRect();

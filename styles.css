@@ -197,9 +197,10 @@ h1,h2,h3,p{margin:0}
 .cal-daygrid .day{height:100%}
 .cal-bars{position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none}
 .ebar{
-  position:absolute; height:14px; line-height:14px; font-size:9.5px; font-weight:700;
-  color:#111111; padding:0 4px 0 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  letter-spacing:-.03em; text-align:left
+  /* v23: 달력에 뜨는 일정 글씨를 1포인트 키움(9.5 → 11px)에 맞춰 막대 높이도 16px */
+  position:absolute; height:16px; line-height:16px; font-size:11px; font-weight:700;
+  color:#111111; padding:0 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  letter-spacing:-.04em; text-align:left
 }
 /* 여러 칸에 걸친 막대는 제목을 막대 가운데에 */
 .ebar.mid{text-align:center; padding:0 6px}
@@ -213,16 +214,18 @@ h1,h2,h3,p{margin:0}
 .day.blank{visibility:hidden}
 .day.sun .dnum{color:var(--hol)}   /* v21: 일요일 숫자도 같은 빨강 */
 .day.sat .dnum{color:#7B8F98}
-/* v19: 선택한 날은 테두리 상자 대신 어두운 바탕으로 채우고 글씨를 반전 */
-.day.sel{background:var(--ink)}
-.day.sel .dnum{color:var(--bg)}
-.day.sel .dhol,.day.sel .dovf{color:var(--bg)}
-.day.sel .dovf{background:transparent}
+/* v23: 선택한 날은 칸 전체를 칠하지 않고 날짜 숫자에만 동그라미 */
+.day.sel{background:transparent}
+.day.sel .dnum{width:24px; height:24px; display:flex; align-items:center; justify-content:center;
+  margin:-3px auto; border-radius:50% !important; background:var(--ink); color:var(--bg); line-height:1}
+/* 칸을 칠하지 않으므로 공휴일 이름·「외 N」은 원래 색 그대로 */
+.day.sel .dhol{color:var(--hol)}
+.day.sel .dovf{color:var(--ink-3); background:var(--bg)}
 /* 오늘은 테두리 없이 숫자 색과 작은 점으로만 표시 */
 .day.today:not(.sel) .dnum{color:var(--accent); font-weight:700}
 /* v21: 오늘 날짜 옆의 작은 점은 지웠어요 — 날짜 숫자 색만으로 오늘이 보입니다 */
 .evbars{display:flex; flex-direction:column; gap:3px; min-height:0; overflow:hidden}
-.evbar{display:block; height:12px; line-height:12px; font-size:8.5px; font-weight:600; color:#111111; font-style:normal; padding:0 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-.03em; text-align:left}
+.evbar{display:block; height:14px; line-height:14px; font-size:9.5px; font-weight:600; color:#111111; font-style:normal; padding:0 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-.03em; text-align:left}
 .evmore{font-size:8px; font-weight:700; color:var(--ink-3); padding-left:3px; line-height:1.3; text-align:left}
 .dots{display:flex; gap:3px; height:5px; align-items:center}
 .dots i{width:5px; height:5px; border-radius:0; display:block}
@@ -376,6 +379,37 @@ html[data-mode="dark"] .segs .seg-btn.active{background:var(--ink); border-color
 .tx .x{width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:#CFCFD4;flex:0 0 22px}
 
 /* ---------- photos: 날짜별 폴라로이드 (v17) ---------- */
+/* v23: 사진첩 달력 보기 — 한 달만, 날짜 칸에 그날 사진을 가득 채움 */
+.pcal{margin:12px 9px 0}
+.pcal-hd{display:flex; align-items:center; justify-content:space-between; padding:2px 6px 10px}
+.pcal-ym{font-size:19px; font-weight:700; letter-spacing:-.035em; color:var(--ink); font-variant-numeric:tabular-nums}
+.pcal-nav{display:flex; align-items:center; gap:2px}
+.pcal-nav .cal-arrow{width:28px; height:28px}
+.pcal-week{display:grid; grid-template-columns:repeat(7,1fr); padding:0 0 6px}
+.pcal-week span{text-align:center; font-size:11px; font-weight:600; color:var(--ink-3)}
+.pcal-week span:first-child{color:var(--hol)}
+.pcal-week span:last-child{color:#8FA0A8}
+.pcal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:3px}
+.pcell{position:relative; aspect-ratio:1/1; display:block; padding:0; border:0; background:transparent;
+  overflow:hidden; border-radius:0; font:inherit; color:inherit; cursor:pointer}
+.pcell.blank{visibility:hidden}
+/* 사진 위에서도 날짜가 잘 보이게 왼쪽 위만 살짝 어둡게 */
+.pcell.has::before{content:""; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(130% 100% at 0 0, rgba(0,0,0,.5), rgba(0,0,0,0) 62%)}
+.pcell img,.pcell svg{width:100%; height:100%; display:block; object-fit:cover}
+.pcell .pn{position:absolute; display:block; font-size:11px; font-weight:700; color:var(--ink-3);
+  font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+/* 사진이 없는 날 — 숫자만 가운데에 깔끔하게 */
+.pcell:not(.has) .pn{inset:0; display:flex; align-items:center; justify-content:center; font-size:12px}
+.pcell.today:not(.has) .pn{color:var(--accent)}
+/* 사진이 있는 날 — 왼쪽 위 날짜, 오른쪽 아래 장수 */
+.pcell.has .pn{top:3px; left:4px; color:#FFFFFF; text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.pcell.has .pn{top:3px; left:4px; color:#FFFFFF; z-index:1; text-shadow:0 1px 2px rgba(0,0,0,.9), 0 0 3px rgba(0,0,0,.7)}
+.pcell .pc{position:absolute; right:3px; bottom:3px; z-index:1; display:flex; align-items:center; gap:2px;
+  font-size:9.5px; font-weight:700; line-height:14px; padding:0 3px; color:#FFFFFF;
+  background:rgba(17,17,17,.5); letter-spacing:-.01em}
+.pcell .pc svg{width:9px; height:9px}
+.pcal-empty{padding:26px 6px 10px; font-size:12.5px; color:var(--ink-3); text-align:center}
 .album{margin:22px 20px 0}
 .album-hd{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px}
 .album-hd .n{font-size:13px; font-weight:700; letter-spacing:-.02em}
@@ -716,19 +750,20 @@ html[data-mode="dark"] .sw-row .sw{border-color:rgba(255,255,255,.16)}
 .ev-when{display:flex; align-items:center; gap:6px}
 .ev-side{flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; gap:7px}
 .ev-datewrap{position:relative; display:block; width:100%; padding:10px 2px; text-align:center; cursor:pointer}
-.ev-dbig{display:block; font-size:20px; font-weight:800; letter-spacing:-.045em; line-height:1.25;
+/* v23: 날짜와 시간 글씨 크기를 같게(16px) — 375~390px 폭에서 한 줄에 나란히 */
+.ev-dbig{display:block; font-size:16px; font-weight:800; letter-spacing:-.035em; line-height:1.25;
   color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap}
 /* 실제 날짜 고르기는 큰 글씨 위에 겹쳐 둔 input[type=date] 가 받아요 (누르면 달력이 열림) */
 .ev-date-in{position:absolute; inset:0; width:100%; height:100%; margin:0; padding:0; border:0;
   opacity:0; background:transparent; -webkit-appearance:none; appearance:none; cursor:pointer; font-size:16px}
 /* 물결은 왼쪽·오른쪽 덩어리 사이의 가로·세로 정중앙에 */
-.ev-tilde{flex:0 0 auto; align-self:center; justify-self:center; font-size:24px; font-weight:700;
+.ev-tilde{flex:0 0 auto; align-self:center; justify-self:center; font-size:34px; font-weight:700;
   color:var(--ink-3); line-height:1; padding:0; letter-spacing:-.02em}
-.ev-time-btn{font-size:12.5px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em;
+.ev-time-btn{font-size:16px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em;
   padding:5px 6px; border:0; border-radius:0; background:none}
 .ev-time-btn.on{color:var(--ink)}
 .ev-time-in{width:100%; max-width:100%; min-width:0; height:34px; border:1px solid var(--line); background:var(--surface);
-  font-size:12px; text-align:center; padding:0 4px; color:var(--ink)}
+  font-size:16px; text-align:center; padding:0 4px; color:var(--ink)}
 .eform .wsel{margin-top:2px}
 /* 다크 모드에서 겹친 날짜 입력칸이 밝은 판으로 보이지 않게 */
 html[data-mode="dark"] .ev-date-in{color-scheme:dark}
@@ -993,7 +1028,7 @@ html[data-mode="dark"] .bcard:active{background:#1A1A1C}
 .row.sched .sbody{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:5px}
 .row.sched .srow1{display:flex; align-items:center; gap:8px; min-width:0}
 .row.sched .t{flex:1 1 auto; min-width:0; font-size:14.5px; font-weight:600; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.row.sched .smeta{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--ink-3); letter-spacing:-.01em; min-width:0}
+.row.sched .smeta{display:flex; align-items:center; gap:8px; font-size:11px; color:var(--ink-3); letter-spacing:-.01em; min-width:0}
 .row.sched .sd{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0}
 .row.sched .sl{flex:0 0 auto; font-weight:700; color:var(--ink-2); font-variant-numeric:tabular-nums}
 .who-row.both .heart{font-size:10.5px; line-height:1; margin:0 -1px}
@@ -1076,7 +1111,9 @@ html[data-mode="dark"] .ncard:active{box-shadow:0 1px 5px rgba(0,0,0,.45), 0 0 0
   background:var(--surface-2); padding:10px 12px}
 .nc-hd.tint .nc-t{color:#111111}
 /* v22: 카드 제목은 한 단계 작게, 언제나 «한 줄» (길면 …) */
-.nc-t{font-size:13.5px; font-weight:700; letter-spacing:-.03em; line-height:1.3; margin-top:0;
+/* v23: 카드 제목을 얇게(700 → 400) · 가운데 정렬 */
+.nc-t{font-size:13.5px; font-weight:400; letter-spacing:-.02em; line-height:1.3; margin-top:0;
+  text-align:center;
   min-width:0; flex:1 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 /* v22: 제목 옆 항목 수·꺾쇠는 지웠어요 */
 .nc-items{display:flex; flex-direction:column; gap:5px; margin-top:0; padding:11px 13px 13px; min-width:0}

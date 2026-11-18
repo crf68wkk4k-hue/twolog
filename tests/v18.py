@@ -89,8 +89,9 @@ with sync_playwright() as p:
     check("홈 D-day 한 줄 위로 (margin-top 74px)", dday["mt"] == "74px", dday)
     sec = page.evaluate("(() => { const e = document.querySelector('#s-home .dday + .home-sec'); return {mt: getComputedStyle(e).marginTop, txt: e.innerText.split('\\n')[0]}; })()")
     check("다가오는 일정 두 줄 아래로 (margin-top 58px)", sec["mt"] == "58px" and "다가오는" in sec["txt"], sec)
-    sec2 = page.evaluate("(() => { const a = document.querySelectorAll('#s-home .home-sec'); return getComputedStyle(a[1]).marginTop; })()")
-    check("뒤따르는 섹션 여백은 26px 그대로", sec2 == "26px", sec2)
+    # v23: 홈에서 「N월의 우리」 섹션이 사라져 다가오는 일정이 마지막 섹션
+    sec2 = page.evaluate("(() => { const a = document.querySelectorAll('#s-home .home-sec'); return a.length; })()")
+    check("홈 섹션은 다가오는 일정 하나", sec2 == 1, sec2)
     page.screenshot(path=os.path.join(SHOT, "home-v18.png"))
     page.screenshot(path=os.path.join(SHOT, "home-v18-full.png"), full_page=True)
 

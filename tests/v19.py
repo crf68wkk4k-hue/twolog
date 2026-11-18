@@ -120,7 +120,8 @@ with sync_playwright() as p:
     check("컬러 직접 고르기 유지", page.locator('#sheet .js-color[data-target="homeTitleBg"]').count() == 1
           and page.locator('#sheet .cp-pick span', has_text="컬러").count() == 1)
     check("기본 버튼 유지", page.locator('#sheet .cp-reset[data-target="homeTitleBg"]').count() == 1)
-    check("하단 설명 유지", "고른 색은 두 섹션의 제목 줄" in txt)
+    # v23: 홈에서 「N월의 우리」 섹션이 사라져 설명도 「홈 제목 줄」로
+    check("하단 설명 유지", "고른 색은 홈 제목 줄" in txt)
     check("완료 버튼 유지", page.locator('#sheet .btn-primary[data-close="1"]').count() == 1)
 
     def btn_style():
@@ -207,7 +208,8 @@ with sync_playwright() as p:
     page.locator("#s-set [data-act='openThemeManager']").click()
     page.wait_for_timeout(450)
     mtxt = page.locator("#sheet").inner_text()
-    check("테마 관리에는 「홈 제목 색」 항목 그대로", "홈 제목 색" in mtxt and "다가오는 일정 · " in mtxt, mtxt[:200])
+    # v23: 「N월의 우리」 섹션이 없어져 색 이름도 「다가오는 일정」만
+    check("테마 관리에는 「홈 제목 색」 항목 그대로", "홈 제목 색" in mtxt and "다가오는 일정" in mtxt, mtxt[:200])
     page.locator('#sheet .seg-btn[data-mode="dark"]').click()
     page.wait_for_timeout(450)
     page.locator('#sheet .sw-grid[data-sw="homeTitleBg"] .sw').nth(0).click()
@@ -448,6 +450,7 @@ with sync_playwright() as p:
         rows: rows.length, row2: rows.length > 1 ? getComputedStyle(rows[1]).borderTopWidth : null,
         row1: rows.length > 0 ? getComputedStyle(rows[0]).borderTopWidth : null,
         selBg: sel ? getComputedStyle(sel).backgroundColor : null,
+        numBg: sel && sel.querySelector('.dnum') ? getComputedStyle(sel.querySelector('.dnum')).backgroundColor : null,
         numColor: dnum ? getComputedStyle(dnum).color : null,
         selShadow: sel ? getComputedStyle(sel).boxShadow : null,
         dayBorders: days.filter(d => { const s = getComputedStyle(d); return s.borderTopWidth !== '0px' || s.borderLeftWidth !== '0px' || s.borderRightWidth !== '0px'; }).length,
@@ -458,7 +461,10 @@ with sync_playwright() as p:
     check("달력 배경 투명", cal["bg"] in ("rgba(0, 0, 0, 0)", "transparent"), cal["bg"])
     check("주 행 사이 가로선 없음", cal["row1"] in ("0px", None) and cal["row2"] in ("0px", None), (cal["row1"], cal["row2"]))
     check("날짜 칸에 테두리·격자선 없음", cal["dayBorders"] == 0, cal["dayBorders"])
-    check("선택한 날 = 진한 검정 바탕", cal["selBg"] == "rgb(9, 9, 11)", cal["selBg"])
+    # v23: 칸을 다 칠하지 않고 날짜 숫자에만 동그라미
+    check("선택한 날 = 칸은 그대로 두고 숫자에만 표시",
+          cal["selBg"] in ("rgba(0, 0, 0, 0)", "transparent") and cal["numBg"] == "rgb(9, 9, 11)",
+          (cal["selBg"], cal["numBg"]))
     check("선택한 날 글씨 반전", cal["numColor"] == "rgb(255, 255, 255)", cal["numColor"])
     check("선택한 날 테두리 상자 없음", cal["selShadow"] == "none", cal["selShadow"])
     check("여러 날 일정 막대 유지", cal["ebars"] >= 1, cal["ebars"])
@@ -525,9 +531,14 @@ with sync_playwright() as p:
     page.evaluate("document.documentElement.setAttribute('data-mode','dark'); 0")
     page.wait_for_timeout(300)
     cdk = page.evaluate("""(() => { const sel = document.querySelector('#s-cal .day.sel');
+      const n = sel ? sel.querySelector('.dnum') : null;
       return {bg: sel ? getComputedStyle(sel).backgroundColor : null,
-              num: sel ? getComputedStyle(sel.querySelector('.dnum')).color : null}; })()""")
-    check("다크에서도 선택한 날 = 밝은 바탕 + 반전", cdk["bg"] == "rgb(245, 245, 245)" and cdk["num"] == "rgb(17, 17, 17)", cdk)
+              numBg: n ? getComputedStyle(n).backgroundColor : null,
+              num: n ? getComputedStyle(n).color : null}; })()""")
+    # v23: 다크에서도 칸은 그대로, 숫자 동그라미만 밝은 바탕 + 반전
+    check("다크에서도 선택한 날 = 숫자 동그라미만 반전",
+          cdk["bg"] in ("rgba(0, 0, 0, 0)", "transparent")
+          and cdk["numBg"] == "rgb(245, 245, 245)" and cdk["num"] == "rgb(17, 17, 17)", cdk)
     page.screenshot(path=os.path.join(SHOT, "calendar-day-v19-dark.png"))
     page.evaluate("document.documentElement.setAttribute('data-mode','light'); 0")
     page.wait_for_timeout(300)

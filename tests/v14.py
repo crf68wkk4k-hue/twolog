@@ -170,10 +170,11 @@ with sync_playwright() as p:
     hd_sched = page.evaluate(CSS_OF, ".home-sec[data-sec='sched'] .sec-tint")
     hd_our = page.evaluate(CSS_OF, ".home-sec[data-sec='our'] .sec-tint")
     check("섹션 전체는 투명", sec_sched and sec_sched["bg"] in ("rgba(0, 0, 0, 0)", "transparent"), sec_sched and sec_sched["bg"])
-    check("두 제목 줄 같은 색", hd_sched and hd_our and hd_sched["bg"] == hd_our["bg"], (hd_sched and hd_sched["bg"], hd_our and hd_our["bg"]))
+    # v23: 「N월의 우리」 섹션이 홈에서 빠져 제목 줄은 다가오는 일정 하나
+    check("제목 줄(다가오는 일정) 하나", hd_sched and not hd_our, (hd_sched and hd_sched["bg"], hd_our))
     check("제목 줄에만 색", hd_sched and hd_sched["bg"] not in ("rgba(0, 0, 0, 0)", "transparent"), hd_sched and hd_sched["bg"])
-    check("카드는 흰 바탕", page.evaluate("() => getComputedStyle(document.querySelector('.home-sec .bcard')).backgroundColor")
-          != (hd_sched and hd_sched["bg"]))
+    # v23: 대시보드 카드는 홈에서 사라짐
+    check("홈에 대시보드 카드 없음", page.evaluate("() => document.querySelectorAll('.home-sec .bcard').length") == 0)
     check("제목 글씨 진하게", hd_sched and page.evaluate(
         "() => getComputedStyle(document.querySelector(\".home-sec[data-sec='sched'] .sec-tint h2\")).color") == "rgb(17, 17, 17)",
         page.evaluate("() => getComputedStyle(document.querySelector(\".home-sec[data-sec='sched'] .sec-tint h2\")).color"))
