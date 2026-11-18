@@ -7,7 +7,7 @@
 
     python3 tests/v20.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
 """
-import functools, http.server, os, socketserver, sys, threading, time
+import functools, http.server, os, re, socketserver, sys, threading, time
 
 from playwright.sync_api import sync_playwright
 
@@ -82,7 +82,8 @@ with sync_playwright() as p:
     # ---------------- 서비스워커 캐시 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
     # v21 에서 캐시 이름이 올라갔어요 — sw.js 는 지금 버전의 이름을 가집니다
-    check("sw.js 캐시 버전 twolog-v20 이상", 'const VERSION = "twolog-v2' in sw and 'const VERSION = "twolog-v20"' not in sw,
+    _vm = re.search(r'const VERSION = "twolog-v(\d+)"', sw)
+    check("sw.js 캐시 버전 twolog-v20 이상", bool(_vm) and int(_vm.group(1)) >= 21,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장되는 일반 모드로 옮겨요

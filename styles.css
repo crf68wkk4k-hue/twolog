@@ -430,16 +430,18 @@ html[data-mode="dark"] .hdr .note-add{border-color:rgba(255,255,255,.26)}
 .album-hd .n{font-size:13px; font-weight:700; letter-spacing:-.02em}
 .album-hd .c{font-size:11px; color:var(--ink-3)}
 /* 날짜 머리글 — 오늘·어제는 포인트 색, 지난 날은 날짜만 진하게 + 요일은 흐리게 */
-.pday{margin:26px 0 0}
-.pday-hd{display:flex; align-items:baseline; gap:7px; padding:0 22px; margin-bottom:12px}
+.pday{margin:24px 0 0}
+.pday-hd{display:flex; align-items:baseline; gap:7px; padding:0 22px; margin-bottom:11px}
 .pday-hd .d{font-size:15px; font-weight:800; letter-spacing:-.03em; color:var(--ink)}
 .pday-hd .d.acc{color:var(--accent)}
 .pday-hd .w{font-size:11.5px; font-weight:500; letter-spacing:-.01em; color:var(--ink-3)}
 .pday-hd .c{margin-left:auto; font-size:11px; letter-spacing:-.01em; color:var(--ink-3);
   max-width:54%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-/* 사진 한 줄 — 각진 흰 폴라로이드(위·옆 6px, 아래 18px 턱), 살짝 기울고 조금씩 겹치게 */
-.polas{display:grid; grid-template-columns:repeat(3,1fr); gap:18px 0; padding:8px 17px 2px}
-.pola{position:relative; display:block; padding:6px 6px 18px; margin:0 -6px; border:0; background:#FFFFFF;
+/* 사진 한 줄 — 각진 흰 폴라로이드(위·옆 5px, 아래 15px 턱), 살짝 기울고 사이를 띄워 아담하게 */
+/* v30: 폴라로이드를 더 작게 — 카드가 칸 폭을 꽉 채우지 않게 안쪽으로 5px씩 들이고(겹침 없이),
+   줄 좌우 여백은 26px 로 넓혀 사진 한 칸을 v29 118.7px → 93.3px 로 줄였습니다. */
+.polas{display:grid; grid-template-columns:repeat(3,1fr); gap:12px 14px; padding:8px 26px 2px}
+.pola{position:relative; display:block; padding:5px 5px 15px; margin:0; border:0; background:#FFFFFF;
   cursor:pointer; text-align:center; transform:rotate(var(--tilt, 0deg));
   box-shadow:0 3px 10px rgba(0,0,0,.13), 0 1px 2px rgba(0,0,0,.07);
   transition:transform .18s ease, box-shadow .18s ease}
@@ -448,8 +450,8 @@ html[data-mode="dark"] .hdr .note-add{border-color:rgba(255,255,255,.26)}
 .pola .pola-pic{display:block; aspect-ratio:1/1; overflow:hidden; background:var(--surface-2)}
 .pola .pola-pic svg,.pola .pola-pic img{width:100%; height:100%; display:block; object-fit:cover}
 /* v18: 하루 사진이 3장을 넘으면 세 번째 폴라로이드에 +N — 하루는 한 줄(3개)로 */
-.pola .pola-more{position:absolute; inset:6px 6px 18px 6px; display:flex; align-items:center; justify-content:center;
-  background:rgba(17,17,17,.46); color:#FFFFFF; font-size:17px; font-weight:800; letter-spacing:-.02em}
+.pola .pola-more{position:absolute; inset:5px 5px 15px 5px; display:flex; align-items:center; justify-content:center;
+  background:rgba(17,17,17,.46); color:#FFFFFF; font-size:14.5px; font-weight:800; letter-spacing:-.02em}
 /* v18: 사진 크게 보기 — 잘리지 않고 화면에 담기게 */
 .pview{position:relative; margin-top:10px; background:var(--surface-2); height:clamp(240px, 48vh, 440px);
   display:flex; align-items:center; justify-content:center; overflow:hidden}
@@ -464,8 +466,8 @@ html[data-mode="dark"] .pview .pv-nav{background:rgba(40,40,44,.86); color:#F2F2
 .pv-cap{margin-top:10px}
 .pv-cap .pd-cap{position:static; min-height:34px; box-shadow:none; border:1px solid var(--line)}
 .pv-count{margin:10px 0 0; text-align:center; font-size:11.5px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em; font-variant-numeric:tabular-nums}
-.pola .pola-chin{position:absolute; left:6px; right:6px; bottom:3px; height:12px; display:flex; align-items:center;
-  justify-content:center; font-size:9.5px; font-weight:600; letter-spacing:-.01em; color:#4A4A4C;
+.pola .pola-chin{position:absolute; left:5px; right:5px; bottom:2px; height:11px; display:flex; align-items:center;
+  justify-content:center; font-size:9px; font-weight:600; letter-spacing:-.01em; color:#4A4A4C;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 
 /* ---------- home: album preview + schedule ---------- */
