@@ -83,11 +83,11 @@ with sync_playwright() as p:
 
     # ---------------- 0. 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
-    check("sw.js 캐시 버전 twolog-v25", 'const VERSION = "twolog-v25"' in sw,
+    check("sw.js 캐시 버전 twolog-v26", 'const VERSION = "twolog-v26"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
     app_js = page.request.get(URL + "app.js").text()
-    check("app.js 버전 상수 v25", 'var APP_VERSION = "v25"' in app_js)
-    check("캐시 목록이 새 버전(shell-twolog-v25)", "shell-" in sw)
+    check("app.js 버전 상수 v26", 'var APP_VERSION = "v26"' in app_js)
+    check("캐시 목록이 새 버전(shell-twolog-v26)", "shell-" in sw)
 
     # 예시 데이터로 상태를 만들고 일반 모드로
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -329,7 +329,7 @@ with sync_playwright() as p:
       return {ok: !!v, txt: v ? v.textContent.trim() : null,
               right: v ? window.innerWidth - v.getBoundingClientRect().right : null};
     })()""")
-    check("My 탭에 버전 v25 표시", my.get("ok") and "v25" in str(my.get("txt")), my.get("txt"))
+    check("My 탭에 버전 v26 표시", my.get("ok") and "v26" in str(my.get("txt")), my.get("txt"))
     page.wait_for_timeout(400)
     page.screenshot(path=os.path.join(SHOT, "my-v23.png"))
 

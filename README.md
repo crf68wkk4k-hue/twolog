@@ -7,6 +7,10 @@
 - **두 대 동기화** — `sync.js` 의 `CONFIG` 두 칸에 Supabase 주소/키를 넣으면 **실시간 동기화 모드**로 바뀝니다(무료 플랜으로 충분).
 - **v25 부터**는 소영·준영의 프로젝트(`qvhupdivtfzhzymovtyy`)가 `CONFIG` 에 들어 있어 **배포 주소는 동기화 모드가 기본**입니다(로그인 화면 → 이메일 계정).
   기기에만 저장하는 예전 방식으로 열어 보려면 주소 뒤에 `?sync=local` 을 붙입니다(테스트도 이 통로를 씁니다).
+- **v26 부터**는 폰에만 남아 있던 예전 기록(localStorage + IndexedDB)을 **처음 로그인할 때 한 번 자동으로 새 커플 공간으로 이어 옵니다**.
+  이미 옮긴 기기는 다시 옮기지 않고(플래그 `twolog.migrated.<coupleId>`), 원본은 폰에 그대로 남깁니다.
+  원격에 이미 기록이 있으면 자동으로는 건드리지 않고 **My 탭 → 「폰에 있던 예전 기록 가져오기」** 로 겹치지 않게 더할 수 있어요.
+  같은 버전에서 **프로필 사진도 사람별로 동기화**됩니다(내 사진은 내가, 상대 사진은 상대 폰에서).
 
 ---
 
@@ -134,9 +138,16 @@ var CONFIG = {
 | 데이터 | 로컬 모드 | 동기화 모드 |
 |---|---|---|
 | 커플·일정·노트·설정 | `localStorage["twolog:v1:state"]` | Supabase 테이블 5개 |
+| 프로필 사진 | `localStorage["twolog:v1:state"]` 의 `couple.pics` | `settings` 행 `avatar:0`(만든 사람) · `avatar:1`(초대받은 사람) |
 | 사진 원본 | **IndexedDB**(`twolog` DB, `photos` 스토어) | Supabase Storage `photos`(비공개) |
 | 사진 보기 주소 | `URL.createObjectURL(blob)` | 6일짜리 **서명 URL** 을 열 때마다 재발급 |
 | 보고 있던 탭·달력 위치 | `localStorage["twolog:v1:ui"]` (기기별, 동기화 안 함) | 같음 |
+| 예전 기록 이전 여부 | — | `localStorage["twolog.migrated.<coupleId>"]` (기기별) |
+
+- 프로필 사진은 256px 정사각 JPEG data URL(수십 KB)이라 `settings` 의 JSONB 한 칸에 그대로 들어갑니다. 사람마다 **행을 따로** 두어
+  두 사람이 동시에 바꿔도 서로 덮어쓰지 않습니다. 상대가 바꾸면 Realtime 으로 몇 초 안에 이 폰에도 나타납니다.
+- **로컬 기록 이전(v26)** 은 `localStorage` 를 읽기만 합니다. 사진 원본은 IndexedDB 에서 꺼내 Storage 로 올리고,
+  이미 있는 기록은 같은 내용(날짜·제목 등)을 건너뛰므로 버튼을 두 번 눌러도 겹치지 않습니다.
 
 - 사진은 넣기 전에 **긴 변 1800px · JPEG 0.82** 로 줄여 저장합니다(요즘 폰 사진 4MB → 대략 200~400KB).
 - 저장은 150ms 모아서 하고, 앱이 가려지거나 닫힐 때(`pagehide`/`visibilitychange`) 바로 밀어 넣습니다.
@@ -159,6 +170,9 @@ store.photos.urls(photos)     // photo id → 볼 수 있는 주소
 store.photos.remove(photo)    // 파일 삭제
 store.auth.signIn/signUp/signOut
 store.couple.myCode() / join(code) / leave()
+store.avatar.set("me", dataUrl)     // v26: 내 프로필 사진을 서버(settings)로
+store.local.summary()               // v26: 이 폰에 남은 예전 기록 요약
+store.migrate.run({force:true})     // v26: 예전 기록 이어 오기 (자동 이전은 force 없이)
 ```
 
 - 로컬 모드: `LocalBackend` (localStorage + IndexedDB).
@@ -189,11 +203,14 @@ store.couple.myCode() / join(code) / leave()
 | 두 폰이 안 맞춰짐 | 두 사람이 **같은 커플**인지(설정 → 연결됨), Realtime 발행에 5개 테이블이 들어갔는지 |
 | 사진이 안 보임 | Storage 버킷 `photos` 가 **비공개**이고 정책 4개가 생성됐는지, 서명 URL 만료(6일) 후 자동 갱신 |
 | 예전 프로토타입 데이터가 보임 | `localStorage["couple-app-v1"]` 을 한 번 읽어 `twolog:v1:state` 로 옮깁니다(자동) |
+| v25 에서 쓰던 기록이 새 계정에 안 보임 | v26 에서 로그인하면 자동으로 한 번 이어 옵니다. 안 보이면 My 탭 → 「폰에 있던 기록」 카드의 개수와 「폰에 있던 예전 기록 가져오기」 를 확인하세요(원격에 이미 기록이 있으면 자동 대신 이 버튼) |
+| 상대 프로필 사진이 안 보임 | 사진은 `settings` 의 `avatar:0/1` 행에 있고 Realtime 발행에 `settings` 가 들어 있어야 합니다. 상대 사진은 그 사람이 자기 폰에서 바꿔야 합니다 |
 
 ### 자동 확인(테스트)
 
 ```bash
 pip install playwright && playwright install chromium
+python3 tests/v26.py       # v26: 폰에 있던 로컬 기록 자동 이전·중복 방지 · 프로필 사진 사람별 동기화 · local 회귀
 python3 tests/v25.py       # v25: Supabase 연결(remote) — 로그인 화면 · 가입/로그인 · 초대 코드/연결 · 스키마 없을 때 · local 회귀
 python3 tests/live.py      # 배포 주소가 방금 올린 버전을 서빙하는지(HTTP 200 · twolog-vNN · 콘솔 오류 없음)
 python3 tests/smoke.py      # 5탭 · 일정 · 할일 · 사진 업로드/저장 · manifest · 서비스워커 · 새로 열어도 유지
@@ -202,9 +219,9 @@ python3 tests/v18.py        # v18: 홈 간격 · 사진첩 하루 3폴라로이�
 python3 tests/v17.py        # (v17 기록용) 노트 「주제」 삭제 · 12색 팔레트 — v18 에서 바뀐 화면이라 지금은 일부 실패가 정상
 ```
 
-마지막 확인 결과(v25): **390×844 헤드리스 Chromium 에서 콘솔/페이지 오류 0**,
-v25(동기화·로그인·초대 코드) 43 · 스모크 18 · v18~v24 회귀 모두 **실패 0**.
-v13~v17 은 그 뒤 화면이 바뀌어 지금은 일부 실패가 정상입니다(v25 이전에도 같은 항목이 실패).
+마지막 확인 결과(v26): **390×844 헤드리스 Chromium 에서 콘솔/페이지 오류 0**,
+v26(로컬 기록 이전·프로필 사진) 81 · v25(동기화·로그인·초대 코드) 43 · 스모크 18 · v18~v24 회귀 모두 **실패 0**.
+v13~v17 은 그 뒤 화면이 바뀌어 지금은 일부 실패가 정상입니다(v26 이전에도 같은 항목이 실패).
 
 ---
 
@@ -234,5 +251,7 @@ v13~v17 은 그 뒤 화면이 바뀌어 지금은 일부 실패가 정상입니�
 - **캘린더에서 날짜를 누르면** 그날의 일정 + 메모 카드 + 영화·먹방 기록 + 폴라로이드가 한 타임라인으로 이어집니다
 - **노트 카드와 To-do 한 줄은 꾹 눌러(320ms) 순서를 바꿉니다** — 손을 떼면 `S.groups`/`S.lists` 순서로 저장됩니다
 - **화면 잠금**은 My 탭에서 켜는 **4자리 숫자 잠금**입니다(기기 안에서만 확인하는 간단한 잠금, 기록 암호화 아님)
+- **프로필 사진은 각자 자기 것만** — 두 사람이 연결된 뒤에는 My 탭에서도 상대 사진에 버튼이 없고(「○○ 폰에서 바꿔요」),
+  사진은 `couple.pics` → settings `avatar:<slot>` 으로 사람별 저장되어 상대 폰에도 함께 보입니다(v26)
 - **기록 PDF**는 My 탭 → 기간 선택 → 인쇄 창에서 ‘PDF로 저장’. 인쇄용 레이아웃은 `@media print` + `#printRoot` 만 남깁니다
 - **서비스 워커**는 `skipWaiting` + `clients.claim` + 옛 캐시 삭제, 앱은 `controllerchange` 때 한 번만 새로고침합니다

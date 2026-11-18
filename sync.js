@@ -41,6 +41,10 @@
   var K_DEVICE = CONFIG.key + ":device";
   var K_LEVEL = CONFIG.key + ":level"; // 마지막으로 올린 상태의 지문(불필요한 push 방지)
   var K_LEGACY = "couple-app-v1";
+  /* v26: 이 기기의 로컬 기록을 그 커플(coupleId)로 옮겼다는 표시.
+     한 번 옮긴 뒤에는 자동으로 다시 옮기지 않아 기록이 겹치지 않습니다.
+     localStorage["twolog.migrated.<coupleId>"] = {at, events, notes, photos} */
+  var K_MIGRATED = "twolog.migrated.";
 
   function isRemote() { return !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey); }
 
@@ -63,6 +67,8 @@
     var d = new Date();
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   }
+  function arr(v) { return Array.isArray(v) ? v : []; }
+  function freshId() { return randId() + randId(); }
   function randId() { return Math.random().toString(36).slice(2, 10); }
   function randomCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
   function log() { try { console.info.apply(console, ["[투로그]"].concat([].slice.call(arguments))); } catch (e) {} }
@@ -74,13 +80,15 @@
   function loadBitmap(file) {
     return new Promise(function (resolve, reject) {
       if (typeof createImageBitmap === "function") {
-        createImageBitmap(file, { imageOrientation: "from-image" }).then(resolve, function () {
-          fallback();
-        });
+        try {
+          createImageBitmap(file, { imageOrientation: "from-image" }).then(resolve, function () { fallback(); });
+        } catch (e) { fallback(); }
       } else fallback();
 
+      /* v26: 사진 덩어리가 아닌 값이 와도 promise 가 영원히 매달리지 않게 — 실패는 reject 로 */
       function fallback() {
-        var url = URL.createObjectURL(file);
+        var url;
+        try { url = URL.createObjectURL(file); } catch (e) { reject(new Error("image_decode_failed")); return; }
         var img = new Image();
         img.onload = function () { resolve(img); };
         img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("image_decode_failed")); };
@@ -161,9 +169,11 @@
   }
   function idbGet(id) {
     if (memPhotos[id]) return Promise.resolve(memPhotos[id]);
-    return idbRun("readonly", function (store) { return store.get(id); }).then(function (blob) {
+    return idbRun("readonly", function (store) { return store.get(id); }).then(function (v) {
+      /* 없는 키를 읽으면 결과가 undefined 라 요청 객체가 돌아올 수 있어요 — 사진 덩어리만 인정 */
+      var blob = typeof Blob !== "undefined" && v instanceof Blob ? v : null;
       if (blob) memPhotos[id] = blob;
-      return blob || null;
+      return blob;
     });
   }
   function idbDel(id) {
@@ -179,6 +189,122 @@
   }
   function dropObjectUrl(id) {
     if (objectUrls[id]) { try { URL.revokeObjectURL(objectUrls[id]); } catch (e) {} delete objectUrls[id]; }
+  }
+
+  /* =====================================================================
+     v26: 이 기기에 남아 있던 로컬 기록(localStorage) 읽기
+     ---------------------------------------------------------------------
+     로컬 모드가 쓰던 자리는 그대로 localStorage["twolog:v1:state"] 이고
+     (없으면 예전 프로토타입 키 "couple-app-v1"), 사진 원본은 IndexedDB 입니다.
+     이전(migration)은 이 값을 **읽기만** 하고 지우지 않습니다.
+     ===================================================================== */
+  function readLocalDoc() {
+    var doc = null;
+    try {
+      var raw = localStorage.getItem(K_STATE);
+      if (raw) doc = JSON.parse(raw);
+      if (!doc) {
+        var legacy = localStorage.getItem(K_LEGACY);
+        if (legacy) doc = JSON.parse(legacy);
+      }
+    } catch (e) { warn("local state read failed", e); }
+    return doc && typeof doc === "object" ? doc : null;
+  }
+
+  /* 로컬 기록 요약 — 무엇이 몇 개 있는지, 기본값과 다른 설정이 있는지. */
+  function localSummary(doc) {
+    var out = { has: false, events: 0, notes: 0, photos: 0, records: 0, customized: false };
+    if (!doc || typeof doc !== "object") return out;
+    out.events = arr(doc.events).length;
+    out.notes = arr(doc.todos).length + arr(doc.bucket).length + arr(doc.logs).length + arr(doc.lists).length;
+    out.photos = arr(doc.photos).length;
+    out.records = out.events + out.notes + out.photos;
+    var c = doc.couple && typeof doc.couple === "object" ? doc.couple : {};
+    var t = doc.theme && typeof doc.theme === "object" ? doc.theme : {};
+    var col = c.colors || {}, sc = c.sched || {};
+    out.customized = !!(
+      (c.me && c.me !== "소영") || (c.you && c.you !== "준영") ||
+      (c.since && c.since !== nowIso()) ||
+      (c.phrase && c.phrase !== "함께한 지") ||
+      (c.fmt && c.fmt !== "D") ||
+      (col.me && col.me !== "#9E636B") || (col.you && col.you !== "#3D5C82") ||
+      (sc.me && sc.me !== "#9E636B") || (sc.you && sc.you !== "#3D5C82") || (sc.both && sc.both !== "#625A7F") ||
+      t.name || t.log || t.mode === "dark" || t.homeTitleBg ||
+      (t.pages && Object.keys(t.pages).length)
+    );
+    out.has = out.records > 0 || out.customized;
+    return out;
+  }
+
+  function dataUrlToBlob(url) {
+    return fetch(url).then(function (r) { return r.blob(); }).catch(function () {
+      try {
+        var parts = String(url).split(",");
+        var mime = (parts[0].match(/data:([^;]+)/) || [])[1] || "image/jpeg";
+        var bin = atob(parts[1] || "");
+        var buf = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+        return new Blob([buf], { type: mime });
+      } catch (e) { return null; }
+    });
+  }
+
+  /* 로컬 사진의 원본 — IndexedDB(idb:) 덩어리이거나, 예전에 data URL 로 들어 있던 것 */
+  function localPhotoBlob(p) {
+    if (!p || typeof p !== "object") return Promise.resolve(null);
+    var path = String(p.path || "");
+    if (path.indexOf("idb:") === 0) return idbGet(path.slice(4));
+    var cand = [p.src, p.data, p.url, path];
+    for (var i = 0; i < cand.length; i++) {
+      if (typeof cand[i] === "string" && cand[i].indexOf("data:") === 0) return dataUrlToBlob(cand[i]);
+    }
+    return Promise.resolve(null);
+  }
+
+  /* 로컬 couple 설정 → couples 행 (상대 기기라면 '나/상대'를 뒤집어 저장) */
+  function couplePatchOf(couple, swap) {
+    var c = couple || {};
+    var cc = c.colors || {}, sc = c.sched || {};
+    return {
+      me: swap ? c.you : c.me,
+      you: swap ? c.me : c.you,
+      since: c.since,
+      phrase: c.phrase || "함께한 지", fmt: c.fmt === "Y" ? "Y" : "D",
+      colors: swap ? { me: cc.you, you: cc.me } : cc,
+      sched: swap ? { me: sc.you, you: sc.me, both: sc.both } : sc
+    };
+  }
+
+  /* 아직 아무도 손대지 않은 커플 행(이름이 '나/상대' 그대로)인지 */
+  function coupleIsPlain(row) {
+    if (!row) return true;
+    var me = String(row.me || ""), you = String(row.you || "");
+    return (me === "" || me === "나" || me === "상대") && (you === "" || you === "상대" || you === "나");
+  }
+
+  /* 겹치지 않게 같은 내용은 건너뛰기 위한 지문 */
+  function sigEvent(r) { return [r.date, r.time || "", r.title || "", r.type || "", r.who || "", r.memo || ""].join("|"); }
+  function sigNote(r) { return String(r.kind || "") + "|" + JSON.stringify(r.payload || {}); }
+  function sigPhoto(r) { return [r.date, r.album || "", r.title || "", r.memo || ""].join("|"); }
+
+  /* v26: 프로필 사진(아바타)은 settings 테이블에 **사람별 한 줄**로 올립니다.
+     key = "avatar:0" (couples.members[0] = 만든 사람) / "avatar:1" (members[1]).
+     두 사람이 같은 순간에 각자 사진을 바꿔도 서로 덮어쓰지 않게 행을 따로 둡니다. */
+  var K_AVATAR = "avatar:";
+  function avatarSlotOf(who, swap) {
+    var meSlot = swap ? 1 : 0;
+    return who === "me" ? meSlot : 1 - meSlot;
+  }
+  function avatarKeyOf(who, swap) { return K_AVATAR + avatarSlotOf(who, swap); }
+  function avatarWhoOf(key, swap) {
+    var slot = Number(String(key || "").slice(K_AVATAR.length));
+    if (isNaN(slot)) return null;
+    return slot === (swap ? 1 : 0) ? "me" : "you";
+  }
+  function avatarSrc(v) {
+    if (!v) return "";
+    var s = typeof v === "string" ? v : v.src;
+    return typeof s === "string" && s.indexOf("data:image/") === 0 ? s : "";
   }
 
   /* =====================================================================
@@ -265,7 +391,8 @@
         fmt: coupleRow.fmt === "Y" ? "Y" : "D",
         phrase: coupleRow.phrase || "함께한 지",
         colors: { me: meColor, you: youColor },
-        sched: { me: meSched, you: youSched, both: bothSched }
+        sched: { me: meSched, you: youSched, both: bothSched },
+        pics: {}
       },
       link: { code: String(coupleRow.invite_code || ""), connected: (coupleRow.members || []).length > 1, partnerCode: "" },
       auth: { out: false, email: "" },
@@ -295,6 +422,12 @@
     });
     (settingRows || []).forEach(function (r) {
       if (r.key === "theme" && r.value) doc.theme = Object.assign({ name: null, log: null, mode: "light" }, r.value);
+      else if (String(r.key || "").indexOf(K_AVATAR) === 0) {
+        /* v26: 프로필 사진 — 사람별 행을 이 기기의 '나/상대'로 바꿔 담습니다 */
+        var aw = avatarWhoOf(r.key, swap);
+        var src = avatarSrc(r.value);
+        if (aw && src) doc.couple.pics[aw] = src;
+      }
     });
     return doc;
   }
@@ -375,6 +508,11 @@
   LocalBackend.prototype.joinCouple = function () { return Promise.resolve({ error: "local_mode" }); };
   LocalBackend.prototype.leaveCouple = function () { return Promise.resolve({ error: "local_mode" }); };
   LocalBackend.prototype.setInviteCode = function () { return Promise.resolve({ error: "local_mode" }); };
+  /* v26: 로컬 모드의 프로필 사진은 상태(couple.pics)와 함께 기기에만 저장됩니다. */
+  LocalBackend.prototype.setAvatar = function () { return Promise.resolve({ ok: true, local: true }); };
+  /* v26: 로컬 모드에서는 옮길 곳(원격)이 없으니 그대로 안내만 */
+  LocalBackend.prototype.migrateLocal = function () { return Promise.resolve({ ok: false, reason: "local_mode" }); };
+  LocalBackend.prototype.migratedFlag = function () { return null; };
   LocalBackend.prototype.subscribe = function () { return function () {}; };
 
   /* =====================================================================
@@ -552,16 +690,7 @@
     var jobs = [];
 
     /* couples (이름·만난 날·문구·D-day 표기·색) — 저장은 항상 '만든 사람' 기준 */
-    var cc = doc.couple.colors || {};
-    var sc = doc.couple.sched || {};
-    var couplePatch = {
-      me: this.swap ? doc.couple.you : doc.couple.me,
-      you: this.swap ? doc.couple.me : doc.couple.you,
-      since: doc.couple.since,
-      phrase: doc.couple.phrase || "함께한 지", fmt: doc.couple.fmt === "Y" ? "Y" : "D",
-      colors: this.swap ? { me: cc.you, you: cc.me } : cc,
-      sched: this.swap ? { me: sc.you, you: sc.me, both: sc.both } : sc
-    };
+    var couplePatch = couplePatchOf(doc.couple, !!this.swap);
     var prevCouple = this.prev.couple || {};
     var coupleChanged = Object.keys(couplePatch).some(function (k) { return JSON.stringify(couplePatch[k]) !== JSON.stringify(prevCouple[k]); });
     if (coupleChanged) {
@@ -723,6 +852,244 @@
     }).catch(function (e) { return { error: String(e && e.message || e) }; });
   };
 
+  /* v26: 프로필 사진 한 장을 서버(settings)에 올립니다.
+       who : 'me' | 'you' (이 기기 화면 기준)
+       dataUrl : 256px JPEG data URL, 지우기면 "" */
+  SupabaseBackend.prototype.setAvatar = function (who, dataUrl) {
+    var self = this;
+    if (!this.couple || !this.user) return Promise.resolve({ error: "no_couple" });
+    var key = avatarKeyOf(who === "you" ? "you" : "me", !!this.swap);
+    var row = { couple_id: this.couple.id, key: key, value: { src: avatarSrc(dataUrl), at: Date.now() } };
+    return this.connect().then(function (client) {
+      return client.from("settings").upsert(row, { onConflict: "couple_id,key" });
+    }).then(function (r) {
+      if (r && r.error) return { error: r.error.message || "update_failed" };
+      if (self.prev && self.prev.settings) self.prev.settings[key] = row;
+      return { ok: true, who: who, has: !!row.value.src };
+    }).catch(function (e) { return { error: String(e && e.message || e) }; });
+  };
+
+  /* =====================================================================
+     v26: 폰에 남아 있던 로컬 기록 → 이 커플 공간으로 이전
+     ---------------------------------------------------------------------
+     · 자동(기본): 이 기기에서 이 커플로 옮긴 적이 없고(플래그 없음),
+                  로컬에 사용자가 만든 기록·설정이 있고, 원격 events/notes/photos 가
+                  비어 있을 때만 — 로그인/앱 시작/커플 연결 직후에 한 번.
+     · force    : My 탭 「폰에 있던 예전 기록 가져오기」 — 원격에 이미 기록이 있어도
+                  겹치는 내용(같은 날·같은 제목 등)은 건너뛰고 새 기록만 더합니다.
+     성공하면 localStorage 의 로컬 상태는 그대로 두고 플래그만 남깁니다.
+     ===================================================================== */
+  SupabaseBackend.prototype.migrateLocal = function (opts) {
+    var self = this;
+    var force = !!(opts && opts.force);
+    if (!this.couple || !this.user) return Promise.resolve({ ok: false, reason: "no_couple" });
+    var cid = this.couple.id;
+    var local = readLocalDoc();
+    var info = localSummary(local);
+    if (!local || !info.has) return Promise.resolve({ ok: false, reason: "no_local", summary: info });
+
+    var flagKey = K_MIGRATED + cid;
+    if (!force) {
+      var already = false;
+      try { already = !!localStorage.getItem(flagKey); } catch (e) {}
+      if (already) return Promise.resolve({ ok: false, skipped: "already", summary: info });
+    }
+
+    var client = this.client;
+    var swap = !!this.swap;
+    return Promise.all([
+      client.from("events").select("*").eq("couple_id", cid),
+      client.from("notes").select("*").eq("couple_id", cid),
+      client.from("photos").select("*").eq("couple_id", cid),
+      client.from("settings").select("*").eq("couple_id", cid)
+    ]).then(function (parts) {
+      parts.forEach(function (r) { if (r && r.error) throw r.error; });
+      var evRows = parts[0].data || [];
+      var noteRows = parts[1].data || [];
+      var photoRows = parts[2].data || [];
+      var setRows = parts[3].data || [];
+
+      var liveNotes = noteRows.filter(function (r) { return !r.deleted; });
+      var remoteHas = evRows.length + liveNotes.length + photoRows.length > 0;
+      if (remoteHas && !force) {
+        return { ok: false, skipped: "remote_not_empty", summary: info, remoteHas: true };
+      }
+
+      /* ---- 1. 일정 · 노트 ---- */
+      var rows = stateToRows(local, cid, swap);
+      var evSigs = {};
+      evRows.forEach(function (r) { evSigs[sigEvent(r)] = 1; });
+      var evIds = {};
+      evRows.forEach(function (r) { evIds[r.id] = 1; });
+      var evOut = [];
+      rows.events.forEach(function (r) {
+        if (evSigs[sigEvent(r)]) return;                     // 이미 있는 같은 일정은 건너뜀
+        if (evIds[r.id]) r.id = freshId();                   // id 가 겹치면 새 id 로
+        evIds[r.id] = 1;
+        evSigs[sigEvent(r)] = 1;
+        evOut.push(r);
+      });
+
+      var noteSigs = {};
+      var noteIds = {};
+      var noteMax = -1;
+      noteRows.forEach(function (r) {
+        noteSigs[sigNote(r)] = 1;
+        noteIds[r.id] = 1;
+        var sv = Number(r.sort);
+        if (!isNaN(sv) && sv > noteMax) noteMax = sv;
+      });
+      var noteOut = [];
+      rows.notes.forEach(function (r) {
+        if (noteSigs[sigNote(r)]) return;                     // 같은 내용의 메모·할일은 건너뜀
+        if (noteIds[r.id]) r.id = freshId();
+        noteIds[r.id] = 1;
+        noteSigs[sigNote(r)] = 1;
+        r.sort = ++noteMax;
+        noteOut.push(r);
+      });
+
+      /* ---- 2. 사진: 원본(IndexedDB / data URL)을 Storage 에 올리고 행을 만듭니다 ---- */
+      var photoSigs = {};
+      var photoIds = {};
+      var photoMax = -1;
+      photoRows.forEach(function (r) {
+        photoSigs[sigPhoto(r)] = 1;
+        photoIds[r.id] = 1;
+        var sv = Number(r.sort);
+        if (!isNaN(sv) && sv > photoMax) photoMax = sv;
+      });
+      var localPhotos = arr(local.photos).filter(function (p) {
+        return p && typeof p === "object" && !photoSigs[sigPhoto(p)];
+      });
+
+      return localPhotos.reduce(function (chain, p) {
+        return chain.then(function (acc) {
+          var pid = freshId();
+          var path = cid + "/" + pid + ".jpg";
+          return localPhotoBlob(p).then(function (blob) {
+            if (!blob) return null;
+            return compressImage(blob, CONFIG.photoMaxDim, CONFIG.photoQuality).catch(function () {
+              return { blob: blob };
+            }).then(function (res) {
+              return client.storage.from(CONFIG.photoBucket)
+                .upload(path, res.blob, { contentType: "image/jpeg", upsert: true });
+            }).then(function (up) {
+              if (up && up.error) throw up.error;
+              return path;
+            });
+          }).then(function (storedPath) {
+            acc.rows.push({
+              id: pid, couple_id: cid, date: p.date || nowIso(), album: p.album || "",
+              title: p.title || "", place: p.place || "", memo: p.memo || "",
+              art: typeof p.art === "number" ? p.art : null,
+              cap_bg: p.capBg || null, storage_path: storedPath || null, sort: ++photoMax
+            });
+            if (!storedPath) acc.withoutFile++;
+            return acc;
+          }, function () {
+            /* 파일을 못 올려도 사진의 날짜·제목은 남깁니다 */
+            acc.rows.push({
+              id: pid, couple_id: cid, date: p.date || nowIso(), album: p.album || "",
+              title: p.title || "", place: p.place || "", memo: p.memo || "",
+              art: typeof p.art === "number" ? p.art : null,
+              cap_bg: p.capBg || null, storage_path: null, sort: ++photoMax
+            });
+            acc.withoutFile++;
+            return acc;
+          });
+        });
+      }, Promise.resolve({ rows: [], withoutFile: 0 })).then(function (photoAcc) {
+        var photoOut = photoAcc.rows;
+
+        /* ---- 3. 커플 정보(이름·만난 날·문구·D-day·색) — 아직 기본값일 때만 ---- */
+        var jobs = [];
+        var metaMoved = false;
+        if (coupleIsPlain(self.couple)) {
+          var patch = couplePatchOf(local.couple, swap);
+          var clean = {};
+          Object.keys(patch).forEach(function (k) {
+            if (patch[k] !== undefined && patch[k] !== null && patch[k] !== "") clean[k] = patch[k];
+          });
+          if (Object.keys(clean).length) {
+            metaMoved = true;
+            jobs.push(client.from("couples").update(clean).eq("id", cid).then(function (r) {
+              if (r && r.error) throw r.error;
+              self.couple = Object.assign({}, self.couple, clean);
+            }));
+          }
+        }
+
+        /* ---- 4. 테마(settings) — 원격에 테마가 없을 때만 ---- */
+        var themeRow = setRows.filter(function (r) { return r.key === "theme"; })[0];
+        var themeEmpty = !themeRow || !themeRow.value || !Object.keys(themeRow.value).length;
+        if (themeEmpty && local.theme && Object.keys(local.theme).length) {
+          jobs.push(client.from("settings").upsert({ couple_id: cid, key: "theme", value: local.theme }, { onConflict: "couple_id,key" }).then(function (r) {
+            if (r && r.error) throw r.error;
+          }));
+        }
+
+        /* ---- 4-2. 프로필 사진 — 이 폰에 있던 사진을 각자 몫으로 올립니다 ---- */
+        var pics = (local.couple && local.couple.pics) || {};
+        var avatarKeys = ["me", "you"].filter(function (w) {
+          var src = avatarSrc(pics[w]);
+          if (!src) return false;
+          var key = avatarKeyOf(w, swap);
+          var there = setRows.filter(function (r) { return r.key === key; })[0];
+          return !(there && avatarSrc(there.value));      // 원격에 이미 그 사람 사진이 있으면 그대로
+        });
+        avatarKeys.forEach(function (w) {
+          var key = avatarKeyOf(w, swap);
+          jobs.push(client.from("settings").upsert({ couple_id: cid, key: key, value: { src: avatarSrc(pics[w]), at: Date.now() } }, { onConflict: "couple_id,key" }).then(function (r) {
+            if (r && r.error) throw r.error;
+          }));
+        });
+        if (avatarKeys.length) metaMoved = true;
+
+        /* ---- 5. 행 쓰기 (바뀐 것만, 200개씩) ---- */
+        if (evOut.length) jobs.push(writeChunks(client, "events", evOut));
+        if (noteOut.length) jobs.push(writeChunks(client, "notes", noteOut));
+        if (photoOut.length) jobs.push(writeChunks(client, "photos", photoOut));
+
+        return Promise.all(jobs).then(function () {
+          var moved = { events: evOut.length, notes: noteOut.length, photos: photoOut.length, meta: metaMoved, photosWithoutFile: photoAcc.withoutFile };
+          return self.load().then(function (doc) {
+            try {
+              localStorage.setItem(flagKey, JSON.stringify({
+                at: Date.now(), events: moved.events, notes: moved.notes, photos: moved.photos, meta: moved.meta
+              }));
+            } catch (e) {}
+            return { ok: true, moved: moved, counts: moved.events + moved.notes + moved.photos, state: doc };
+          });
+        });
+      });
+    }).catch(function (e) {
+      warn("migrate failed", e);
+      return { ok: false, reason: "failed", error: String(e && e.message || e) };
+    });
+  };
+
+  /* 이 기기에서 그 커플로 이미 옮겼는지 */
+  SupabaseBackend.prototype.migratedFlag = function () {
+    if (!this.couple) return null;
+    try {
+      var raw = localStorage.getItem(K_MIGRATED + this.couple.id);
+      if (!raw) return null;
+      var v = JSON.parse(raw);
+      return v && typeof v === "object" ? v : { at: 0 };
+    } catch (e) { return null; }
+  };
+
+  function writeChunks(client, table, rows) {
+    var chunks = [];
+    for (var i = 0; i < rows.length; i += 200) chunks.push(rows.slice(i, i + 200));
+    return Promise.all(chunks.map(function (part) {
+      return client.from(table).upsert(part).then(function (r) {
+        if (r && r.error) throw r.error;
+      });
+    }));
+  }
+
   /* Realtime: 상대가 바꾸면 다시 읽어서 화면에 반영 */
   SupabaseBackend.prototype.subscribe = function (onRemote) {
     var self = this;
@@ -868,7 +1235,9 @@
         signUp: function (email, pw) { return backend.signUp(email, pw); },
         signOut: function () {
           return backend.signOut().then(function () {
-            try { localStorage.removeItem(K_STATE); localStorage.removeItem(K_LEVEL); } catch (e) {}
+            /* v26: 로그아웃해도 이 기기에 남아 있던 로컬 기록(twolog:v1:state)은 지우지 않습니다.
+               다음에 로그인할 때 그 기록을 다시 이어 올 수 있어야 하니까요. */
+            try { localStorage.removeItem(K_LEVEL); } catch (e) {}
             return true;
           });
         }
@@ -880,7 +1249,40 @@
         setCode: function (code) { return backend.setInviteCode(code); },
         join: function (code) { return backend.joinCouple(code); },
         leave: function () { return backend.leaveCouple(); },
-        memberCount: function () { return backend.couple && backend.couple.members ? backend.couple.members.length : 1; }
+        memberCount: function () { return backend.couple && backend.couple.members ? backend.couple.members.length : 1; },
+        /* v26: 이 기기 사용자가 members[0] 인지 [1] 인지 (0/1) */
+        mySlot: function () { return backend.swap ? 1 : 0; }
+      },
+
+      /* v26: 프로필 사진 — 사람별로 서버(settings)에 올립니다 */
+      avatar: {
+        set: function (who, dataUrl) {
+          if (!remote) return Promise.resolve({ ok: true, local: true });
+          return backend.setAvatar ? backend.setAvatar(who, dataUrl) : Promise.resolve({ ok: true });
+        }
+      },
+
+      /* v26: 이 기기에 남아 있던 로컬 기록 — 요약과 이전 */
+      local: {
+        summary: function () { return localSummary(readLocalDoc()); },
+        doc: function () { return readLocalDoc(); }
+      },
+      migrate: {
+        /* opts.force === true 면 원격에 기록이 있어도 겹치지 않는 것만 더합니다.
+           성공하면 store 가 들고 있는 마지막 상태도 옮긴 뒤의 것으로 바꿉니다
+           (그러지 않으면 앱을 닫을 때 옛 빈 상태가 서버로 다시 밀려 기록을 지울 수 있어요). */
+        run: function (opts) {
+          if (!remote) return Promise.resolve({ ok: false, reason: "local_mode" });
+          return backend.migrateLocal(opts || {}).then(function (res) {
+            if (res && res.ok && res.state) {
+              var ui = lastDoc ? lastDoc.ui : null;
+              if (ui) res.state.ui = Object.assign(res.state.ui || {}, ui);
+              lastDoc = res.state;
+            }
+            return res;
+          });
+        },
+        done: function () { return remote && backend.migratedFlag ? backend.migratedFlag() : null; }
       },
 
       /* 이 기기 식별(충돌 방지용) */

@@ -11,12 +11,24 @@
    ========================================================================= */
 
 const SESSION_KEY = "stub-sb-session";
+/* 테스트 중 새로 열기(reload)에도 같은 서버 상태가 유지되도록 localStorage 에 둡니다 */
+const DB_KEY = "stub-sb-db";
 
 function db() {
   if (!window.__stub) {
-    window.__stub = { users: {}, couples: [], events: [], notes: [], photos: [], settings: [], seq: 0 };
+    let restored = null;
+    try { const raw = localStorage.getItem(DB_KEY); if (raw) restored = JSON.parse(raw); } catch (e) { restored = null; }
+    window.__stub = restored || { users: {}, couples: [], events: [], notes: [], photos: [], settings: [], uploads: [], seq: 0 };
+    ["couples", "events", "notes", "photos", "settings", "uploads"].forEach((k) => {
+      if (!Array.isArray(window.__stub[k])) window.__stub[k] = [];
+    });
+    if (!window.__stub.users) window.__stub.users = {};
   }
   return window.__stub;
+}
+
+function persist() {
+  try { localStorage.setItem(DB_KEY, JSON.stringify(db())); } catch (e) {}
 }
 
 function readSession() {
@@ -43,7 +55,12 @@ class Query {
   contains(k, v) { this.filters.push([k, v, "contains"]); return this; }
   insert(p) { this.kind = "insert"; this.payload = p; return this; }
   update(p) { this.kind = "update"; this.payload = p; return this; }
-  upsert(p) { this.kind = "upsert"; this.payload = p; return this; }
+  upsert(p, opts) {
+    this.kind = "upsert";
+    this.payload = p;
+    this.conflictKeys = opts && opts.onConflict ? String(opts.onConflict).split(",").map((s) => s.trim()) : null;
+    return this;
+  }
   delete() { this.kind = "delete"; return this; }
   single() { this.one = true; return this; }
 
@@ -74,30 +91,33 @@ class Query {
       const row = Object.assign({}, this.payload);
       if (!row.id) row.id = uid("row");
       rows.push(row);
+      persist();
       if (this.one) return { data: row, error: null };
       return { data: [row], error: null };
     }
     if (this.kind === "upsert") {
-      const key = this.payload && this.payload.id ? "id" : null;
-      if (key) {
-        const at = rows.findIndex((r) => r.id === this.payload.id);
-        if (at >= 0) Object.assign(rows[at], this.payload);
-        else rows.push(Object.assign({}, this.payload));
-      } else {
-        const at = rows.findIndex((r) => this.match(r));
-        if (at >= 0) Object.assign(rows[at], this.payload);
-        else rows.push(Object.assign({}, this.payload));
-      }
+      const list = Array.isArray(this.payload) ? this.payload : [this.payload];
+      list.forEach((p) => {
+        const row = Object.assign({}, p);
+        const at = row.id
+          ? rows.findIndex((r) => r.id === row.id)
+          : rows.findIndex((r) => this.conflictKeys && this.conflictKeys.every((k) => r[k] === row[k]));
+        if (at >= 0) Object.assign(rows[at], row);
+        else rows.push(row);
+      });
+      persist();
       return { data: null, error: null };
     }
     if (this.kind === "update") {
       const hit = rows.filter((r) => this.match(r));
       hit.forEach((r) => Object.assign(r, this.payload));
+      persist();
       return { data: hit, error: null };
     }
     if (this.kind === "delete") {
       const rest = rows.filter((r) => !this.match(r));
       db()[this.table] = rest;
+      persist();
       return { data: null, error: null };
     }
     return err("unsupported");
@@ -130,6 +150,7 @@ export function createClient(url, key, opts) {
       const users = db().users;
       let user = Object.keys(users).map((k) => users[k]).find((u) => u.email === email);
       if (!user) { user = { id: uid("user"), email: email, password: creds.password }; users[user.id] = user; }
+      persist();
       const session = { access_token: "stub-token", refresh_token: "stub-refresh", user: { id: user.id, email: user.email } };
       writeSession(session);
       return Promise.resolve({ data: { session: session, user: session.user }, error: null });
@@ -151,12 +172,14 @@ export function createClient(url, key, opts) {
       if (row.members.indexOf(me) >= 0) return Promise.resolve({ data: row, error: null });
       if (row.members.length >= 2) return Promise.resolve(err("couple_full"));
       row.members = row.members.concat([me]);
+      persist();
       return Promise.resolve({ data: row, error: null });
     }
     if (name === "leave_couple") {
       const session = readSession();
       const me = session && session.user ? session.user.id : null;
       db().couples.forEach((c) => { c.members = (c.members || []).filter((m) => m !== me); });
+      persist();
       return Promise.resolve({ data: null, error: null });
     }
     return Promise.resolve(err("unknown_function"));
@@ -164,7 +187,13 @@ export function createClient(url, key, opts) {
 
   function storageFrom() {
     return {
-      upload(path) { return Promise.resolve({ data: { path: path }, error: null }); },
+      upload(path, blob) {
+        const st = db();
+        st.uploads = st.uploads || [];
+        st.uploads.push({ path: path, size: (blob && blob.size) || 0, type: (blob && blob.type) || "" });
+        persist();
+        return Promise.resolve({ data: { path: path }, error: null });
+      },
       createSignedUrl(path) { return Promise.resolve({ data: { signedUrl: TINY_GIF }, error: null }); },
       createSignedUrls(paths) {
         return Promise.resolve({ data: (paths || []).map((p) => ({ path: p, signedUrl: TINY_GIF })), error: null });
@@ -175,7 +204,13 @@ export function createClient(url, key, opts) {
 
   function channel() {
     const ch = {
-      on() { return ch; },
+      on(type, filter, cb) {
+        if (typeof cb === "function") {
+          window.__stubHandlers = window.__stubHandlers || [];
+          window.__stubHandlers.push({ type: type, filter: filter || {}, cb: cb });
+        }
+        return ch;
+      },
       subscribe(cb) { if (typeof cb === "function") setTimeout(() => cb("SUBSCRIBED"), 0); return ch; },
       unsubscribe() { return Promise.resolve("ok"); }
     };
@@ -186,3 +221,23 @@ export function createClient(url, key, opts) {
 }
 
 export default { createClient };
+
+/* ----------------------------------------------------------------------------
+   테스트에서 진짜 Realtime 이벤트를 흉내 낼 때:
+     window.__stubEmit("settings", "<couple_id>")
+   구독해 둔 postgres_changes 핸들러를 그대로 불러 줍니다(앱의 재구독·재읽기 경로 확인용).
+   -------------------------------------------------------------------------- */
+if (typeof window !== "undefined") {
+  window.__stubEmit = function (table, filterValue) {
+    const list = window.__stubHandlers || [];
+    let hit = 0;
+    list.forEach((h) => {
+      const f = h.filter || {};
+      if (f.table && f.table !== table) return;
+      if (f.filter && filterValue && String(f.filter).indexOf(String(filterValue)) < 0) return;
+      hit += 1;
+      try { h.cb({ eventType: "*", table: table, new: {}, old: {} }); } catch (e) {}
+    });
+    return hit;
+  };
+}

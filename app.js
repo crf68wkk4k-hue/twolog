@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v25";
+  var APP_VERSION = "v26";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -268,6 +268,63 @@
   function save() {
     if (!S || !Store) return;
     try { Store.persist(S); } catch (e) {}
+  }
+
+  /* ==========================================================================
+     v26: 폰에 남아 있던 예전 로컬 기록(localStorage·IndexedDB)을 새 커플 공간으로
+     이어 오기. 실제 업로드는 sync.js 의 Store.migrate 가 합니다.
+     ========================================================================== */
+  function localSummaryLine(info) {
+    if (!info) return "";
+    var parts = [];
+    if (info.events) parts.push("일정 " + info.events + "개");
+    if (info.notes) parts.push("노트 " + info.notes + "개");
+    if (info.photos) parts.push("사진 " + info.photos + "장");
+    if (!parts.length && info.customized) parts.push("커플 정보·설정");
+    return parts.join(" · ");
+  }
+  function migrateToast(res) {
+    if (!res || !res.ok) return "";
+    var line = res.moved ? localSummaryLine({ events: res.moved.events, notes: res.moved.notes, photos: res.moved.photos }) : "";
+    if (!line && res.moved && res.moved.meta) return "폰에 있던 커플 정보를 이어 왔어요";
+    if (!line) return "";
+    return "폰에 있던 예전 기록을 이어 왔어요 · " + line;
+  }
+  function localReadyInfo() {
+    if (!Store || Store.mode !== "remote" || !Store.local) return null;
+    var info = null;
+    try { info = Store.local.summary(); } catch (e) { info = null; }
+    return info && info.has ? info : null;
+  }
+  /* 이전 결과의 상태를 화면에 반영 (사진 주소는 다시 받아 옵니다) */
+  function applyMigrated(res) {
+    if (!res || !res.ok || !res.state) return false;
+    var keepUi = S ? S.ui : null;
+    S = normalizeState(res.state);
+    if (keepUi) S.ui = keepUi;
+    S.auth.out = false;
+    var u = Store && Store.backend && Store.backend.user;
+    if (u && u.email) S.auth.email = u.email;
+    applyTheme(); renderAll(); loadPhotoUrls();
+    var msg = migrateToast(res);
+    if (msg) toast(msg);
+    return true;
+  }
+  /* 앱 시작 직후: 로그인된 기기에 예전 기록이 남아 있으면 자동 1회 이전 */
+  function joinLocalHistory() {
+    if (!Store || Store.mode !== "remote" || !Store.migrate || !S) return Promise.resolve(false);
+    return Store.migrate.run({}).then(function (res) {
+      if (res && res.ok && res.state) { applyMigrated(res); return true; }
+      if (current === "set") renderSet();
+      return false;
+    }).catch(function () { return false; });
+  }
+  /* 로그인·커플 연결 직후: 이전을 마친 상태(doc)를 받아 화면을 그립니다 */
+  function withLocalHistory(doc, done) {
+    if (!Store || Store.mode !== "remote" || !Store.migrate) { done(doc, null); return; }
+    Store.migrate.run({}).then(function (res) {
+      done(res && res.state ? res.state : doc, res);
+    }, function () { done(doc, null); });
   }
 
   /* ------------------------------------------------------------------ color theme */
@@ -2159,6 +2216,26 @@
 
   /* --------------------------------------------------- 프로필 사진 (동그란 아바타)
      작은 JPEG dataURL 로 만들어 상태(couple.pics)에 함께 저장합니다. */
+  /* v26: 두 사람이 연결된 뒤에는 **자기 사진만** 바꿀 수 있습니다.
+     (상대 사진은 상대 폰에서 바꾸면 settings 를 통해 이 폰에도 나타나요) */
+  function canEditAvatar(who) {
+    if (!Store || Store.mode !== "remote") return true;      // 이 기기 혼자 쓰는 모드
+    var n = 1;
+    try { n = Store.couple.memberCount(); } catch (e) { n = 1; }
+    if (!(n >= 2)) return true;                               // 아직 연결 전 — 두 사람 다 꾸밀 수 있음
+    return who !== "you";
+  }
+  function setAvatarPic(who, url) {
+    S.couple.pics = S.couple.pics || {};
+    if (url) S.couple.pics[who] = url;
+    else delete S.couple.pics[who];
+    if (Store && Store.mode === "remote" && Store.avatar) {
+      Store.avatar.set(who, url || "").catch(function () {});
+    }
+    save();
+    renderAll();
+    if (personSheetWho) openPersonSheet(personSheetWho);
+  }
   function avPic(who) {
     var p = (S.couple.pics || {})[who];
     return typeof p === "string" && p.indexOf("data:image/") === 0 ? p : "";
@@ -2218,12 +2295,16 @@
     var pic = avPic(who);
     var linked = !!(S.link && S.link.connected);
     var h = sheetHead(isMe ? "내 프로필" : esc(nm) + " 설정");
+    var canPic = canEditAvatar(who);
     h += '<div class="pr-top">' +
       '<span class="pr-av' + (pic ? " pic" : "") + '" style="background:' + avColor(who) + '">' + avInner(who) + "</span>" +
-      '<div class="pr-acts">' +
-      '<button type="button" class="set-btn" data-act="pickPic" data-who="' + who + '">사진첩에서 선택</button>' +
-      (pic ? '<button type="button" class="set-btn ghost" data-act="clearPic" data-who="' + who + '">사진 지우기</button>' : "") +
-      "</div></div>";
+      (canPic
+        ? '<div class="pr-acts">' +
+          '<button type="button" class="set-btn" data-act="pickPic" data-who="' + who + '">사진첩에서 선택</button>' +
+          (pic ? '<button type="button" class="set-btn ghost" data-act="clearPic" data-who="' + who + '">사진 지우기</button>' : "") +
+          "</div>"
+        : '<div class="pr-acts"><div class="set-hint" style="margin:0">프로필 사진은 ' + esc(nm) + " 본인 폰에서 바꿀 수 있어요.</div></div>") +
+      "</div>";
     h += '<div class="pr-color"><span class="set-lbl">색</span>' + colorPickRow(who) + "</div>";
     h += '<form class="form" id="personForm" data-who="' + who + '" style="margin-top:16px">' +
       '<div class="f"><label>' + (isMe ? "닉네임 바꾸기" : "닉네임 설정") + '</label>' +
@@ -2250,14 +2331,17 @@
   function avatarPickRow(who) {
     var nm = who === "me" ? S.couple.me : S.couple.you;
     var has = !!avPic(who);
+    var canPic = canEditAvatar(who);
     return '<div class="av-line">' +
       '<button type="button" class="set-av pick' + (has ? " pic" : "") + '" data-act="pickPic" data-who="' + who +
       '" style="background:' + avColor(who) + '" aria-label="' + esc(nm) + ' 프로필 사진 선택">' + avInner(who) + "</button>" +
       '<span class="av-nm">' + esc(nm) + "</span>" +
-      '<span class="av-acts"><button type="button" class="set-btn" data-act="pickPic" data-who="' + who + '">' +
-      (has ? "사진 바꾸기" : "사진 선택") + "</button>" +
-      (has ? '<button type="button" class="set-btn ghost" data-act="clearPic" data-who="' + who + '">기본으로</button>' : "") +
-      "</span></div>";
+      (canPic
+        ? '<span class="av-acts"><button type="button" class="set-btn" data-act="pickPic" data-who="' + who + '">' +
+          (has ? "사진 바꾸기" : "사진 선택") + "</button>" +
+          (has ? '<button type="button" class="set-btn ghost" data-act="clearPic" data-who="' + who + '">기본으로</button>' : "") + "</span>"
+        : '<span class="av-acts"><span class="set-hint" style="margin:0">본인 폰에서 바꿔요</span></span>') +
+      "</div>";
   }
   function avColor(who) {
     var c = (S.couple.colors || {})[who];
@@ -2454,13 +2538,19 @@
     /* ---- 1. 계정 및 커플 연결 ---- */
     h += '<div class="sec"><h2>계정 및 커플 연결</h2><span class="more">' + (li.connected ? "연결됨" : "미연결") + "</span></div>";
     h += '<div class="list">';
+    /* 내 줄 — 프로필 사진은 언제나 내가 바꿀 수 있어요 */
     h += '<div class="row tap" data-act="personSheet" data-who="me"><button type="button" class="set-av pick' + (avPic("me") ? " pic" : "") + '" data-act="pickPic" data-who="me" style="background:' + avColor("me") + '" aria-label="' + esc(c.me) + ' 프로필 사진 선택">' + avInner("me") + "</button>" +
       '<div class="body" style="flex:1 1 auto;min-width:0"><div class="t set-who-nm">' + esc(c.me) + "</div>" +
       '<div style="font-size:11px;color:var(--ink-3);margin-top:2px">' + (remote && acct.email ? esc(acct.email) : "내 계정 · 로그인됨") + "</div></div>" +
       '<span class="chip plain">나</span></div>';
-    h += '<div class="row tap" data-act="personSheet" data-who="you"><button type="button" class="set-av pick' + (avPic("you") ? " pic" : "") + '" data-act="pickPic" data-who="you" style="background:' + avColor("you") + '" aria-label="' + esc(c.you) + ' 프로필 사진 선택">' + avInner("you") + "</button>" +
+    /* 상대 줄 — v26: 두 사람이 연결된 뒤에는 상대 사진을 바꿀 수 없고, 상대 폰에서 바꿔요 */
+    var youPicOn = canEditAvatar("you");
+    h += '<div class="row tap" data-act="personSheet" data-who="you">' +
+      (youPicOn
+        ? '<button type="button" class="set-av pick' + (avPic("you") ? " pic" : "") + '" data-act="pickPic" data-who="you" style="background:' + avColor("you") + '" aria-label="' + esc(c.you) + ' 프로필 사진 선택">' + avInner("you") + "</button>"
+        : '<span class="set-av' + (avPic("you") ? " pic" : "") + '" style="background:' + avColor("you") + '" aria-label="' + esc(c.you) + ' 프로필 사진">' + avInner("you") + "</span>") +
       '<div class="body" style="flex:1 1 auto;min-width:0"><div class="t set-who-nm">' + esc(c.you) + "</div>" +
-      '<div style="font-size:11px;color:var(--ink-3);margin-top:2px">' + (li.connected ? "커플 연결됨 · 함께 기록 중" : "초대 코드로 연결할 수 있어요") + "</div></div>" +
+      '<div style="font-size:11px;color:var(--ink-3);margin-top:2px">' + (li.connected ? (youPicOn ? "커플 연결됨 · 함께 기록 중" : "프로필 사진은 " + esc(c.you) + " 폰에서 바꿔요") : "초대 코드로 연결할 수 있어요") + "</div></div>" +
       '<button class="chip ' + (li.connected ? "coral" : "plain") + '" data-act="linkSheet" aria-label="커플 연결 설정">' + (li.connected ? "연결됨" : "미연결") + "</button></div>";
     h += "</div>";
 
@@ -2475,11 +2565,25 @@
       "</div>";
 
     h += '<div style="margin:14px 20px 0"><button class="set-btn warn" data-act="logout" style="width:100%;height:46px">로그아웃</button></div>';
+    /* ---- v26: 폰에 남아 있던 예전 로컬 기록 ---- */
+    var locInfo = localReadyInfo();
+    if (locInfo) {
+      var mdone = null;
+      try { mdone = Store.migrate && Store.migrate.done ? Store.migrate.done() : null; } catch (e) { mdone = null; }
+      h += '<div class="set-card"><div class="set-lbl">폰에 있던 기록</div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px">' +
+        '<div style="font-size:12.5px;font-weight:600;letter-spacing:-.01em">' + esc(localSummaryLine(locInfo)) + "</div>" +
+        '<span class="chip ' + (mdone ? "sage" : "plain") + '">' + (mdone ? "이어 옴" : "대기") + "</span></div>" +
+        '<div class="set-hint">' + (mdone
+          ? "이 기기의 예전 기록은 새 커플 공간으로 옮겨 두었어요. 원본은 이 폰에 그대로 남아 있고, 다시 가져와도 같은 기록은 겹치지 않아요."
+          : "이 기기에만 저장해 둔 예전 기록이에요. 커플 공간이 비어 있으면 로그인할 때 자동으로 이어 오고, 그 밖에는 아래 버튼으로 더할 수 있어요.") + "</div>" +
+        '<button class="set-btn" data-act="importLocal" style="width:100%;margin-top:10px">폰에 있던 예전 기록 가져오기</button></div>';
+    }
 
     /* ---- 2. 잠금 · 보관 (v18) ---- */
     h += '<div class="my-gap"></div>';
-    h += '<div class="sec"><h2>잠금 · 보관</h2></div>';
-    h += '<div class="list">' +
+    h += '<div class="sec"><h2>잠금 · 보관</h2></div>' +
+      '<div class="list">' +
       menuRow("lockSheet", "🔒", "화면 잠금", lockOn() ? "켜짐 · 4자리 비밀번호" : "꺼짐") +
       menuRow("exportSheet", "📄", "기록 PDF 내보내기", "이번 달 · 올해 · 전체") + "</div>";
 
@@ -3291,6 +3395,16 @@
       return;
     }
 
+    if (act === "importLocal") {
+      var linf = localReadyInfo();
+      if (!linf) { toast("이 기기에 예전 기록이 없어요"); return; }
+      openSheet(sheetHead("폰에 있던 기록 가져오기") +
+        '<p class="sheet-sub">' + esc(localSummaryLine(linf)) + "을 지금 커플 공간에 더해요. 이미 있는 기록은 건드리지 않고, 같은 내용은 겹치지 않게 건너뛰어요.</p>" +
+        '<form class="form" id="importForm"><button class="btn-primary" type="submit">가져오기</button></form>' +
+        '<div style="height:10px"></div><button class="btn-line" data-close="1">취소</button>');
+      return;
+    }
+
     if (act === "copyCode") { copyText(myInviteCode(), "초대 코드를 복사했어요"); return; }
 
     if (act === "linkSheet") { openSheet(formLink()); return; }
@@ -3410,6 +3524,7 @@
 
     if (act === "pickPic") {
       var pWho = el.getAttribute("data-who") === "you" ? "you" : "me";
+      if (!canEditAvatar(pWho)) { toast("프로필 사진은 " + (pWho === "you" ? S.couple.you : "본인") + " 폰에서 바꿀 수 있어요"); return; }
       var ai = $("#avatarInput");
       if (!ai) return;
       ai.value = "";
@@ -3420,9 +3535,8 @@
 
     if (act === "clearPic") {
       var cWho = el.getAttribute("data-who") === "you" ? "you" : "me";
-      if (S.couple.pics) delete S.couple.pics[cWho];
-      save(); renderAll();
-      if (personSheetWho) openPersonSheet(personSheetWho);
+      if (!canEditAvatar(cWho)) { toast("프로필 사진은 " + (cWho === "you" ? S.couple.you : "본인") + " 폰에서 바꿀 수 있어요"); return; }
+      setAvatarPic(cWho, "");
       toast("프로필 사진을 지웠어요"); return;
     }
 
@@ -3887,9 +4001,19 @@
           if (lbtn) { lbtn.disabled = false; lbtn.textContent = "연결하기"; }
           if (!res || res.error) { toast("연결하지 못했어요. 코드를 확인해 주세요"); return; }
           return Store.reload().then(function (doc) {
-            if (doc) { var keepUi = S.ui; S = normalizeState(doc); S.ui = keepUi; applyTheme(); renderAll(); }
-            closeSheet();
-            toast("커플 연결을 완료했어요");
+            return new Promise(function (resolve) {
+              withLocalHistory(doc, function (next, mres) {
+                if (next) {
+                  var keepUi = S.ui;
+                  S = normalizeState(next);
+                  S.ui = keepUi;
+                  applyTheme(); renderAll(); loadPhotoUrls();
+                }
+                closeSheet();
+                toast(migrateToast(mres) || "커플 연결을 완료했어요");
+                resolve();
+              });
+            });
           });
         }).catch(function () {
           if (lbtn) { lbtn.disabled = false; lbtn.textContent = "연결하기"; }
@@ -3919,14 +4043,37 @@
         if (res && res.error) { toast("들어가지 못했어요: " + res.error); return; }
         if (res && res.needsConfirm) { toast("메일로 온 확인 링크를 누른 뒤 로그인해 주세요"); return; }
         return Store.load().then(function (doc) {
-          S = normalizeState(doc || emptyState());
+          /* v26: 이 폰에 예전 로컬 기록이 남아 있으면 먼저 이어 옵니다 */
+          return new Promise(function (resolve) {
+            withLocalHistory(doc, function (next, mres) { resolve({ doc: next, mres: mres }); });
+          });
+        }).then(function (got) {
+          S = normalizeState(got.doc || emptyState());
           S.auth.out = false;
           S.auth.email = email;
           applyTheme(); go("home"); renderAll();
-          toast("들어왔어요");
           loadPhotoUrls();
+          toast(migrateToast(got.mres) || "들어왔어요");
         });
       }).catch(function (e) { toast("들어가지 못했어요"); if (btn) { btn.disabled = false; btn.textContent = label; } });
+      return;
+    }
+
+    if (ev.target.id === "importForm") {
+      ev.preventDefault();
+      var ibtn = ev.target.querySelector(".btn-primary");
+      if (ibtn) { ibtn.disabled = true; ibtn.textContent = "가져오는 중…"; }
+      Store.migrate.run({ force: true }).then(function (res) {
+        if (ibtn) { ibtn.disabled = false; ibtn.textContent = "가져오기"; }
+        closeSheet();
+        if (!res || !res.ok) {
+          toast(res && res.reason === "no_local" ? "이 기기에 예전 기록이 없어요"
+            : res && res.reason === "no_couple" ? "로그인이 필요해요"
+            : "가져오지 못했어요. 잠시 뒤 다시 해 주세요");
+          return;
+        }
+        applyMigrated(res);
+      }).catch(function () { closeSheet(); toast("가져오지 못했어요"); });
       return;
     }
 
@@ -4062,12 +4209,15 @@
     var file = (ev.target.files || [])[0];
     if (!file) return;
     var w = ev.target.getAttribute("data-who") === "you" ? "you" : "me";
+    if (!canEditAvatar(w)) { toast("프로필 사진은 " + (w === "you" ? S.couple.you : "본인") + " 폰에서 바꿀 수 있어요"); return; }
     squareAvatar(file).then(function (url) {
+      /* v26: remote 모드에서는 그 사람 몫으로 서버(settings)에 올라가 두 폰에 함께 보입니다 */
       S.couple.pics = S.couple.pics || {};
       S.couple.pics[w] = url;
+      if (Store && Store.mode === "remote" && Store.avatar) Store.avatar.set(w, url).catch(function () {});
       save(); renderAll();
       if (personSheetWho) openPersonSheet(personSheetWho);
-      toast("프로필 사진을 바꿨어요");
+      toast(w === "me" ? "내 프로필 사진을 바꿨어요" : "프로필 사진을 바꿨어요");
     }).catch(function () { toast("사진을 불러오지 못했어요. 다른 사진으로 해볼까요?"); });
   });
 
@@ -4158,6 +4308,8 @@
   window.TwoLogUI = {
     start: start,
     applyRemote: applyRemote,
+    joinLocalHistory: joinLocalHistory,
+    localReadyInfo: localReadyInfo,
     rerender: function () { if (BOOTED) { applyTheme(); renderAll(); } },
     toast: function (m) { toast(m); },
     go: go,
@@ -4258,6 +4410,8 @@
         store.onRemote(function (doc) { window.TwoLogUI.applyRemote(doc); });
       }
       window.TwoLogUI.loadPhotoUrls();
+      /* v26: 로그인된 기기에 예전 로컬 기록이 남아 있으면 한 번 자동으로 이어 옵니다 */
+      if (!demo && !signedOut) window.TwoLogUI.joinLocalHistory();
     }).catch(function (e) {
       console.error("[투로그] 시작하지 못했어요", e);
       window.TwoLogUI.start(store, demo ? "demo" : null, {});
