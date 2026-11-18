@@ -4,7 +4,7 @@
    월 제목·요일·날짜 숫자·장수 배지도 비례해서 커짐 (5주·6주 달력 모두)
 2) 캘린더 한 주에 일정 세 줄이 서로 붙지 않고(6px) 날짜 숫자·다음 주와 부딪히지 않게
 3) v23 기능 그대로: 선택한 날 숫자 동그라미 · 일정 시트 · 노트 카드 제목 · My 버전 표시
-4) My 탭 맨 윗줄 「버전 v27」 · sw.js 캐시 twolog-v27
+4) My 탭 맨 윗줄 「버전 v28」 · sw.js 캐시 twolog-v28
 
     python3 tests/v24.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
 """
@@ -83,11 +83,11 @@ with sync_playwright() as p:
 
     # ---------------- 0. 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
-    check("sw.js 캐시 버전 twolog-v27", 'const VERSION = "twolog-v27"' in sw,
+    check("sw.js 캐시 버전 twolog-v28", 'const VERSION = "twolog-v28"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
     app_js = page.request.get(URL + "app.js").text()
-    check("app.js 버전 상수 v27", 'var APP_VERSION = "v27"' in app_js)
-    check("캐시 목록이 새 버전(shell-twolog-v27)", "shell-" in sw)
+    check("app.js 버전 상수 v28", 'var APP_VERSION = "v28"' in app_js)
+    check("캐시 목록이 새 버전(shell-twolog-v28)", "shell-" in sw)
 
     # 예시 데이터로 상태를 만들고 일반 모드로
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -146,7 +146,8 @@ with sync_playwright() as p:
       bars.forEach(b => { const r = b.getBoundingClientRect();
         const k = Math.round(r.left / 7); (byCol[k] = byCol[k] || []).push(r.top); });
       return Math.max.apply(null, Object.keys(byCol).map(k => byCol[k].length)); })()""")
-    check("같은 칸에 일정 막대가 3줄까지 쌓임", stacked >= 3, stacked)
+    # v28: 한 칸에 보이는 막대는 두 줄까지 (세 개부터는 +N)
+    check("같은 칸에 일정 막대가 2줄까지 쌓임", stacked == 2, stacked)
     # v27: 한 칸에 쌓인 막대는 빈틈 없이 붙습니다 (다른 주 사이 간격은 제외)
     check("쌓인 막대 사이에 빈틈이 없음 (v27: 붙여서)",
           bool(vgaps) and min(vgaps) == 0 and all(v <= 0.6 or v > 10 for v in vgaps),
@@ -177,8 +178,8 @@ with sync_playwright() as p:
         const r = b.getBoundingClientRect(); return r.left < cr.right - 1 && r.right > cr.left + 1; }) : [];
       return {bars: bars.map(b => b.textContent.trim()),
               ovf: o ? o.textContent.trim() : null}; })()""")
-    check("일정이 많은 날은 세 줄까지 펼치고 나머지는 「외 N」",
-          len(ovf["bars"]) == 3 and bool(ovf["ovf"]) and "외" in str(ovf["ovf"]), ovf)
+    check("일정이 많은 날은 두 줄까지 펼치고 나머지는 「+N」",
+          len(ovf["bars"]) == 2 and bool(ovf["ovf"]) and str(ovf["ovf"]).startswith("+"), ovf)
     page.wait_for_timeout(1500)
     page.locator("#s-cal .cal").scroll_into_view_if_needed()
     page.wait_for_timeout(400)
@@ -251,23 +252,36 @@ with sync_playwright() as p:
       return best;
     })()""")
     lines = three["lines"]
-    check("한 주에 일정 세 줄이 쌓임", len(lines) >= 3, [l["t"] for l in lines])
+    # v28: 한 칸에 보이는 막대는 두 줄 — 세 줄이 되지 않아요
+    check("한 주에 일정 막대가 두 줄까지", len(lines) == 2, [l["t"] for l in lines])
     pitch = [round(lines[i + 1]["top"] - lines[i]["top"], 1) for i in range(len(lines) - 1)]
     gaps = [round(lines[i + 1]["top"] - lines[i]["bottom"], 1) for i in range(len(lines) - 1)]
     # v27: 막대 16px 이 서로 붙어 쌓입니다(줄 간격 16px)
-    check("세 줄이 16px 줄 간격으로 자리 잡음", bool(pitch) and min(pitch) >= 15.4, pitch)
+    check("두 줄이 16px 줄 간격으로 자리 잡음", bool(pitch) and min(pitch) >= 15.4, pitch)
     check("줄과 줄 사이 빈틈 없음 (v27)", bool(gaps) and max(abs(g) for g in gaps) <= 1, gaps)
     num_bottom = max([n["bottom"] for n in three["nums"]] or [0])
     check("첫 줄이 날짜 숫자에 붙지 않음(3px 이상)", lines[0]["top"] - num_bottom >= 3,
           round(lines[0]["top"] - num_bottom, 1))
     last_b = lines[-1]["bottom"]
-    check("셋째 줄 아래로 8px 넘는 여백", three["rowH"] - last_b >= 8, round(three["rowH"] - last_b, 1))
-    ovf_all = three["ovf"]
-    check("「외 N」이 셋째 줄에 붙지 않음(6px 이상)",
-          bool(ovf_all) and min(o["top"] for o in ovf_all) - last_b >= 6,
-          [(o["t"], round(o["top"] - last_b, 1)) for o in ovf_all])
-    check("「외 N」이 주 칸 안에 들어옴",
-          bool(ovf_all) and all(o["bottom"] <= three["rowH"] for o in ovf_all), three["rowH"])
+    check("둘째 줄 아래로 8px 넘는 여백", three["rowH"] - last_b >= 8, round(three["rowH"] - last_b, 1))
+    # v28: 「+N」은 막대 두 줄 아래·그 주 칸 안에 (칸마다 확인)
+    ovf_all = page.evaluate("""() => {
+      const out = [];
+      document.querySelectorAll('#s-cal .cal-daygrid .day').forEach(d => {
+        const o = d.querySelector('.dovf'); if (!o) return;
+        const cell = d.getBoundingClientRect(), orr = o.getBoundingClientRect();
+        const row = d.closest('.cal-row').getBoundingClientRect();
+        const bars = Array.from(d.closest('.cal-row').querySelectorAll('.ebar')).filter(b => {
+          const r = b.getBoundingClientRect(); return r.left < cell.right - 1 && r.right > cell.left + 1; });
+        const lastBar = bars.length ? Math.max.apply(null, bars.map(b => b.getBoundingClientRect().bottom)) : cell.top;
+        out.push({t: o.textContent.trim(), gap: Math.round(orr.top - lastBar),
+                  inRow: orr.bottom <= row.bottom + 0.5});
+      });
+      return out;
+    }""")
+    check("「+N」이 막대에 붙지 않음(6px 이상)",
+          bool(ovf_all) and min(o["gap"] for o in ovf_all) >= 6, ovf_all)
+    check("「+N」이 주 칸 안에 들어옴", bool(ovf_all) and all(o["inRow"] for o in ovf_all), ovf_all)
     check("다음 주 날짜 숫자와 10px 넘게 떨어짐",
           three["nextTop"] is not None and three["nextTop"] - last_b - 0 >= 10,
           round((three["nextTop"] or 0) - last_b, 1))
@@ -291,6 +305,7 @@ with sync_playwright() as p:
           const bcs = getComputedStyle(big);
           const tbtn = sh.querySelector('.ev-time-btn[data-side="start"]');
           const tin = sh.querySelector('.ev-time-in[data-side="start"]');
+          const dow = sh.querySelector('.ev-dow[data-dow="start"]');
           const til = sh.querySelector('.ev-tilde');
           const sides = Array.from(sh.querySelectorAll('.ev-side')).map(e => e.getBoundingClientRect());
           const when = sh.querySelector('.ev-when').getBoundingClientRect();
@@ -303,9 +318,14 @@ with sync_playwright() as p:
                   bigFs: bcs.fontSize, bigW: bigR.width, bigSW: big.scrollWidth,
                   bigOverflow: big.scrollWidth > Math.ceil(bigR.width) + 1,
                   bigTxt: big.textContent.trim(),
-                  btnFs: getComputedStyle(tbtn).fontSize, btnTxt: tbtn.textContent.trim(),
-                  btnR: tbtn.getBoundingClientRect().width,
+                  btnFs: tbtn ? getComputedStyle(tbtn).fontSize : null, btnTxt: tbtn ? tbtn.textContent.trim() : null,
+                  btnR: tbtn ? tbtn.getBoundingClientRect().width : null,
                   inFs: tin ? getComputedStyle(tin).fontSize : null,
+                  dowTxt: dow ? dow.textContent.trim() : null,
+                  dowFs: dow ? getComputedStyle(dow).fontSize : null,
+                  dowWant: (() => { const i0 = sh.querySelector('.js-evdate[data-side="start"]');
+                    const names = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
+                    return i0 ? names[new Date(i0.value + 'T00:00:00').getDay()] : null; })(),
                   tildeFs: tcs.fontSize, tildeTxt: til.textContent.trim(),
                   tildeMid: tr.left + tr.width / 2, gapMid: midGap,
                   tildeVMid: tr.top + tr.height / 2,
@@ -319,19 +339,20 @@ with sync_playwright() as p:
         return m
 
     ev = sheet_metrics(390)
-    check("날짜 글씨 16px", ev["bigFs"] == "16px", ev["bigFs"])
-    check("날짜·시간 글씨 크기가 완전히 같음",
-          ev["bigFs"] == ev["btnFs"] and ev["btnFs"] == ev["inFs"], (ev["bigFs"], ev["btnFs"], ev["inFs"]))
+    # v28: 날짜 19px · 아래 요일 13px, 시간 설정 버튼은 없앰
+    check("날짜 글씨 19px (v28: 더 크게)", ev["bigFs"] == "19px", ev["bigFs"])
+    check("날짜 아래 요일이 13px", ev["dowTxt"] == ev["dowWant"] and ev["dowFs"] == "13px",
+          (ev["dowTxt"], ev["dowWant"], ev["dowFs"]))
+    check("시간 설정 버튼·칸 없음", ev["btnFs"] is None and ev["inFs"] is None, (ev["btnFs"], ev["inFs"]))
     check("390px 폭에서 날짜가 한 줄로 잘리지 않음",
           not ev["bigOverflow"] and ev["oneLine"] == 1, (ev["bigTxt"], ev["bigW"], ev["bigSW"], ev["oneLine"]))
-    check("390px 폭에서 시간도 한 줄", "오전" in ev["btnTxt"] and ev["btnR"] <= (ev["whenR"] - ev["whenL"]) / 2,
-          (ev["btnTxt"], round(ev["btnR"], 1)))
-    check("물결(~)이 24px보다 확실히 큼", float(ev["tildeFs"].replace("px", "")) >= 30, ev["tildeFs"])
+    check("390px 폭에서 요일도 한 줄", "요일" in str(ev["dowTxt"]), ev["dowTxt"])
+    check("물결(~)이 날짜 글씨보다 큼", float(ev["tildeFs"].replace("px", "")) >= 26, ev["tildeFs"])
     check("물결이 두 날짜 블록 사이 가로 가운데", abs(ev["tildeMid"] - ev["gapMid"]) <= 3,
           (round(ev["tildeMid"], 1), round(ev["gapMid"], 1)))
     check("물결이 두 날짜 블록 세로 가운데", abs(ev["tildeVMid"] - ev["side0VMid"]) <= 3,
           (round(ev["tildeVMid"], 1), round(ev["side0VMid"], 1)))
-    check("날짜·시간이 시트 안에 들어옴", bool(ev["inSheet"]), (ev["sheetL"], ev["sheetR"], ev["whenR"]))
+    check("날짜가 시트 안에 들어옴", bool(ev["inSheet"]), (ev["sheetL"], ev["sheetR"], ev["whenR"]))
     page.wait_for_timeout(500)
     page.screenshot(path=os.path.join(SHOT, "event-sheet-v24.png"))
     page.locator("#sheet [data-close]").first.click()
@@ -341,9 +362,9 @@ with sync_playwright() as p:
     page.set_viewport_size({"width": 375, "height": 667})
     page.wait_for_timeout(500)
     ev375 = sheet_metrics(375)
-    check("375px 폭에서도 날짜·시간 한 줄 (넘침 없음)",
-          not ev375["bigOverflow"] and ev375["oneLine"] == 1
-          and ev375["bigFs"] == ev375["btnFs"], (ev375["bigW"], ev375["bigSW"], ev375["btnR"]))
+    check("375px 폭에서도 날짜·요일 한 줄 (넘침 없음)",
+          not ev375["bigOverflow"] and ev375["oneLine"] == 1 and ev375["dowTxt"] == ev375["dowWant"],
+          (ev375["bigW"], ev375["bigSW"], ev375["dowTxt"]))
     check("375px 폭에서도 시트 안", bool(ev375["inSheet"]), (ev375["sheetL"], ev375["whenR"]))
     page.wait_for_timeout(300)
     page.screenshot(path=os.path.join(SHOT, "event-sheet-v24-375.png"))
@@ -390,7 +411,7 @@ with sync_playwright() as p:
       return {ok: !!v, txt: v ? v.textContent.trim() : null,
               right: v ? window.innerWidth - v.getBoundingClientRect().right : null};
     })()""")
-    check("My 탭에 버전 v27 표시", my.get("ok") and "v27" in str(my.get("txt")), my.get("txt"))
+    check("My 탭에 버전 v28 표시", my.get("ok") and "v28" in str(my.get("txt")), my.get("txt"))
     page.wait_for_timeout(400)
     page.screenshot(path=os.path.join(SHOT, "my-v24.png"))
 

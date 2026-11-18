@@ -88,7 +88,7 @@ with sync_playwright() as p:
     # ---------------- 서비스워커 캐시 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
     # v24: 캐시 버전은 배포마다 올라가므로 v24 으로 (앱 버전 상수와 같은 값)
-    check("sw.js 캐시 버전 twolog-v27", 'const VERSION = "twolog-v27"' in sw,
+    check("sw.js 캐시 버전 twolog-v28", 'const VERSION = "twolog-v28"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장되는 일반 모드로 옮겨요
@@ -574,18 +574,26 @@ with sync_playwright() as p:
     # v22: 스와치를 20px 로 한 단계 더 줄였어요 (모양은 그대로 동그라미)
     check("컬러는 작은 동그라미(20px·둥글게)", ef["swSize"]["w"] <= 22 and ef["swSize"]["h"] <= 22
           and ("50%" in ef["swSize"]["radius"] or "999px" in ef["swSize"]["radius"]), ef["swSize"])
-    check("기본 시간은 오전 12:00 · 오후 09:00", ef["timeLabels"] == ["오전 12:00", "오후 09:00"], ef["timeLabels"])
+    # v28: 시간 설정 칸을 없애고 날짜 아래에 요일을 크게 — 시간 버튼은 하나도 없어요
+    check("v28: 시간 설정 버튼 없음", ef["timeLabels"] == [] and ef["times"] == 0, (ef["timeLabels"], ef["times"]))
     check("큰 날짜 두 개 + 가운데 ~", len(ef["bigs"]) == 2 and ef["tildeTxt"] == "~", (ef["bigs"], ef["tildeTxt"]))
     import re as _re
-    # v23: 날짜와 시간 글씨를 같은 크기(16px)로 맞춰서 날짜 크기 기준을 현행에 맞춤
-    check("날짜는 26.11.17(화) 형식·큰 글씨", all(_re.match(r"^\d{2}\.\d{2}\.\d{2}\([일월화수목금토]\)$", b["t"]) for b in ef["bigs"])
-          and all(b["fs"] == "16px" and b["fw"] == "800" for b in ef["bigs"]), ef["bigs"])
+    # v28: 날짜는 «26.11.17», 요일은 그 아래 «화요일» — 날짜 글씨도 19px 로 커짐
+    check("날짜는 26.11.17 형식·더 큰 글씨(19px)", all(_re.match(r"^\d{2}\.\d{2}\.\d{2}$", b["t"]) for b in ef["bigs"])
+          and all(b["fs"] == "19px" and b["fw"] == "800" for b in ef["bigs"]), ef["bigs"])
+    dw = page.evaluate("""(() => {
+      const in0 = document.querySelector('#sheet .js-evdate[data-side="start"]');
+      const names = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
+      const d = new Date(in0.value + 'T00:00:00');
+      return {want: names[d.getDay()], txt: Array.from(document.querySelectorAll('#sheet .ev-dow')).map(e => e.textContent.trim())};
+    })()""")
+    check("날짜 아래에 요일 전체 이름", dw["txt"] == [dw["want"], dw["want"]], dw)
     check("~ 도 큼직하게", ef["tildeFs"] and float(ef["tildeFs"].replace("px", "")) >= 20, ef["tildeFs"])
     til = page.evaluate("""(() => { const t = document.querySelector('#sheet .ev-tilde').getBoundingClientRect();
       const l = document.querySelector('#sheet .ev-side').getBoundingClientRect();
       return {tMid: t.top + t.height / 2, lMid: l.top + l.height / 2}; })()""")
     check("물결이 두 날짜 사이 세로 가운데", abs(til["tMid"] - til["lMid"]) <= 2, til)
-    check("날짜마다 시간 버튼", ef["times"] == 2, ef["times"])
+    check("시간 버튼·시간 칸이 사라짐", ef["times"] == 0, ef["times"])
 
     # 색·제목·날짜·시간을 넣고 헤더 ✓ 로 저장
     page.locator('#sheet [data-sw="evColor"] .sw[data-color="#80A4AA"]').click()
@@ -594,13 +602,9 @@ with sync_playwright() as p:
     page.locator('#sheet .js-evdate[data-side="start"]').fill("2026-11-22")
     page.wait_for_timeout(250)
     dbig = page.evaluate("document.querySelector('#sheet .ev-dbig[data-dbig=\"start\"]').textContent.trim()")
-    check("날짜를 고르면 큰 글씨도 바뀜", dbig == "26.11.22(일)", dbig)
-    page.locator('#sheet .ev-time-btn[data-side="start"]').click()
-    page.wait_for_timeout(250)
-    page.fill('#sheet .js-evtime[data-side="start"]', "19:00")
-    page.wait_for_timeout(250)
-    tbtn = page.evaluate("Array.from(document.querySelectorAll('#sheet .ev-time-btn')).map(b => b.textContent.trim())")
-    check("시간을 고르면 오전/오후 표기로 남음", tbtn[0] == "오후 07:00", tbtn)
+    check("날짜를 고르면 큰 글씨도 바뀜", dbig == "26.11.22", dbig)
+    ddow = page.evaluate("document.querySelector('#sheet .ev-dow[data-dow=\"start\"]').textContent.trim()")
+    check("날짜를 고르면 요일도 함께 바뀜", ddow == "일요일", ddow)
     page.wait_for_timeout(1200)
     page.screenshot(path=os.path.join(SHOT, "event-sheet-v21.png"))
     page.locator("#evSave").click()
@@ -618,7 +622,7 @@ with sync_playwright() as p:
               sel: window.__app.state.ui.selDate};
     })()""")
     check("헤더 ✓ 로 일정 저장", ev["n"] == 1 and not ev["open"], ev)
-    check("고른 색·시간이 그대로 저장", ev["color"] == "#80A4AA" and ev["time"] == "19:00", ev)
+    check("고른 색이 그대로 저장 (시간 없이)", ev["color"] == "#80A4AA" and ev["time"] == "", ev)
     check("일정 띠가 고른 컬러", ev["bar"] == "rgb(128, 164, 170)", ev["bar"])
     check("일정 줄에 작은 날짜·종일 표시 없음", ev["meta"] is None and ev["mCount"] == 0, (ev["meta"], ev["mCount"]))
 
@@ -639,8 +643,7 @@ with sync_playwright() as p:
     })()""")
     check("색을 안 고르면 담당자 색", ev2["color"] == "" and ev2["bar"] not in (None, ""), ev2)
     check("일정 줄엔 작은 표시 없음", ev2["meta"] is None, ev2["meta"])
-    check("기본 시간도 함께 저장", ev2.get("time") == "00:00" and ev2.get("endTime") == "21:00",
-          (ev2.get("time"), ev2.get("endTime")))
+    check("v28: 새 일정은 시간 없이 저장", (ev2.get("time") or "") == "", (ev2.get("time"), ev2.get("endTime")))
     page.wait_for_timeout(1200)
     page.screenshot(path=os.path.join(SHOT, "calendar-event-v21.png"))
 

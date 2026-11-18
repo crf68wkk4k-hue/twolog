@@ -1,7 +1,7 @@
 """투로그 v27 확인 — 노트 카드 묶음(groups·gid) 동기화 · v26 기기 자동 복구 · 달력 글씨.
 
-1) 버전: sw.js 캐시 twolog-v27 · APP_VERSION v27 · sync.js 에 repairGroups
-2) 달력 아래 선택한 날 일정 글씨가 커짐(제목 16px · 이름 12.5px)
+1) 버전: sw.js 캐시 twolog-v28 · APP_VERSION v28 · sync.js 에 repairGroups
+2) 달력 아래 선택한 날 일정 글씨가 커짐(제목 16px · 이름 12.5px → v28 13.5px)
 3) v26 으로 이미 한 번 이전을 마친 폰 재현
    (원격 notes 38개에 gid·memo 없음 + settings 에 groups 없음 + twolog.migrated.<cid> 있음,
     폰 localStorage 에는 groups(메모 2·버킷 3)와 항목별 gid·상세 메모가 그대로)
@@ -177,9 +177,9 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     sync_js = page.request.get(URL + "sync.js").text()
-    check("sw.js 캐시 버전 twolog-v27", 'const VERSION = "twolog-v27"' in sw,
+    check("sw.js 캐시 버전 twolog-v28", 'const VERSION = "twolog-v28"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:1])
-    check("app.js 버전 상수 v27", 'var APP_VERSION = "v27"' in app_js)
+    check("app.js 버전 상수 v28", 'var APP_VERSION = "v28"' in app_js)
     check("sync.js 에 gid·groups 동기화가 있음",
           "notePayload" in sync_js and 'K_GROUPS = "groups"' in sync_js and "repairGroups" in sync_js)
     ctx.close()
@@ -223,7 +223,8 @@ with sync_playwright() as p:
               txt: t ? t.textContent.trim() : ''};
     }""")
     check("달력 아래 일정 제목 글씨가 16px (v26 14px 보다 큼)", fs["t"] == "16px", fs)
-    check("일정 줄 이름 글씨도 12.5px", fs["w"] == "12.5px", fs)
+    # v28: 이름 글씨를 1px 더 크게 (12.5 → 13.5px)
+    check("일정 줄 이름 글씨 13.5px", fs["w"] == "13.5px", fs)
     check("일정 제목이 그대로 보임", fs["txt"] == "글씨 크기 확인 일정", fs)
     # ---- 달력 격자 칸 안의 일정 막대: 빈틈 없이 쌓기 · 글씨 1px 작게
     page.evaluate("""() => {

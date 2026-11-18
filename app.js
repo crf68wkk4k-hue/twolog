@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v27";
+  var APP_VERSION = "v28";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -56,7 +56,9 @@
     gear: svg('<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="1.9"/><circle cx="9" cy="12" r="1.9"/><circle cx="17.5" cy="17" r="1.9"/>', 21),
     person: svg('<circle cx="12" cy="8.3" r="3.5"/><path d="M5.2 20c0-3.4 3.1-5.7 6.8-5.7s6.8 2.3 6.8 5.7"/>', 21),
     search: svg('<circle cx="10.8" cy="10.8" r="6.2"/><path d="M15.4 15.4l4.1 4.1"/>', 20),
-    grid: svg('<rect x="3.6" y="3.6" width="7" height="7"/><rect x="13.4" y="3.6" width="7" height="7"/><rect x="3.6" y="13.4" width="7" height="7"/><rect x="13.4" y="13.4" width="7" height="7"/>', 18)
+    grid: svg('<rect x="3.6" y="3.6" width="7" height="7"/><rect x="13.4" y="3.6" width="7" height="7"/><rect x="3.6" y="13.4" width="7" height="7"/><rect x="13.4" y="13.4" width="7" height="7"/>', 18),
+    /* v28: 노트 알약 탭 옆 — 「목록 +」 아이콘 */
+    listPlus: svg('<path d="M4.6 6.4h9.2M4.6 11h6.4M4.6 15.6h4.4"/><path d="M17.6 12.4v6.2M14.5 15.5h6.2"/>', 20)
   };
   var STAR = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.8l2.86 5.94 6.54.9-4.77 4.55 1.18 6.5L12 17.6l-5.81 3.09 1.18-6.5L2.6 9.64l6.54-.9z"/></svg>';
 
@@ -845,6 +847,8 @@
   }
   function evCovers(e, ds) { return !!ds && ds >= evStart(e) && ds <= evEnd(e); }
   var DOW_KR = ["일", "월", "화", "수", "목", "금", "토"];
+  /* v28: 일정 시트 — 날짜 아래에 「화요일」처럼 요일을 풀어서 */
+  var DOW_FULL = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
   /* v21: 일정에 고른 색이 있으면 그 색, 없으면 담당자 색 (달력 막대·띠·목록에 함께) */
   function evColor(e) {
     var c = String((e && e.color) || "").toUpperCase();
@@ -876,7 +880,13 @@
   function evDateBig(ds) {
     var d = parse(ds);
     if (!d || isNaN(d.getTime())) return "";
-    return String(d.getFullYear()).slice(2) + "." + pad(d.getMonth() + 1) + "." + pad(d.getDate()) + "(" + DOW_KR[d.getDay()] + ")";
+    /* v28: 요일은 아래 줄(evDowFull)로 따로 — 여기는 날짜만 */
+    return String(d.getFullYear()).slice(2) + "." + pad(d.getMonth() + 1) + "." + pad(d.getDate());
+  }
+  function evDowFull(ds) {
+    var d = parse(ds);
+    if (!d || isNaN(d.getTime())) return "";
+    return DOW_FULL[d.getDay()];
   }
   function evRange(e) {
     var st = evStart(e), en = evEnd(e);
@@ -1016,7 +1026,8 @@
        TOP_H = 날짜 숫자 아래에서 첫 줄까지, LANE_H = 한 줄 높이(막대 16 + 사이 6),
        ROW_PAD = 마지막 줄 아래 여백입니다.
        v27: 한 칸에 일정이 여러 개면 막대 사이 빈틈 없이 딱 붙여 쌓습니다(LANE_H = 막대 16). */
-    var LANE_H = 16, TOP_H = 32, ROW_MIN = 68, ROW_PAD = 12, MAX_LANE = 3;
+    /* v28: 한 날에 보이는 일정 막대는 두 줄까지 — 세 개부터는 날짜 칸에 「+1」처럼 알려 줘요 */
+    var LANE_H = 16, TOP_H = 32, ROW_MIN = 68, ROW_PAD = 12, MAX_LANE = 2;
     html += '<div class="cal-grid">';
     for (var w = 0; w < cells.length / 7; w++) {
       var wk = cells.slice(w * 7, w * 7 + 7);
@@ -1043,7 +1054,7 @@
         (lanes[li] = lanes[li] || []).push(b);
         b.lane = li;
       });
-      /* 한 주에 보이는 막대는 세 줄까지 — 넘치는 일정은 날짜 칸에 '외 N' 으로 알려 줍니다 */
+      /* 한 주에 보이는 막대는 두 줄까지 — 넘치는 일정은 날짜 칸에 '+N' 으로 알려 줍니다 */
       var shown = bars.filter(function (b) { return b.lane < MAX_LANE; });
       var ovf = {};
       bars.forEach(function (b) {
@@ -1075,7 +1086,7 @@
         html += '<button class="' + cls + '" data-act="pickDay" data-date="' + ds2 + '"><span class="dnum">' +
           Number(ds2.slice(8, 10)) + "</span>" +
           (hol2 ? '<span class="dhol">' + esc(hol2) + "</span>" : "") +
-          (ovfCount && ovfCount[ds2] ? '<span class="dovf">외 ' + ovfCount[ds2] + "</span>" : "") + "</button>";
+          (ovfCount && ovfCount[ds2] ? '<span class="dovf">+' + ovfCount[ds2] + "</span>" : "") + "</button>";
       }
       html += "</div>";
       if (shown.length) {
@@ -1113,7 +1124,9 @@
     if (selEvents.length) {
       selEvents.forEach(function (e) {
         /* (프사) 이름 일정 — 한 줄로 나란히 (오른쪽은 삭제 × 하나만) */
-        html += '<div class="ev"><span class="bar" style="background:' + evColor(e) + '"></span>' +
+        /* v28: 줄을 누르면 그 일정의 수정 시트가 열려요 (오른쪽 × 만 삭제) */
+        html += '<div class="ev ev-tap" role="button" tabindex="0" data-act="editEvent" data-id="' + e.id +
+          '" aria-label="' + esc(e.title) + ' 일정 수정"><span class="bar" style="background:' + evColor(e) + '"></span>' +
           whoRow(e) +
           '<div class="t" title="' + esc(e.title) + '">' + esc(e.title) + "</div>" +
           /* v21: 오른쪽의 작은 날짜·종일 표시는 지웠어요 — 색띠·이름·제목만 깔끔하게 */
@@ -1185,15 +1198,21 @@
     html += '<div class="segs">';
     NOTE_BASE.forEach(function (k) { html += segBtn(seg, k, noteLabel(k)); });
     html += "</div>";
+    /* v28: 카테고리 칩 줄 오른쪽 끝의 동그란 + — 누르면 새 카테고리 탭을 만드는 시트가 열립니다.
+       (칩이 하나도 없어도 + 는 보이도록 이 줄은 늘 그립니다) */
+    html += '<div class="lstbar">';
     if (S.lists.length) {
-      html += '<div class="lstbar"><div class="lst-scroll">';
+      html += '<div class="lst-scroll">';
       S.lists.forEach(function (l) {
         var on = seg === "list:" + l.id;
         html += '<button class="lchip' + (on ? " active" : "") + '" data-act="seg" data-seg="list:' + l.id + '" aria-label="' + esc(listLabel(l)) + '">' +
           (l.emoji ? '<span class="le">' + esc(l.emoji) + "</span>" : "") + "<span>" + esc(l.title) + "</span></button>";
       });
-      html += "</div></div>";
+      html += "</div>";
     }
+    html += '<button type="button" class="lst-new" data-act="newList" aria-label="새 카테고리 탭 추가" title="새 카테고리 탭 추가">' +
+      IC.listPlus + "</button>";
+    html += "</div>";
     var body;
     if (seg === "todo") body = viewTodo();
     else if (seg === "bucket") body = viewBucket();
@@ -1774,51 +1793,57 @@
       function () { closeSheet(); if (onYes) onYes(); });
   }
 
-  /* v21: 일정 추가 시트 — 컬러 → 제목 → 큰 «26.11.17(화) ~ 26.11.17(화)» + 시간 설정 → 누구와.
-     종류·시작일/종료일 라벨·여러 날 설명은 지우고, 저장은 헤더 오른쪽 검정 ✓ 로 해요. */
+  /* v28: 일정 추가·수정 시트 — 컬러 → 제목 → 큰 «26.11.17 / 화요일 ~ 26.11.17 / 화요일» → 누구와.
+     시간 설정은 없앴고, 저장은 헤더 오른쪽 검정 ✓ 로 해요. */
   var IC_CHK = '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.4l4.4 4.4L19 6.8"/></svg>';
 
-  /* v21: 기본 세팅 시간 — 왼쪽(시작) 오전 12:00 · 오른쪽(종료) 오후 09:00 */
-  var EV_TIME_DEF = { start: "00:00", end: "21:00" };
+  /* v28: 시작·종료 날짜 칸 — 날짜 아래에 요일(화요일) */
   function evSideHtml(side, label, ds) {
-    var tv = EV_TIME_DEF[side];
     return '<div class="ev-side">' +
       '<label class="ev-datewrap">' +
       '<span class="ev-dbig" data-dbig="' + side + '">' + evDateBig(ds) + "</span>" +
+      '<span class="ev-dow" data-dow="' + side + '">' + evDowFull(ds) + "</span>" +
       '<input type="date" class="ev-date-in js-evdate" data-side="' + side + '" name="' + side + '" value="' + ds + '" required aria-label="' + label + '">' +
       "</label>" +
-      '<button type="button" class="ev-time-btn on" data-act="evTime" data-side="' + side + '">' + timeK(tv) + "</button>" +
-      '<input type="time" class="ev-time-in js-evtime" data-side="' + side + '" name="' + side + 'Time" value="' + tv + '" hidden aria-label="' + label + ' 시간">' +
       "</div>";
   }
 
-  function formEvent(dateStr) {
-    var ds = dateStr || today;
-    var wopts = '<button type="button" class="wopt active" data-act="who" data-who="both">' + avSpan("me") + avSpan("you") + "함께</button>" +
-      '<button type="button" class="wopt" data-act="who" data-who="me">' + avSpan("me") + esc(S.couple.me) + "</button>" +
-      '<button type="button" class="wopt" data-act="who" data-who="you">' + avSpan("you") + esc(S.couple.you) + "</button>";
+  /* v28: 일정 시트 — 새 일정(ev 없음)과 수정(ev 있음)에 함께 씁니다.
+     수정할 때는 컬러·제목·시작일·종료일·누구와가 채워진 채로 열려요. */
+  function formEvent(dateStr, ev) {
+    var edit = !!ev;
+    var ds = edit ? evStart(ev) : (dateStr || today);
+    var de = edit ? evEnd(ev) : ds;
+    var ecol = edit ? String(ev.color || "").toUpperCase() : "";
+    var ewho = edit ? (ev.who || "both") : "both";
+    var wopts = [["both", "함께"], ["me", S.couple.me], ["you", S.couple.you]].map(function (w) {
+      return '<button type="button" class="wopt' + (ewho === w[0] ? " active" : "") + '" data-act="who" data-who="' + w[0] + '">' +
+        (w[0] === "both" ? avSpan("me") + avSpan("you") : avSpan(w[0])) + esc(w[1]) + "</button>";
+    }).join("");
     var sw = "";
     MUTED.forEach(function (p) {
-      sw += '<button type="button" class="sw" data-act="pickEvColor" data-color="' + p.c +
+      sw += '<button type="button" class="sw' + (ecol === p.c ? " sel" : "") + '" data-act="pickEvColor" data-color="' + p.c +
         '" style="background:' + p.c + '" aria-label="' + p.n + " " + p.c + '"></button>';
     });
+    var saveWord = edit ? "저장" : "추가";
     return '<div class="sheet-hd ev-hd">' +
       '<button type="button" class="icon-btn" data-close="1" aria-label="닫기">' + IC.x + "</button>" +
-      "<h2>일정 추가</h2>" +
-      '<button type="submit" form="sheetForm" id="evSave" class="icon-btn ev-chk" aria-label="일정 추가" title="일정 추가">' + IC_CHK + "</button>" +
+      "<h2>일정 " + saveWord + "</h2>" +
+      '<button type="submit" form="sheetForm" id="evSave" class="icon-btn ev-chk" aria-label="일정 ' + saveWord + '" title="일정 ' + saveWord + '">' + IC_CHK + "</button>" +
       "</div>" +
       '<form class="form eform" id="sheetForm">' +
-      '<input type="hidden" name="color" value="">' +
-      '<div class="f"><label>제목</label><input class="field ev-title" name="title" placeholder="예) 성수 데이트" required autocomplete="off"></div>' +
+      '<input type="hidden" name="color" value="' + ecol + '">' +
+      '<input type="hidden" name="evId" value="' + (edit ? esc(ev.id) : "") + '">' +
+      '<div class="f"><label>제목</label><input class="field ev-title" name="title" value="' + (edit ? esc(ev.title) : "") + '" placeholder="예) 성수 데이트" required autocomplete="off"></div>' +
       '<div class="cp ccp ev-cp"><div class="cp-hd"><span>컬러</span>' +
-      '<button type="button" class="cp-reset on" data-act="pickEvColor" data-color="">기본</button></div>' +
+      '<button type="button" class="cp-reset' + (ecol ? "" : " on") + '" data-act="pickEvColor" data-color="">기본</button></div>' +
       '<div class="sw-row" data-sw="evColor">' + sw + "</div></div>" +
       '<div class="ev-when">' + evSideHtml("start", "시작 날짜", ds) + '<span class="ev-tilde">~</span>' +
-      evSideHtml("end", "종료 날짜", ds) + "</div>" +
+      evSideHtml("end", "종료 날짜", de) + "</div>" +
       '<div class="wsel" data-group="who" aria-label="누구와">' + wopts + "</div>" +
-      '<input type="hidden" name="who" value="both">' +
-      /* 아래 「추가하기」도 그대로 — 헤더의 검은 ✓ 와 같은 일을 합니다 */
-      '<button class="btn-primary" type="submit">추가하기</button>' +
+      '<input type="hidden" name="who" value="' + ewho + '">' +
+      /* 아래 버튼도 그대로 — 헤더의 검은 ✓ 와 같은 일을 합니다 */
+      '<button class="btn-primary" type="submit">' + (edit ? "저장하기" : "추가하기") + "</button>" +
       "</form>";
   }
 
@@ -3102,8 +3127,20 @@
     }).join("");
   }
 
-  function go(name) {
+  /* v28: 캘린더는 열 때마다 «오늘이 속한 달»·«오늘 날짜»로 시작합니다.
+     달 안에서 화살표·스와이프로 넘긴 달은 그 달에 머무는 동안만 유지되고,
+     다른 탭에 갔다 돌아오거나 앱을 다시 켜면 다시 이번 달이 나와요. */
+  function syncCalToday() {
+    if (!S || !S.ui) return;
+    S.ui.calMonth = today.slice(0, 7);
+    S.ui.selDate = today;
+  }
+
+  function go(name, opts) {
     if (S.auth && S.auth.out) return;
+    /* v28: 탭에서 캘린더로 들어올 때는 늘 이번 달로.
+       일정 검색 결과처럼 «그 달로 가야 하는» 이동은 opts.keepCal 로 그 달을 지킵니다. */
+    if (name === "cal" && current !== "cal" && !(opts && opts.keepCal)) syncCalToday();
     current = name;
     showScreen(name);
     $("#screens").scrollTop = 0;
@@ -3193,21 +3230,21 @@
       if (!/^\d{4}-\d{2}-\d{2}$/.test(gd)) return;
       S.ui.calMonth = gd.slice(0, 7);
       S.ui.selDate = gd;
-      save(); closeSheet(); go("cal");
+      save(); closeSheet(); go("cal", { keepCal: true });
       toast(Number(gd.slice(5, 7)) + "월 " + Number(gd.slice(8, 10)) + "일로 이동했어요");
       return;
     }
 
     if (act === "addEvent") {
-      openSheet(formEvent(S.ui.selDate || today), function (fd) {
+      openSheet(formEvent(el.getAttribute("data-date") || S.ui.selDate || today), function (fd) {
         var st = String(fd.get("start") || today).slice(0, 10);
         var en = String(fd.get("end") || st).slice(0, 10);
         if (en < st) en = st;
         var ecol = String(fd.get("color") || "").toUpperCase();
         S.events.push({
           id: uid(), date: st, endDate: en,
-          time: String(fd.get("startTime") || "").slice(0, 5),
-          endTime: String(fd.get("endTime") || "").slice(0, 5),
+          /* v28: 시간 설정 칸을 없앴어요 — 새 일정은 시간 없이 담깁니다 */
+          time: "",
           title: String(fd.get("title") || "").trim(),
           /* v21: 종류 고르는 칸은 없어졌어요 — 새 일정은 「기타」로 담기고, 색은 고른 컬러(없으면 담당자 색) */
           type: "etc", memo: "",
@@ -3217,6 +3254,32 @@
         S.ui.calMonth = st.slice(0, 7);
         S.ui.selDate = st;
         save(); closeSheet(); renderAll(); toast("일정을 추가했어요");
+      });
+      return;
+    }
+
+    /* v28: 달력 아래 상세 일정을 누르면 그 일정을 고칠 수 있는 시트가 열려요 */
+    if (act === "editEvent") {
+      var evId = el.getAttribute("data-id");
+      var editEv = S.events.filter(function (x) { return x.id === evId; })[0];
+      if (!editEv) return;
+      openSheet(formEvent(null, editEv), function (fd) {
+        var curEv = S.events.filter(function (x) { return x.id === evId; })[0];
+        if (!curEv) return;
+        var st2 = String(fd.get("start") || curEv.date || today).slice(0, 10);
+        var en2 = String(fd.get("end") || st2).slice(0, 10);
+        if (en2 < st2) en2 = st2;
+        var ecol2 = String(fd.get("color") || "").toUpperCase();
+        var title2 = String(fd.get("title") || "").trim();
+        if (!title2) { toast("제목을 적어 주세요"); return; }
+        curEv.date = st2;
+        curEv.endDate = en2;
+        curEv.title = title2;
+        curEv.color = /^#[0-9A-F]{6}$/.test(ecol2) ? ecol2 : "";
+        curEv.who = fd.get("who") || "both";
+        S.ui.calMonth = st2.slice(0, 7);
+        S.ui.selDate = st2;
+        save(); closeSheet(); renderAll(); toast("일정을 저장했어요");
       });
       return;
     }
@@ -3568,16 +3631,6 @@
       if (egrid) egrid.querySelectorAll(".sw").forEach(function (b) { b.classList.toggle("sel", b === el); });
       var ereset = document.querySelector('#sheet .cp-reset[data-act="pickEvColor"]');
       if (ereset) ereset.classList.toggle("on", !ecol);
-      return;
-    }
-
-    /* v21: 「시간 설정」을 누르면 그 자리에 시간 고르는 칸이 열려요 (다시 누르면 다시 고름) */
-    if (act === "evTime") {
-      var eside = el.getAttribute("data-side");
-      var etin = document.querySelector('#sheet .ev-time-in[data-side="' + eside + '"]');
-      if (!etin) return;
-      etin.hidden = false;
-      try { if (etin.showPicker) etin.showPicker(); else etin.focus(); } catch (e) { etin.focus(); }
       return;
     }
 
@@ -4395,6 +4448,9 @@
       var edside = t.getAttribute("data-side");
       var big = document.querySelector('#sheet .ev-dbig[data-dbig="' + edside + '"]');
       if (big) big.textContent = evDateBig(t.value);
+      /* v28: 날짜 아래 요일(화요일)도 함께 바뀝니다 */
+      var dowEl = document.querySelector('#sheet .ev-dow[data-dow="' + edside + '"]');
+      if (dowEl) dowEl.textContent = evDowFull(t.value);
       /* 시작일을 종료일보다 뒤로 고르면 종료일도 같이 따라가요 */
       if (edside === "start") {
         var ein = document.querySelector('#sheet .js-evdate[data-side="end"]');
@@ -4402,16 +4458,9 @@
           ein.value = t.value;
           var ebig = document.querySelector('#sheet .ev-dbig[data-dbig="end"]');
           if (ebig) ebig.textContent = evDateBig(t.value);
+          var edow = document.querySelector('#sheet .ev-dow[data-dow="end"]');
+          if (edow) edow.textContent = evDowFull(t.value);
         }
-      }
-      return;
-    }
-    if (t && t.classList && t.classList.contains("js-evtime")) {
-      var tside = t.getAttribute("data-side");
-      var tbtn = document.querySelector('#sheet .ev-time-btn[data-side="' + tside + '"]');
-      if (tbtn) {
-        tbtn.textContent = t.value ? timeK(t.value) : "시간 설정";
-        tbtn.classList.toggle("on", !!t.value);
       }
       return;
     }
@@ -4489,6 +4538,8 @@
     Store = store;
     var base = state === "demo" ? seed() : (state || emptyState());
     S = normalizeState(base);
+    /* v28: 앱을 새로 켜면 캘린더는 지난번에 보던 달이 아니라 오늘의 달로 열립니다 */
+    syncCalToday();
     if (opts && opts.signedOut) { S.auth.out = true; S.auth.email = ""; }
     applyTheme();
     renderAll();
@@ -4520,8 +4571,14 @@
   }
 
   function refreshToday() {
+    var was = today;
     var t2 = iso(new Date());
-    if (t2 !== today) { today = t2; if (BOOTED) renderAll(); }
+    if (t2 === today) return;
+    today = t2;
+    /* v28: 앱을 켜 둔 채 날짜가 바뀌어 달이 넘어갔으면 캘린더도 새 달로 맞춰요.
+       (다른 달을 보던 중이면 그 달은 그대로 둡니다) */
+    if (was.slice(0, 7) !== t2.slice(0, 7) && S && S.ui && S.ui.calMonth === was.slice(0, 7)) syncCalToday();
+    if (BOOTED) renderAll();
   }
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") refreshToday();

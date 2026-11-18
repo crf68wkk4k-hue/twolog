@@ -264,10 +264,13 @@ h1,h2,h3,p{margin:0}
 .daylist{margin:0}
 .daylist .ev{padding:13px 0; border-bottom:1px solid var(--line-2); gap:9px; align-items:center}
 .daylist .ev:last-child{border-bottom:0}
+/* v28: 줄을 누르면 그 일정을 고치는 시트가 열려요 */
+.daylist .ev-tap{cursor:pointer}
+.daylist .ev-tap:active{background:var(--surface-2)}
 .daylist .ev .bar{width:3px; height:22px; min-height:0; margin-top:0; flex:0 0 3px}
 .daylist .who-row{gap:4px; margin-bottom:0; flex:0 0 auto}
 .daylist .av{width:24px; height:24px; flex:0 0 24px; font-size:10.5px}
-.daylist .wname{font-size:12.5px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em; margin-left:2px; white-space:nowrap; max-width:76px; overflow:hidden; text-overflow:ellipsis}
+.daylist .wname{font-size:13.5px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em; margin-left:2px; white-space:nowrap; max-width:76px; overflow:hidden; text-overflow:ellipsis}
 /* v27: 달력 아래 선택한 날 일정 글씨를 더 크게 (14px → 16px, 이름 11.5 → 12.5px) */
 .daylist .ev .t{flex:1 1 auto; min-width:0; font-size:16px; font-weight:600; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .daylist .ev .m{flex:0 0 auto; font-size:10.5px; font-weight:600; color:var(--ink-3); margin-top:0; gap:4px; white-space:nowrap; font-variant-numeric:tabular-nums}
@@ -296,6 +299,14 @@ h1,h2,h3,p{margin:0}
 .segs .seg-btn:active{opacity:.88}
 html[data-mode="dark"] .segs .seg-btn{border-color:rgba(255,255,255,.14)}
 html[data-mode="dark"] .segs .seg-btn.active{background:var(--ink); border-color:var(--ink); color:#111}
+/* v28: 카테고리 칩 줄 오른쪽 끝의 동그란 + — 새 카테고리 탭 추가 */
+.lst-new{
+  flex:0 0 auto; width:38px; height:38px; margin-left:auto; display:flex; align-items:center; justify-content:center;
+  border:1px dashed rgba(28,28,30,.26); background:var(--surface); color:var(--ink-2);
+  transition:transform .12s ease, opacity .12s ease
+}
+.lst-new:active{transform:scale(.94); opacity:.9}
+html[data-mode="dark"] .lst-new{border-color:rgba(255,255,255,.26)}
 
 .dbody{margin-top:14px}
 
@@ -564,7 +575,7 @@ html[data-mode="dark"] .pview .pv-nav{background:rgba(40,40,44,.86); color:#F2F2
 .wsel{display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px}
 .wopt{
   height:40px; border:1px solid var(--line); background:var(--surface); display:flex; align-items:center;
-  justify-content:center; gap:6px; font-size:11.5px; font-weight:600; color:var(--ink-2); letter-spacing:-.02em
+  justify-content:center; gap:6px; font-size:12.5px; font-weight:600; color:var(--ink-2); letter-spacing:-.02em
 }
 .wopt.active{border-color:var(--ink); color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink)}
 .wopt .av{width:17px; height:17px; flex:0 0 17px; font-size:8.5px}
@@ -751,24 +762,20 @@ html[data-mode="dark"] .sw-row .sw{border-color:rgba(255,255,255,.16)}
 /* .sw-grid 를 함께 쓰는 컬러판(테마·노트 카드)도 격자 대신 한 줄로 */
 .sw-grid.sw-row[data-sw]{display:flex; grid-template-columns:none; gap:5px; align-items:center; justify-content:space-between}
 .sw-grid.sw-row[data-sw] .sw{width:20px; height:20px; flex:0 0 20px; aspect-ratio:auto; min-width:0}
-/* 큰 날짜 두 개와 가운데 ~ */
-.ev-when{display:flex; align-items:center; gap:6px}
-.ev-side{flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; gap:7px}
-.ev-datewrap{position:relative; display:block; width:100%; padding:10px 2px; text-align:center; cursor:pointer}
-/* v23: 날짜와 시간 글씨 크기를 같게(16px) — 375~390px 폭에서 한 줄에 나란히 */
-.ev-dbig{display:block; font-size:16px; font-weight:800; letter-spacing:-.035em; line-height:1.25;
+/* 큰 날짜 두 개와 가운데 ~ (v28: 날짜 위·요일 아래, 사이는 더 좁게) */
+.ev-when{display:flex; align-items:center; gap:2px}
+.ev-side{flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; gap:0}
+.ev-datewrap{position:relative; display:block; width:100%; padding:8px 2px 9px; text-align:center; cursor:pointer}
+/* v28: 날짜는 더 크게(16 → 19px), 요일은 그 아래 한 줄(13px) */
+.ev-dbig{display:block; font-size:19px; font-weight:800; letter-spacing:-.035em; line-height:1.2;
   color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap}
+.ev-dow{display:block; margin-top:2px; font-size:13px; font-weight:700; color:var(--ink-2); letter-spacing:-.02em}
 /* 실제 날짜 고르기는 큰 글씨 위에 겹쳐 둔 input[type=date] 가 받아요 (누르면 달력이 열림) */
 .ev-date-in{position:absolute; inset:0; width:100%; height:100%; margin:0; padding:0; border:0;
   opacity:0; background:transparent; -webkit-appearance:none; appearance:none; cursor:pointer; font-size:16px}
 /* 물결은 왼쪽·오른쪽 덩어리 사이의 가로·세로 정중앙에 */
-.ev-tilde{flex:0 0 auto; align-self:center; justify-self:center; font-size:34px; font-weight:700;
+.ev-tilde{flex:0 0 auto; align-self:center; justify-self:center; font-size:28px; font-weight:700;
   color:var(--ink-3); line-height:1; padding:0; letter-spacing:-.02em}
-.ev-time-btn{font-size:16px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em;
-  padding:5px 6px; border:0; border-radius:0; background:none}
-.ev-time-btn.on{color:var(--ink)}
-.ev-time-in{width:100%; max-width:100%; min-width:0; height:34px; border:1px solid var(--line); background:var(--surface);
-  font-size:16px; text-align:center; padding:0 4px; color:var(--ink)}
 .eform .wsel{margin-top:2px}
 /* 다크 모드에서 겹친 날짜 입력칸이 밝은 판으로 보이지 않게 */
 html[data-mode="dark"] .ev-date-in{color-scheme:dark}
@@ -834,6 +841,7 @@ svg [rx]{rx:0}
 
 /* ---------- 프로필 사진만 동그랗게 (사각 잠금 예외) ---------- *//* ---------- v21: 노트의 탭·카드·제목 색 블록은 둥근 끝 (사각 잠금 예외) ---------- */
 #s-diary .segs .seg-btn{border-radius:12px !important}
+#s-diary .lstbar .lst-new{border-radius:50% !important}
 #s-diary .lchip{border-radius:12px !important}
 #s-diary .ncard{border-radius:16px !important}
 #s-diary .nc-t.tint{border-radius:8px !important}
