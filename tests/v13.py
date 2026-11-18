@@ -105,8 +105,8 @@ with sync_playwright() as p:
 
     # ---------- 캘린더: 글씨 크기 (v15 에서 생일 줄은 지웠어요) ----------
     eb = page.evaluate(CSS_OF, ".ebar")
-    # v23: 달력 일정 글씨를 1포인트 키워 11px
-    check("캘린더 일정 글씨 11px", eb and eb["fs"] == "11px", eb)
+    # v27: 한 줄에 글자가 더 들어가게 달력 칸 일정 글씨를 1px 더 작게 (11 → 10px)
+    check("캘린더 일정 글씨 10px", eb and eb["fs"] == "10px", eb)
     check("캘린더 일정 막대 높이", eb and float(eb["h"].replace("px", "")) >= 14, eb)
     check("생일 줄 없음", page.locator("#s-cal .bday-note").count() == 0,
           page.locator("#s-cal .bday-note").count())
@@ -247,13 +247,14 @@ with sync_playwright() as p:
     page.locator('#s-set .row[data-who="me"]').first.click()
     page.wait_for_timeout(400)
     me_txt = page.locator("#sheet").inner_text()
-    check("내 프로필 닉네임", "닉네임 바꾸기" in me_txt, me_txt[:80])
+    # v27: 프로필 시트의 닉네임 칸 라벨은 「닉네임」 하나로
+    check("내 프로필 닉네임", "닉네임" in me_txt, me_txt[:80])
     page.keyboard.press("Escape")
     page.wait_for_timeout(250)
     page.locator('#s-set .row[data-who="you"]').first.click()
     page.wait_for_timeout(400)
     you_txt = page.locator("#sheet").inner_text()
-    check("상대 닉네임", "닉네임 설정" in you_txt, you_txt[:80])
+    check("상대 닉네임", "닉네임" in you_txt, you_txt[:80])
     check("연결 버튼", ("연결 끊기" in you_txt) or ("연결하기" in you_txt) or ("재연결" in you_txt), you_txt[:120])
     page.keyboard.press("Escape")
     page.wait_for_timeout(200)

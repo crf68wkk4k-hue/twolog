@@ -1,7 +1,7 @@
 """투로그 v26 확인 — 폰에 남아 있던 로컬 기록(localStorage·IndexedDB)을 새 커플 공간으로
 자동 1회 이전(merge)하고, 다시 로그인해도 중복되지 않는지 확인합니다.
 
-1) 버전: sw.js 캐시 twolog-v26 · APP_VERSION v26
+1) 버전: sw.js 캐시 twolog-v27 · APP_VERSION v27
 2) 로컬 모드에서 일정·메모·사진을 만들고 → 원격(remote)에 처음 로그인
    → 자동으로 그 기록들이 살아나고(일정·노트·사진·커플 정보) 플래그가 남음
    → 새로 열기/다시 로그인해도 중복 없음, 폰의 원본 데이터는 그대로
@@ -135,9 +135,9 @@ with sync_playwright() as p:
     page = ctx.new_page()
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v26", 'const VERSION = "twolog-v26"' in sw,
+    check("sw.js 캐시 버전 twolog-v27", 'const VERSION = "twolog-v27"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:1])
-    check("app.js 버전 상수 v26", 'var APP_VERSION = "v26"' in app_js)
+    check("app.js 버전 상수 v27", 'var APP_VERSION = "v27"' in app_js)
     check("sync.js 에 이전 로직(Store.migrate) 있음",
           "migrateLocal" in page.request.get(URL + "sync.js").text())
     ctx.close()
@@ -193,6 +193,8 @@ with sync_playwright() as p:
 
     # 프로필 사진도 로컬에만 있던 상태 (v26 이전)
     page.set_input_files("#avatarInput", JPG)
+    page.wait_for_timeout(900)
+    page.locator("#avcApply").click()          # v27: 동그라미 가이드에서 잘라 적용
     page.wait_for_timeout(1600)
     local_pic = page.evaluate("""(() => {
       const s = JSON.parse(localStorage.getItem('twolog:v1:state') || '{}');
@@ -560,6 +562,8 @@ with sync_playwright() as p:
           before_pic["pickYou"] >= 1 and before_pic["pickMe"] >= 1 and before_pic["members"] == 1, before_pic)
 
     page.set_input_files("#avatarInput", JPG)
+    page.wait_for_timeout(900)
+    page.locator("#avcApply").click()          # v27: 동그라미 가이드에서 잘라 적용
     page.wait_for_timeout(1500)
     pic_a = page.evaluate("""() => {
       const st = window.__stub;
@@ -645,6 +649,8 @@ with sync_playwright() as p:
     page_b.locator("#tabbar .tab").nth(4).click()
     page_b.wait_for_timeout(400)
     page_b.set_input_files("#avatarInput", JPG)
+    page_b.wait_for_timeout(900)
+    page_b.locator("#avcApply").click()        # v27: 동그라미 가이드에서 잘라 적용
     page_b.wait_for_timeout(1500)
     b_rows = page_b.evaluate("""() => (window.__stub.settings||[]).filter(r=>String(r.key).indexOf('avatar:')===0)
       .map(r => ({key: r.key, src: (r.value && r.value.src) || ''}))""")

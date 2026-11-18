@@ -197,8 +197,9 @@ h1,h2,h3,p{margin:0}
 .cal-daygrid .day{height:100%}
 .cal-bars{position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none}
 .ebar{
-  /* v23: 달력에 뜨는 일정 글씨를 1포인트 키움(9.5 → 11px)에 맞춰 막대 높이도 16px */
-  position:absolute; height:16px; line-height:16px; font-size:11px; font-weight:700;
+  /* v23: 달력에 뜨는 일정 글씨를 1포인트 키움(9.5 → 11px)에 맞춰 막대 높이도 16px
+     v27: 한 줄에 글자가 더 들어가게 글씨만 1px 작게(11 → 10px). 막대 높이는 16px 그대로 */
+  position:absolute; height:16px; line-height:16px; font-size:10px; font-weight:700;
   color:#111111; padding:0 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   letter-spacing:-.04em; text-align:left
 }
@@ -266,8 +267,9 @@ h1,h2,h3,p{margin:0}
 .daylist .ev .bar{width:3px; height:22px; min-height:0; margin-top:0; flex:0 0 3px}
 .daylist .who-row{gap:4px; margin-bottom:0; flex:0 0 auto}
 .daylist .av{width:24px; height:24px; flex:0 0 24px; font-size:10.5px}
-.daylist .wname{font-size:11.5px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em; margin-left:2px; white-space:nowrap; max-width:76px; overflow:hidden; text-overflow:ellipsis}
-.daylist .ev .t{flex:1 1 auto; min-width:0; font-size:14px; font-weight:600; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.daylist .wname{font-size:12.5px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em; margin-left:2px; white-space:nowrap; max-width:76px; overflow:hidden; text-overflow:ellipsis}
+/* v27: 달력 아래 선택한 날 일정 글씨를 더 크게 (14px → 16px, 이름 11.5 → 12.5px) */
+.daylist .ev .t{flex:1 1 auto; min-width:0; font-size:16px; font-weight:600; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .daylist .ev .m{flex:0 0 auto; font-size:10.5px; font-weight:600; color:var(--ink-3); margin-top:0; gap:4px; white-space:nowrap; font-variant-numeric:tabular-nums}
 .daylist .ev .x{align-self:center}
 .daylist .empty{padding:18px 0}
@@ -858,6 +860,38 @@ svg [rx]{rx:0}
   border-radius:50% !important
 }
 .pr-av.pic{background:var(--surface-2) !important}
+/* v27: 프사(＋ 배지) + 닉네임 한 줄 */
+.pr-avbtn{position:relative; flex:0 0 auto; display:block; padding:0; border:0; background:none; line-height:0; cursor:pointer}
+.pr-avbtn.locked{cursor:default}
+.pr-plus{position:absolute; right:-1px; bottom:-1px; width:27px; height:27px; border-radius:50% !important;
+  background:var(--ink); color:var(--surface); display:flex; align-items:center; justify-content:center;
+  font-size:17px; font-weight:700; line-height:1; box-shadow:0 0 0 2.5px var(--surface)}
+.pr-del{position:absolute; right:-2px; top:-2px; width:23px; height:23px; border-radius:50% !important;
+  background:var(--surface); color:var(--ink-2); border:1px solid var(--line); padding:0;
+  display:flex; align-items:center; justify-content:center; font-size:14px; line-height:1}
+.pr-nm{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:6px}
+.pr-lbl{font-size:11px; font-weight:600; color:var(--ink-3); letter-spacing:.01em}
+.pr-nm .field{width:100%}
+.pr-sws{display:grid; grid-template-columns:repeat(6,1fr); gap:9px; margin-top:10px; max-width:240px}
+.pr-sws .rsw{width:100%; height:auto; min-width:0; flex:none; aspect-ratio:1/1 !important; border-radius:50% !important}
+.pr-sws .rsw.sel{box-shadow:inset 0 0 0 2px var(--surface), 0 0 0 1.6px var(--ink)}
+/* v27: 프로필 사진 동그라미 가이드 크롭 */
+.avcrop{position:absolute; inset:0; z-index:95; background:#08080A;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:24px 18px}
+.avcrop-hd{color:#FFFFFF; font-size:13.5px; font-weight:600; letter-spacing:-.01em; opacity:.92}
+.avcrop-stage{position:relative; border-radius:50% !important; overflow:hidden; background:#000;
+  box-shadow:0 0 0 2px rgba(255,255,255,.95), 0 0 44px 10px rgba(0,0,0,.55);
+  touch-action:none; cursor:grab}
+.avcrop-stage:active{cursor:grabbing}
+.avc-img{position:absolute; left:50%; top:50%; max-width:none; transform-origin:center center; user-select:none; -webkit-user-drag:none}
+.avcrop-zoom{display:flex; align-items:center; gap:12px; width:min(84%,300px); color:#FFFFFF; font-size:14px; font-weight:600}
+.avcrop-zoom input[type="range"]{-webkit-appearance:none; appearance:none; flex:1 1 auto; height:3px; border-radius:2px !important; background:rgba(255,255,255,.45); outline:none}
+.avcrop-zoom input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50% !important; background:#FFFFFF; box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.avcrop-zoom input[type="range"]::-moz-range-thumb{width:22px; height:22px; border:0; border-radius:50% !important; background:#FFFFFF}
+.avcrop-btns{display:flex; align-items:center; gap:10px; width:min(84%,300px)}
+.avcrop-btn{flex:1 1 0; height:46px; border-radius:0; border:1px solid rgba(255,255,255,.4); background:transparent;
+  color:#FFFFFF; font-size:14.5px; font-weight:600; letter-spacing:-.01em}
+.avcrop-btn.on{background:#FFFFFF; color:#111111; border-color:#FFFFFF}
 .pr-acts{display:flex; flex-direction:column; align-items:flex-start; gap:8px}
 .link-on{display:flex; align-items:center; gap:11px}
 .link-nm{font-size:14.5px; font-weight:700; letter-spacing:-.02em}

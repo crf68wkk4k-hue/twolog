@@ -83,11 +83,11 @@ with sync_playwright() as p:
 
     # ---------------- 0. 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
-    check("sw.js 캐시 버전 twolog-v26", 'const VERSION = "twolog-v26"' in sw,
+    check("sw.js 캐시 버전 twolog-v27", 'const VERSION = "twolog-v27"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
     app_js = page.request.get(URL + "app.js").text()
-    check("app.js 버전 상수 v26", 'var APP_VERSION = "v26"' in app_js)
-    check("캐시 목록이 새 버전(shell-twolog-v26)", "shell-" in sw)
+    check("app.js 버전 상수 v27", 'var APP_VERSION = "v27"' in app_js)
+    check("캐시 목록이 새 버전(shell-twolog-v27)", "shell-" in sw)
 
     # 예시 데이터로 상태를 만들고 일반 모드로
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -123,7 +123,8 @@ with sync_playwright() as p:
               dnumFs: (() => { const d = document.querySelector('#s-cal .day .dnum');
                 return d ? getComputedStyle(d).fontSize : null; })()};
     })()""")
-    check("달력 일정 글씨 11px (1포인트 키움)", cal["fs"] == "11px", cal["fs"])
+    # v27: 달력 칸 안 막대 글씨만 1px 더 작게 (11 → 10px) — 아래 상세 패널은 그대로
+    check("달력 일정 글씨 10px (v27: 1px 더 작게)", cal["fs"] == "10px", cal["fs"])
     check("달력 일정 막대 높이 16px", cal["h"] == "16px" and cal["lh"] == "16px", (cal["h"], cal["lh"]))
     check("달력 일정 막대에 일정이 그려짐", cal["n"] >= 3, cal["n"])
 
@@ -146,8 +147,11 @@ with sync_playwright() as p:
         const k = Math.round(r.left / 7); (byCol[k] = byCol[k] || []).push(r.top); });
       return Math.max.apply(null, Object.keys(byCol).map(k => byCol[k].length)); })()""")
     check("같은 칸에 일정 막대가 3줄까지 쌓임", stacked >= 3, stacked)
-    check("쌓인 막대 사이가 2px 이상 벌어짐 (붙어 보이지 않음)",
-          bool(vgaps) and min(vgaps) >= 2, sorted(set(vgaps))[:6])
+    # v27: 한 칸에 일정이 여러 개면 막대 사이 빈틈 없이 딱 붙습니다
+    # v27: 한 칸에 쌓인 막대는 빈틈 없이 붙습니다 (다른 주 사이 간격은 제외)
+    check("쌓인 막대 사이에 빈틈이 없음 (v27: 붙여서)",
+          bool(vgaps) and min(vgaps) == 0 and all(v <= 0.6 or v > 10 for v in vgaps),
+          sorted(set(vgaps))[:6])
 
     # 가로 분리 — 이웃한 칸의 막대 사이 2px 이상
     hgaps = []
@@ -210,7 +214,8 @@ with sync_playwright() as p:
     })()""" % month_day)
     check("일정 두 개인 날은 둘 다 따로 보임(외 N 없음)",
           len(two.get("bars", [])) == 2 and not two.get("ovf"), two)
-    check("두 일정 막대가 3px 떨어져 보임", two.get("gap") is not None and two["gap"] >= 2, two.get("gap"))
+    # v27: 한 칸에 일정이 여러 개면 막대 사이 빈틈 없이 딱 붙습니다
+    check("두 일정 막대가 빈틈 없이 붙어 있음 (v27)", two.get("gap") is not None and abs(two["gap"]) <= 1, two.get("gap"))
     page.locator("#s-cal .day[data-date='%s']" % month_day).click()
     page.wait_for_timeout(500)
     page.screenshot(path=os.path.join(SHOT, "calendar-v23-two.png"))
@@ -329,7 +334,7 @@ with sync_playwright() as p:
       return {ok: !!v, txt: v ? v.textContent.trim() : null,
               right: v ? window.innerWidth - v.getBoundingClientRect().right : null};
     })()""")
-    check("My 탭에 버전 v26 표시", my.get("ok") and "v26" in str(my.get("txt")), my.get("txt"))
+    check("My 탭에 버전 v27 표시", my.get("ok") and "v27" in str(my.get("txt")), my.get("txt"))
     page.wait_for_timeout(400)
     page.screenshot(path=os.path.join(SHOT, "my-v23.png"))
 
@@ -527,7 +532,7 @@ with sync_playwright() as p:
     dark = page.evaluate("""(() => {
       const b = document.querySelector('#s-cal .ebar');
       return b ? {fs: getComputedStyle(b).fontSize, h: getComputedStyle(b).height} : null; })()""")
-    check("다크 모드에서도 막대 11px/16px", dark and dark["fs"] == "11px" and dark["h"] == "16px", dark)
+    check("다크 모드에서도 막대 10px/16px", dark and dark["fs"] == "10px" and dark["h"] == "16px", dark)
     page.evaluate("document.documentElement.removeAttribute('data-mode'); 0")
     page.wait_for_timeout(300)
 

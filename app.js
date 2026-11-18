@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v26";
+  var APP_VERSION = "v27";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -327,6 +327,32 @@
     }, function () { done(doc, null); });
   }
 
+  /* ==========================================================================
+     v27: v26 에서 카드 정보(gid·groups) 없이 올라간 노트를 이 폰의 원본으로 1회 복구
+     — 메모 2개·버킷 3개처럼 나눠 둔 카드와 그 안의 항목이 원래 자리로 돌아옵니다.
+     ========================================================================== */
+  function repairNoteGroups() {
+    if (!Store || Store.mode !== "remote" || !Store.repairGroups || !S) return Promise.resolve(false);
+    return Store.repairGroups().then(function (res) {
+      if (!res || !res.ok || !res.state) return false;
+      var keepUi = S ? S.ui : null;
+      S = normalizeState(res.state);
+      if (keepUi) S.ui = keepUi;
+      S.auth.out = false;
+      var u = Store && Store.backend && Store.backend.user;
+      if (u && u.email) S.auth.email = u.email;
+      applyTheme(); renderAll(); loadPhotoUrls();
+      var g = res.groups || {};
+      var parts = [];
+      if (g.todo) parts.push("메모 " + g.todo + "개");
+      if (g.bucket) parts.push("버킷 " + g.bucket + "개");
+      if (g.log) parts.push("영화·먹방 " + g.log + "개");
+      toast("노트 카드를 되살렸어요" + (parts.length ? " · " + parts.join(" · ") : ""));
+      if (current === "set") renderSet();
+      return true;
+    }).catch(function () { return false; });
+  }
+
   /* ------------------------------------------------------------------ color theme */
   /* 팔레트 버튼에서 고르는 차분한 10색 (일정 색과 같은 톤) */
   var PALETTE = [
@@ -378,6 +404,16 @@
     S.couple.sched[who] = v;
     save(); applyTheme(); renderAll();
     if (personSheetWho) openPersonSheet(personSheetWho);
+  }
+  /* v27: 프로필 시트의 컬러 — 이름·네모 칸 없이 「컬러」 라벨 + 동그란 12색(뮤트)만 */
+  function prColorRow(who) {
+    var cur = String(sched(who) || "").toUpperCase();
+    var h = '<div class="pr-sws">';
+    MUTED.forEach(function (p) {
+      h += '<button type="button" class="sw rsw' + (cur === p.c ? " sel" : "") + '" data-act="pickOwner" data-who="' + who +
+        '" data-color="' + p.c + '" style="background:' + p.c + '" aria-label="' + p.n + " " + p.c + '"></button>';
+    });
+    return h + "</div>";
   }
   function colorPickRow(who) {
     var cur = String(sched(who) || "").toUpperCase();
@@ -978,8 +1014,9 @@
        네 줄을 넘는 일정만 날짜 칸의「외 N」으로 알려 줘요. */
     /* v24: 세 줄이 서로 붙지 않고 날짜 숫자·다음 주와도 부딪히지 않게 간격을 넉넉히.
        TOP_H = 날짜 숫자 아래에서 첫 줄까지, LANE_H = 한 줄 높이(막대 16 + 사이 6),
-       ROW_PAD = 마지막 줄 아래 여백입니다. */
-    var LANE_H = 22, TOP_H = 32, ROW_MIN = 68, ROW_PAD = 12, MAX_LANE = 3;
+       ROW_PAD = 마지막 줄 아래 여백입니다.
+       v27: 한 칸에 일정이 여러 개면 막대 사이 빈틈 없이 딱 붙여 쌓습니다(LANE_H = 막대 16). */
+    var LANE_H = 16, TOP_H = 32, ROW_MIN = 68, ROW_PAD = 12, MAX_LANE = 3;
     html += '<div class="cal-grid">';
     for (var w = 0; w < cells.length / 7; w++) {
       var wk = cells.slice(w * 7, w * 7 + 7);
@@ -1018,7 +1055,7 @@
       /* v24: 공휴일 이름이 있는 주는 그 이름 아래에서 일정 줄이 시작하게 조금 내립니다 */
       var holRow = wk.some(function (dsH) { return !!dsH && !!holName(dsH); });
       var topBase = TOP_H + (holRow ? 13 : 0);
-      var rowsH = Math.max(ROW_MIN, topBase + Math.min(lanes.length, MAX_LANE) * LANE_H + (ovfCount ? 20 : ROW_PAD));
+      var rowsH = Math.max(ROW_MIN, topBase + Math.min(lanes.length, MAX_LANE) * LANE_H + (ovfCount ? 22 : ROW_PAD));
       /* v21: 마지막 주에 일정이 없으면 그 빈 줄만큼 높이를 줄여 — 달력과 아래 일정이 훨씬 가깝게 */
       var lastRow = (w === cells.length / 7 - 1);
       if (lastRow && !shown.length && !ovfCount) rowsH = topBase + 10;
@@ -2251,7 +2288,8 @@
     return '<span class="av ' + who + (avPic(who) ? " pic" : "") + (extra ? " " + extra : "") +
       '" aria-label="' + esc(nm) + '">' + avInner(who) + "</span>";
   }
-  /* 고른 사진을 가운데 기준으로 정사각형 256px JPEG 로 줄입니다 */
+  /* 고른 사진을 가운데 기준으로 정사각형 256px JPEG 로 줄입니다
+     (v27: 프로필 사진은 동그라미 가이드 크롭 화면(openAvatarCrop)을 거쳐 저장합니다) */
   function squareAvatar(file) {
     return new Promise(function (resolve, reject) {
       if (!file) return reject(new Error("no file"));
@@ -2286,6 +2324,169 @@
     });
   }
   var personSheetWho = null;
+  /* ==========================================================================
+     v27: 프로필 사진 — 카카오톡 프사처럼 동그라미 가이드 안에서 옮기고 키워 자르기
+     · 어두운 화면 가운데 밝은 동그라미 안에서 손가락(마우스)으로 옮기고
+       두 손가락(또는 아래 슬라이더)으로 확대·축소
+     · 「적용」을 누르면 동그라미에 맞춘 정사각 256×256 JPEG 로 잘라 저장·동기화
+     ========================================================================== */
+  var AV_SIDE = 256;
+  var avCrop = null;
+
+  function avCropEl() { return document.getElementById("avCrop"); }
+  function closeAvatarCrop() {
+    var el = avCropEl();
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+    avCrop = null;
+  }
+  function avClamp() {
+    if (!avCrop) return;
+    var st = avCrop;
+    var halfW = st.iw * st.base * st.zoom / 2;
+    var halfH = st.ih * st.base * st.zoom / 2;
+    var mx = Math.max(0, halfW - st.box / 2);
+    var my = Math.max(0, halfH - st.box / 2);
+    st.tx = Math.min(mx, Math.max(-mx, st.tx));
+    st.ty = Math.min(my, Math.max(-my, st.ty));
+  }
+  function avDraw() {
+    if (!avCrop) return;
+    avClamp();
+    var st = avCrop;
+    var img = document.getElementById("avcImg");
+    if (img) {
+      img.style.width = (st.iw * st.base) + "px";
+      img.style.height = (st.ih * st.base) + "px";
+      img.style.transform = "translate(calc(-50% + " + st.tx + "px), calc(-50% + " + st.ty + "px)) scale(" + st.zoom + ")";
+    }
+    var z = document.getElementById("avcZoom");
+    if (z && Math.abs(Number(z.value) - st.zoom) > 0.002) z.value = String(st.zoom);
+  }
+  function showAvatarCrop(img, iw, ih, who) {
+    closeAvatarCrop();
+    var vw = window.innerWidth || 390, vh = window.innerHeight || 700;
+    var box = Math.round(Math.min(300, Math.min(vw, vh) * 0.62));
+    box = Math.max(190, box);
+    avCrop = { who: who, img: img, iw: iw, ih: ih, box: box, base: box / Math.min(iw, ih), zoom: 1, tx: 0, ty: 0 };
+    var wrap = document.createElement("div");
+    wrap.className = "avcrop";
+    wrap.id = "avCrop";
+    wrap.setAttribute("role", "dialog");
+    wrap.setAttribute("aria-label", "프로필 사진 맞추기");
+    wrap.innerHTML =
+      '<div class="avcrop-hd">동그라미 안에 맞춰 주세요</div>' +
+      '<div class="avcrop-stage" id="avcStage" style="width:' + box + 'px;height:' + box + 'px">' +
+      '<img class="avc-img" id="avcImg" alt="" src="' + img.src + '"></div>' +
+      '<div class="avcrop-zoom"><span aria-hidden="true">−</span>' +
+      '<input id="avcZoom" type="range" min="1" max="3" step="0.01" value="1" aria-label="확대·축소">' +
+      '<span aria-hidden="true">+</span></div>' +
+      '<div class="avcrop-btns"><button type="button" class="avcrop-btn" id="avcCancel">취소</button>' +
+      '<button type="button" class="avcrop-btn on" id="avcApply">적용</button></div>';
+    (document.getElementById("phone") || document.body).appendChild(wrap);
+    avDraw();
+
+    var stage = document.getElementById("avcStage");
+    var pts = {}, last = null;
+    function list() { return Object.keys(pts).map(function (k) { return pts[k]; }); }
+    function reset() { last = null; }
+    stage.addEventListener("pointerdown", function (e) {
+      pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+      reset();
+      if (e.preventDefault) e.preventDefault();
+    });
+    stage.addEventListener("pointermove", function (e) {
+      if (!avCrop || !pts[e.pointerId]) return;
+      pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      var ps = list();
+      if (ps.length === 1) {
+        if (!last || last.n !== 1) { last = { n: 1, x: e.clientX, y: e.clientY }; return; }
+        avCrop.tx += e.clientX - last.x;
+        avCrop.ty += e.clientY - last.y;
+        last = { n: 1, x: e.clientX, y: e.clientY };
+        avDraw();
+      } else if (ps.length >= 2) {
+        var a = ps[0], b = ps[1];
+        var dist = Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2)) || 1;
+        var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        if (!last || last.n !== 2) { last = { n: 2, dist: dist, x: mx, y: my }; return; }
+        avCrop.zoom = Math.min(3, Math.max(1, avCrop.zoom * (dist / last.dist)));
+        avCrop.tx += mx - last.x;
+        avCrop.ty += my - last.y;
+        last = { n: 2, dist: dist, x: mx, y: my };
+        avDraw();
+      }
+      if (e.preventDefault) e.preventDefault();
+    });
+    function done(e) { delete pts[e.pointerId]; reset(); }
+    stage.addEventListener("pointerup", done);
+    stage.addEventListener("pointercancel", done);
+    stage.addEventListener("pointerleave", done);
+    wrap.addEventListener("wheel", function (e) {
+      if (!avCrop) return;
+      if (e.preventDefault) e.preventDefault();
+      avCrop.zoom = Math.min(3, Math.max(1, avCrop.zoom - e.deltaY * 0.0015));
+      avDraw();
+    }, { passive: false });
+    var zoomIn = document.getElementById("avcZoom");
+    if (zoomIn) zoomIn.addEventListener("input", function () {
+      if (!avCrop) return;
+      avCrop.zoom = Math.min(3, Math.max(1, Number(zoomIn.value) || 1));
+      avDraw();
+    });
+    document.getElementById("avcCancel").addEventListener("click", function () { closeAvatarCrop(); });
+    document.getElementById("avcApply").addEventListener("click", function () {
+      if (!avCrop) return;
+      var applyWho = avCrop.who;
+      var url = "";
+      try { url = avatarCropUrl(); } catch (e) { url = ""; }
+      if (!url) { toast("사진을 자르지 못했어요. 다른 사진으로 해볼까요?"); return; }
+      closeAvatarCrop();
+      setAvatarPic(applyWho, url);
+      toast(applyWho === "me" ? "내 프로필 사진을 바꿨어요" : "프로필 사진을 바꿨어요");
+    });
+  }
+  /* 동그라미 가이드에 보이는 부분을 정사각 256px JPEG 로 */
+  function avatarCropUrl() {
+    var st = avCrop;
+    if (!st || !st.img) return "";
+    var per = 1 / (st.base * st.zoom);        // 화면 1px = 원본 몇 px
+    var half = (st.box / 2) * per;
+    var size = Math.max(1, Math.min(half * 2, Math.min(st.iw, st.ih)));
+    var cx = st.iw / 2 - st.tx * per;
+    var cy = st.ih / 2 - st.ty * per;
+    var sx = Math.min(Math.max(0, cx - size / 2), Math.max(0, st.iw - size));
+    var sy = Math.min(Math.max(0, cy - size / 2), Math.max(0, st.ih - size));
+    var cv = document.createElement("canvas");
+    cv.width = AV_SIDE; cv.height = AV_SIDE;
+    var ctx = cv.getContext("2d");
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, AV_SIDE, AV_SIDE);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(st.img, sx, sy, size, size, 0, 0, AV_SIDE, AV_SIDE);
+    var url = cv.toDataURL("image/jpeg", 0.82);
+    if (url.length > 180000) url = cv.toDataURL("image/jpeg", 0.62);
+    if (url.length > 180000) url = cv.toDataURL("image/jpeg", 0.45);
+    return url;
+  }
+  function openAvatarCrop(file, who) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onerror = function () { toast("사진을 불러오지 못했어요"); };
+    reader.onload = function () {
+      var img = new Image();
+      img.onerror = function () { toast("사진을 불러오지 못했어요. 다른 사진으로 해볼까요?"); };
+      img.onload = function () {
+        var iw = img.naturalWidth || img.width || 0;
+        var ih = img.naturalHeight || img.height || 0;
+        if (!iw || !ih) { toast("사진을 불러오지 못했어요"); return; }
+        showAvatarCrop(img, iw, ih, who);
+      };
+      img.src = String(reader.result || "");
+    };
+    reader.readAsDataURL(file);
+  }
   /* 노트 카드 상세 시트가 열려 있을 때 어느 카드인지 */
   var openCard = null;
 
@@ -2294,22 +2495,25 @@
     var nm = isMe ? S.couple.me : S.couple.you;
     var pic = avPic(who);
     var linked = !!(S.link && S.link.connected);
-    var h = sheetHead(isMe ? "내 프로필" : esc(nm) + " 설정");
     var canPic = canEditAvatar(who);
-    h += '<div class="pr-top">' +
+    var h = sheetHead(isMe ? "내 프로필" : esc(nm) + " 설정");
+    /* v27: 프로필 사진(＋ 배지 · 누르면 사진첩) 바로 옆에 「닉네임」 한 칸 —
+       글씨 버튼(사진첩 선택·사진 지우기)은 없애고, 지우기는 사진 위 작은 × 로만. */
+    h += '<form class="form" id="personForm" data-who="' + who + '" style="margin-top:2px">' +
+      '<div class="pr-top">' +
+      '<div class="pr-avbtn' + (canPic ? "" : " locked") + '"' +
+      (canPic ? ' data-act="pickPic" data-who="' + who + '" role="button" tabindex="0"' : "") +
+      ' aria-label="' + esc(nm) + ' 프로필 사진 바꾸기">' +
       '<span class="pr-av' + (pic ? " pic" : "") + '" style="background:' + avColor(who) + '">' + avInner(who) + "</span>" +
-      (canPic
-        ? '<div class="pr-acts">' +
-          '<button type="button" class="set-btn" data-act="pickPic" data-who="' + who + '">사진첩에서 선택</button>' +
-          (pic ? '<button type="button" class="set-btn ghost" data-act="clearPic" data-who="' + who + '">사진 지우기</button>' : "") +
-          "</div>"
-        : '<div class="pr-acts"><div class="set-hint" style="margin:0">프로필 사진은 ' + esc(nm) + " 본인 폰에서 바꿀 수 있어요.</div></div>") +
-      "</div>";
-    h += '<div class="pr-color"><span class="set-lbl">색</span>' + colorPickRow(who) + "</div>";
-    h += '<form class="form" id="personForm" data-who="' + who + '" style="margin-top:16px">' +
-      '<div class="f"><label>' + (isMe ? "닉네임 바꾸기" : "닉네임 설정") + '</label>' +
-      '<input class="field" name="name" value="' + esc(nm) + '" placeholder="닉네임" required autocomplete="off"></div>' +
-      '<button class="btn-primary" type="submit">저장</button></form>';
+      (canPic ? '<span class="pr-plus" aria-hidden="true">+</span>' : "") +
+      (canPic && pic ? '<button type="button" class="pr-del" data-act="clearPic" data-who="' + who + '" aria-label="프로필 사진 지우기">×</button>' : "") +
+      "</div>" +
+      '<div class="pr-nm"><label class="pr-lbl" for="personName">닉네임</label>' +
+      '<input class="field" id="personName" name="name" value="' + esc(nm) + '" placeholder="닉네임" required autocomplete="off"></div>' +
+      "</div>" +
+      (canPic ? "" : '<div class="set-hint" style="margin-top:10px;padding:0">프로필 사진은 ' + esc(nm) + " 본인 폰에서 바꿀 수 있어요.</div>") +
+      '<button class="btn-primary" type="submit" style="margin-top:18px">저장</button></form>';
+    h += '<div class="pr-color"><span class="set-lbl">컬러</span>' + prColorRow(who) + "</div>";
     if (!isMe) {
       /* 상대 카드: 연결 끊기 · 재연결 */
       h += '<div class="pr-link">' +
@@ -2528,6 +2732,20 @@
     } catch (e) { cb(false); }
   }
 
+  /* v27: 노트 카드 묶음 복구 결과 — My 탭 「폰에 있던 기록」 카드 안에 한 줄 */
+  function repairedHint() {
+    var rep = null;
+    try { rep = Store && Store.groupsRepaired ? Store.groupsRepaired() : null; } catch (e) { rep = null; }
+    if (!rep) return "";
+    var c = rep.groups || {};
+    var bits = [];
+    if (c.todo) bits.push("메모 " + c.todo + "개");
+    if (c.bucket) bits.push("버킷 " + c.bucket + "개");
+    if (c.log) bits.push("영화·먹방 " + c.log + "개");
+    return '<div class="set-hint" style="margin-top:8px">노트 카드를 되살렸어요' +
+      (bits.length ? " · " + bits.join(" · ") : "") + "</div>";
+  }
+
   function renderSet() {
     var c = S.couple, t = S.theme || {}, li = S.link || {}, dark = t.mode === "dark";
     var remote = !!(Store && Store.mode === "remote");
@@ -2577,6 +2795,7 @@
         '<div class="set-hint">' + (mdone
           ? "이 기기의 예전 기록은 새 커플 공간으로 옮겨 두었어요. 원본은 이 폰에 그대로 남아 있고, 다시 가져와도 같은 기록은 겹치지 않아요."
           : "이 기기에만 저장해 둔 예전 기록이에요. 커플 공간이 비어 있으면 로그인할 때 자동으로 이어 오고, 그 밖에는 아래 버튼으로 더할 수 있어요.") + "</div>" +
+        repairedHint() +
         '<button class="set-btn" data-act="importLocal" style="width:100%;margin-top:10px">폰에 있던 예전 기록 가져오기</button></div>';
     }
 
@@ -4011,6 +4230,7 @@
                 }
                 closeSheet();
                 toast(migrateToast(mres) || "커플 연결을 완료했어요");
+                repairNoteGroups();
                 resolve();
               });
             });
@@ -4054,6 +4274,8 @@
           applyTheme(); go("home"); renderAll();
           loadPhotoUrls();
           toast(migrateToast(got.mres) || "들어왔어요");
+          /* v27: 카드 정보 없이 올라간 예전 노트가 있으면 바로 되살립니다 */
+          repairNoteGroups();
         });
       }).catch(function (e) { toast("들어가지 못했어요"); if (btn) { btn.disabled = false; btn.textContent = label; } });
       return;
@@ -4073,6 +4295,8 @@
           return;
         }
         applyMigrated(res);
+        /* v27: 예전에 gid 없이 올라간 항목도 이 폰의 카드 자리로 맞춥니다 */
+        repairNoteGroups();
       }).catch(function () { closeSheet(); toast("가져오지 못했어요"); });
       return;
     }
@@ -4210,15 +4434,9 @@
     if (!file) return;
     var w = ev.target.getAttribute("data-who") === "you" ? "you" : "me";
     if (!canEditAvatar(w)) { toast("프로필 사진은 " + (w === "you" ? S.couple.you : "본인") + " 폰에서 바꿀 수 있어요"); return; }
-    squareAvatar(file).then(function (url) {
-      /* v26: remote 모드에서는 그 사람 몫으로 서버(settings)에 올라가 두 폰에 함께 보입니다 */
-      S.couple.pics = S.couple.pics || {};
-      S.couple.pics[w] = url;
-      if (Store && Store.mode === "remote" && Store.avatar) Store.avatar.set(w, url).catch(function () {});
-      save(); renderAll();
-      if (personSheetWho) openPersonSheet(personSheetWho);
-      toast(w === "me" ? "내 프로필 사진을 바꿨어요" : "프로필 사진을 바꿨어요");
-    }).catch(function () { toast("사진을 불러오지 못했어요. 다른 사진으로 해볼까요?"); });
+    /* v27: 바로 저장하지 않고 동그라미 가이드 화면에서 위치·확대를 맞춘 뒤 적용 */
+    ev.target.value = "";
+    openAvatarCrop(file, w);
   });
 
   /* 파일 선택 → 사진 추가 시트 */
@@ -4235,7 +4453,11 @@
   });
 
   document.addEventListener("keydown", function (ev) {
-    if (ev.key === "Escape") closeSheet();
+    if (ev.key === "Escape") {
+      /* v27: 사진 맞추기 화면이 열려 있으면 그것부터 닫습니다 */
+      if (avCropEl()) { closeAvatarCrop(); return; }
+      closeSheet();
+    }
   });
 
   /* ------------------------------------------------------------------ boot */
@@ -4276,7 +4498,7 @@
     if (lockOn()) showLock();
   }
 
-  /* 상대 기기에서 바뀐 내용 반영 */
+  /* 상대 기기에서 바뀐 내용 반영 — v27: 조용히 다시 그립니다(토스트 없음) */
   function applyRemote(doc) {
     if (!doc) return;
     var ui = S ? S.ui : null;
@@ -4288,7 +4510,7 @@
     applyTheme();
     renderAll();
     loadPhotoUrls();
-    toast("상대와 맞췄어요");
+    /* v27: 「상대와 맞췄어요」 토스트는 띄우지 않습니다 — 바뀐 내용만 조용히 반영 */
   }
   function stripUi(doc) {
     if (!doc) return null;
@@ -4309,6 +4531,7 @@
     start: start,
     applyRemote: applyRemote,
     joinLocalHistory: joinLocalHistory,
+    repairNoteGroups: repairNoteGroups,
     localReadyInfo: localReadyInfo,
     rerender: function () { if (BOOTED) { applyTheme(); renderAll(); } },
     toast: function (m) { toast(m); },
@@ -4410,8 +4633,11 @@
         store.onRemote(function (doc) { window.TwoLogUI.applyRemote(doc); });
       }
       window.TwoLogUI.loadPhotoUrls();
-      /* v26: 로그인된 기기에 예전 로컬 기록이 남아 있으면 한 번 자동으로 이어 옵니다 */
-      if (!demo && !signedOut) window.TwoLogUI.joinLocalHistory();
+      /* v26: 로그인된 기기에 예전 로컬 기록이 남아 있으면 한 번 자동으로 이어 옵니다
+         v27: 이어 오기를 마친 뒤, v26 에서 카드 정보 없이 올라간 노트 카드를 한 번 되살립니다 */
+      if (!demo && !signedOut) {
+        window.TwoLogUI.joinLocalHistory().then(function () { window.TwoLogUI.repairNoteGroups(); });
+      }
     }).catch(function (e) {
       console.error("[투로그] 시작하지 못했어요", e);
       window.TwoLogUI.start(store, demo ? "demo" : null, {});

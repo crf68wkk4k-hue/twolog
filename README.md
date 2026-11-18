@@ -11,6 +11,10 @@
   이미 옮긴 기기는 다시 옮기지 않고(플래그 `twolog.migrated.<coupleId>`), 원본은 폰에 그대로 남깁니다.
   원격에 이미 기록이 있으면 자동으로는 건드리지 않고 **My 탭 → 「폰에 있던 예전 기록 가져오기」** 로 겹치지 않게 더할 수 있어요.
   같은 버전에서 **프로필 사진도 사람별로 동기화**됩니다(내 사진은 내가, 상대 사진은 상대 폰에서).
+- **v27 부터**는 노트의 **카드 묶음(그룹)까지 함께 동기화**됩니다. 카드의 id·제목·제목색과 항목별 소속(`gid`)을
+  `notes.payload.gid` · `settings[groups]` 행으로 저장해, 어느 폰에서 열어도 메모 2개·버킷 3개처럼 나눠 둔 카드가 그대로 보입니다.
+  v26 에서 카드 정보 없이 올라가 버린 기기는 **폰에 남은 원본으로 한 번 자동 복구**합니다(플래그 `twolog.groupsRepaired.<coupleId>`).
+  같은 버전에서 상대 변경은 토스트 없이 조용히 반영되고, 앱으로 돌아오면(`focus`/`visibilitychange`) 최신 상태를 한 번 당겨옵니다.
 
 ---
 
@@ -143,6 +147,9 @@ var CONFIG = {
 | 사진 보기 주소 | `URL.createObjectURL(blob)` | 6일짜리 **서명 URL** 을 열 때마다 재발급 |
 | 보고 있던 탭·달력 위치 | `localStorage["twolog:v1:ui"]` (기기별, 동기화 안 함) | 같음 |
 | 예전 기록 이전 여부 | — | `localStorage["twolog.migrated.<coupleId>"]` (기기별) |
+| 노트 카드 묶음 | 상태의 `groups` (같은 `twolog:v1:state`) | `settings` 행 `groups` = `{todo,bucket,log}` 배열 (카드의 모든 필드) |
+| 노트 항목의 카드 소속 | 각 항목의 `gid` | `notes.payload.gid` |
+| 카드 복구 여부(v27) | — | `localStorage["twolog.groupsRepaired.<coupleId>"]` (기기별) |
 
 - 프로필 사진은 256px 정사각 JPEG data URL(수십 KB)이라 `settings` 의 JSONB 한 칸에 그대로 들어갑니다. 사람마다 **행을 따로** 두어
   두 사람이 동시에 바꿔도 서로 덮어쓰지 않습니다. 상대가 바꾸면 Realtime 으로 몇 초 안에 이 폰에도 나타납니다.
@@ -152,7 +159,10 @@ var CONFIG = {
 - 사진은 넣기 전에 **긴 변 1800px · JPEG 0.82** 로 줄여 저장합니다(요즘 폰 사진 4MB → 대략 200~400KB).
 - 저장은 150ms 모아서 하고, 앱이 가려지거나 닫힐 때(`pagehide`/`visibilitychange`) 바로 밀어 넣습니다.
 - 오프라인에서 고친 내용도 다음 저장 때 다시 시도하고, 다시 연결되면 `online` 이벤트에서 재전송합니다.
-- 상대 기기의 변경은 Realtime 구독으로 받아 450ms 디바운스 후 다시 읽어 화면에 반영합니다.
+- 상대 기기의 변경은 Realtime 구독(`events`·`notes`·`photos`·`settings`·`couples`)으로 받아 450ms 디바운스 후 다시 읽어 화면에 반영합니다.
+  반영할 때는 **토스트를 띄우지 않고** 바뀐 화면만 조용히 다시 그립니다(v27).
+- 앱이 다시 앞으로 나오면(`focus`·`visibilitychange`·`pageshow`·`online`) 서버 상태를 한 번 당겨옵니다(v27) — 홈 화면 앱이 쉬는 동안 Realtime 이 끊겨도 최신으로 맞습니다.
+- `couples` 행(이름·만난 날·색)도 다시 읽어 오므로, 한쪽에서 바꾼 커플 정보가 상대 화면에 바로 반영됩니다(v27).
 
 ---
 
@@ -173,6 +183,9 @@ store.couple.myCode() / join(code) / leave()
 store.avatar.set("me", dataUrl)     // v26: 내 프로필 사진을 서버(settings)로
 store.local.summary()               // v26: 이 폰에 남은 예전 기록 요약
 store.migrate.run({force:true})     // v26: 예전 기록 이어 오기 (자동 이전은 force 없이)
+store.repairGroups()                // v27: v26 에서 카드 정보 없이 올라간 노트를 폰 원본으로 1회 복구
+store.groupsRepaired()             // v27: 이 기기에서 복구했는지(플래그)
+store.pull()                       // v27: 지금 서버 상태를 바로 당겨오기 (깨어날 때 자동)
 ```
 
 - 로컬 모드: `LocalBackend` (localStorage + IndexedDB).
@@ -204,12 +217,14 @@ store.migrate.run({force:true})     // v26: 예전 기록 이어 오기 (자동 
 | 사진이 안 보임 | Storage 버킷 `photos` 가 **비공개**이고 정책 4개가 생성됐는지, 서명 URL 만료(6일) 후 자동 갱신 |
 | 예전 프로토타입 데이터가 보임 | `localStorage["couple-app-v1"]` 을 한 번 읽어 `twolog:v1:state` 로 옮깁니다(자동) |
 | v25 에서 쓰던 기록이 새 계정에 안 보임 | v26 에서 로그인하면 자동으로 한 번 이어 옵니다. 안 보이면 My 탭 → 「폰에 있던 기록」 카드의 개수와 「폰에 있던 예전 기록 가져오기」 를 확인하세요(원격에 이미 기록이 있으면 자동 대신 이 버튼) |
+| 노트 카드가 1개로 합쳐져 보임(v26 기기) | v27 로 열면 폰에 남은 원본으로 한 번 자동 복구합니다. My 탭 「폰에 있던 기록」 카드에 「노트 카드를 되살렸어요」가 보이는지 확인하세요 |
 | 상대 프로필 사진이 안 보임 | 사진은 `settings` 의 `avatar:0/1` 행에 있고 Realtime 발행에 `settings` 가 들어 있어야 합니다. 상대 사진은 그 사람이 자기 폰에서 바꿔야 합니다 |
 
 ### 자동 확인(테스트)
 
 ```bash
 pip install playwright && playwright install chromium
+python3 tests/v27.py       # v27: 노트 카드(groups·gid) 동기화 · v26 기기 자동 복구 · 달력 글씨 · 프로필 시트/동그라미 크롭 · 조용한 실시간 반영
 python3 tests/v26.py       # v26: 폰에 있던 로컬 기록 자동 이전·중복 방지 · 프로필 사진 사람별 동기화 · local 회귀
 python3 tests/v25.py       # v25: Supabase 연결(remote) — 로그인 화면 · 가입/로그인 · 초대 코드/연결 · 스키마 없을 때 · local 회귀
 python3 tests/live.py      # 배포 주소가 방금 올린 버전을 서빙하는지(HTTP 200 · twolog-vNN · 콘솔 오류 없음)
@@ -219,9 +234,10 @@ python3 tests/v18.py        # v18: 홈 간격 · 사진첩 하루 3폴라로이�
 python3 tests/v17.py        # (v17 기록용) 노트 「주제」 삭제 · 12색 팔레트 — v18 에서 바뀐 화면이라 지금은 일부 실패가 정상
 ```
 
-마지막 확인 결과(v26): **390×844 헤드리스 Chromium 에서 콘솔/페이지 오류 0**,
-v26(로컬 기록 이전·프로필 사진) 81 · v25(동기화·로그인·초대 코드) 43 · 스모크 18 · v18~v24 회귀 모두 **실패 0**.
-v13~v17 은 그 뒤 화면이 바뀌어 지금은 일부 실패가 정상입니다(v26 이전에도 같은 항목이 실패).
+마지막 확인 결과(v27): **390×844 헤드리스 Chromium 에서 콘솔/페이지 오류 0**,
+v27(카드 동기화·자동 복구·달력 글씨·프로필 시트·크롭) · v26(로컬 기록 이전·프로필 사진) · v25(동기화·로그인·초대 코드) ·
+스모크 · v18~v24 회귀 모두 **실패 0**.
+v13~v17 은 그 뒤 화면이 바뀌어 지금은 일부 실패가 정상입니다(v24~v26 때도 같은 항목이 실패).
 
 ---
 

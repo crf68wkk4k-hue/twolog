@@ -45,6 +45,11 @@
      한 번 옮긴 뒤에는 자동으로 다시 옮기지 않아 기록이 겹치지 않습니다.
      localStorage["twolog.migrated.<coupleId>"] = {at, events, notes, photos} */
   var K_MIGRATED = "twolog.migrated.";
+  /* v27: v26 에서 gid·groups 없이 올라간 노트 카드 묶음을 폰의 원본으로 되살렸다는 표시.
+     localStorage["twolog.groupsRepaired.<coupleId>"] = {at, groups:{todo,bucket,log}, notes} */
+  var K_GROUPS_REPAIRED = "twolog.groupsRepaired.";
+  var K_GROUPS = "groups";           // settings 테이블의 노트 카드 묶음 행
+  var NOTE_ARR = { todo: "todos", bucket: "bucket", log: "logs" };
 
   function isRemote() { return !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey); }
 
@@ -284,7 +289,14 @@
 
   /* 겹치지 않게 같은 내용은 건너뛰기 위한 지문 */
   function sigEvent(r) { return [r.date, r.time || "", r.title || "", r.type || "", r.who || "", r.memo || ""].join("|"); }
-  function sigNote(r) { return String(r.kind || "") + "|" + JSON.stringify(r.payload || {}); }
+  /* v27: 노트 지문은 «무엇을 적었는지»만 봅니다.
+     payload 에 gid·memo·done 이 더해지기 전(v26)에 올라간 행과 같은 내용을
+     다시 가져오기 했을 때 중복으로 들어가지 않게 하려는 것. */
+  function noteLabel(kind, p) {
+    var v = kind === "todo" ? (p || {}).text : (p || {}).title;
+    return String(v == null ? "" : v);
+  }
+  function sigNote(r) { return String(r.kind || "") + "|" + noteLabel(r.kind, r.payload); }
   function sigPhoto(r) { return [r.date, r.album || "", r.title || "", r.memo || ""].join("|"); }
 
   /* v26: 프로필 사진(아바타)은 settings 테이블에 **사람별 한 줄**로 올립니다.
@@ -333,17 +345,19 @@
     var push = function (kind, obj, sort, payload) {
       rows.notes.push({ id: String(obj.id), couple_id: coupleId, kind: kind, sort: sort, payload: payload, deleted: false });
     };
+    /* v27: 항목 하나를 notes 행의 payload 로 — gid(카드 묶음)·memo(상세 메모)·done 까지 담습니다.
+       (v26 까지는 이 셋이 빠져서 카드가 한 개로 합쳐지고 상세 메모가 사라졌어요) */
     (doc.todos || []).forEach(function (t, i) {
-      push("todo", t, i, { text: t.text || "", done: !!t.done, who: flip(whoToken(t.who)) });
+      push("todo", t, i, notePayload("todo", t, flip, whoToken));
     });
     (doc.bucket || []).forEach(function (b, i) {
-      push("bucket", b, i, { title: b.title || "", cat: b.cat || "기타", done: !!b.done, status: b.status || "" });
+      push("bucket", b, i, notePayload("bucket", b, flip, whoToken));
     });
     (doc.logs || []).forEach(function (l, i) {
-      push("log", l, i, { kind: l.kind === "food" ? "food" : "movie", title: l.title || "", rating: Number(l.rating) || 0, date: l.date || nowIso(), review: l.review || "", place: l.place || "" });
+      push("log", l, i, notePayload("log", l, flip, whoToken));
     });
     (doc.lists || []).forEach(function (l, i) {
-      push("list", l, i, { title: l.title || "", emoji: l.emoji || "📌", kind: l.kind === "memo" ? "memo" : "check", items: (l.items || []).map(function (it) { return { id: it.id, text: it.text || "", done: !!it.done }; }) });
+      push("list", l, i, notePayload("list", l, flip, whoToken));
     });
     (doc.photos || []).forEach(function (p, i) {
       rows.photos.push({
@@ -354,6 +368,50 @@
       });
     });
     return rows;
+  }
+
+  /* v27: 노트 한 항목 → payload (stateToRows·repairGroups 가 함께 씁니다) */
+  function notePayload(kind, obj, flip, whoToken) {
+    var o = obj || {};
+    var p;
+    if (kind === "todo") {
+      p = { text: o.text || "", memo: o.memo || "", done: !!o.done, who: flip(whoToken(o.who)) };
+    } else if (kind === "bucket") {
+      p = { title: o.title || "", cat: o.cat || "기타", memo: o.memo || "", done: !!o.done, status: o.status || "" };
+    } else if (kind === "log") {
+      p = { kind: o.kind === "food" ? "food" : "movie", title: o.title || "", rating: Number(o.rating) || 0,
+        date: o.date || nowIso(), review: o.review || "", place: o.place || "", done: o.done !== false };
+    } else {
+      p = { title: o.title || "", emoji: o.emoji || "📌", kind: o.kind === "memo" ? "memo" : "check",
+        items: arr(o.items).map(function (it) { return { id: it.id, text: it.text || "", memo: it.memo || "", done: !!it.done }; }) };
+    }
+    if (o.gid) p.gid = String(o.gid);        // 어느 카드(리스트)에 들어 있는지
+    return p;
+  }
+
+  /* v27: 노트 카드 묶음({todo,bucket,log} 의 {id,title,titleBg,caption,who,date,...})을
+     그대로(모든 필드) 복사합니다. settings 의 key="groups" 행에 이 값을 담아요. */
+  function normalizeGroups(value) {
+    var src = value && typeof value === "object" ? value : {};
+    var out = { todo: [], bucket: [], log: [] };
+    ["todo", "bucket", "log"].forEach(function (k) {
+      out[k] = arr(src[k]).filter(function (g) { return g && typeof g === "object"; }).map(function (g) {
+        var c;
+        try { c = JSON.parse(JSON.stringify(g)); } catch (e) { c = {}; }
+        if (!c.id) c.id = freshId();
+        c.id = String(c.id);
+        return c;
+      });
+    });
+    return out;
+  }
+  function groupCount(groups) {
+    var g = normalizeGroups(groups);
+    return { todo: g.todo.length, bucket: g.bucket.length, log: g.log.length };
+  }
+  function groupsEmpty(value) {
+    if (!value || typeof value !== "object") return true;
+    return !(arr(value.todo).length + arr(value.bucket).length + arr(value.log).length);
   }
 
   function noteWhoLabel(who, flip, couple) {
@@ -405,13 +463,30 @@
       var rEnd = /^\d{4}-\d{2}-\d{2}$/.test(rMemo) && rMemo > String(r.date || "") ? rMemo : String(r.date || "");
       doc.events.push({ id: r.id, date: r.date, endDate: rEnd, time: r.time || "", title: r.title || "", type: r.type || "date", memo: "", who: flip(r.who) });
     });
+    /* v27: gid(카드 묶음)·memo(상세 메모)·done 도 함께 복원합니다 */
     (noteRows || []).filter(function (r) { return !r.deleted; }).sort(function (a, b) { return (a.sort || 0) - (b.sort || 0); })
       .forEach(function (r) {
         var p = r.payload || {};
-        if (r.kind === "todo") doc.todos.push({ id: r.id, text: p.text || "", done: !!p.done, who: noteWhoLabel(p.who, flip, doc.couple) });
-        else if (r.kind === "bucket") doc.bucket.push({ id: r.id, title: p.title || "", cat: p.cat || "기타", done: !!p.done, status: p.status || undefined });
-        else if (r.kind === "log") doc.logs.push({ id: r.id, kind: p.kind === "food" ? "food" : "movie", title: p.title || "", rating: Number(p.rating) || 0, date: p.date || nowIso(), review: p.review || "", place: p.place || "" });
-        else if (r.kind === "list") doc.lists.push({ id: r.id, title: p.title || "", emoji: p.emoji || "📌", kind: p.kind === "memo" ? "memo" : "check", items: (p.items || []).map(function (it) { return { id: it.id || randId(), text: it.text || "", done: !!it.done }; }) });
+        var gid = p.gid ? String(p.gid) : undefined;
+        if (r.kind === "todo") {
+          var todo = { id: r.id, text: p.text || "", memo: p.memo || "", done: !!p.done, who: noteWhoLabel(p.who, flip, doc.couple) };
+          if (gid) todo.gid = gid;
+          doc.todos.push(todo);
+        } else if (r.kind === "bucket") {
+          var buck = { id: r.id, title: p.title || "", cat: p.cat || "기타", memo: p.memo || "", done: !!p.done, status: p.status || undefined };
+          if (gid) buck.gid = gid;
+          doc.bucket.push(buck);
+        } else if (r.kind === "log") {
+          var log = { id: r.id, kind: p.kind === "food" ? "food" : "movie", title: p.title || "", rating: Number(p.rating) || 0,
+            date: p.date || nowIso(), review: p.review || "", place: p.place || "", done: p.done !== false };
+          if (gid) log.gid = gid;
+          doc.logs.push(log);
+        } else if (r.kind === "list") {
+          var list = { id: r.id, title: p.title || "", emoji: p.emoji || "📌", kind: p.kind === "memo" ? "memo" : "check",
+            items: arr(p.items).map(function (it) { return { id: it.id || randId(), text: it.text || "", memo: it.memo || "", done: !!it.done }; }) };
+          if (gid) list.gid = gid;
+          doc.lists.push(list);
+        }
       });
     (photoRows || []).sort(function (a, b) { return (a.sort || 0) - (b.sort || 0); }).forEach(function (r) {
       doc.photos.push({
@@ -422,6 +497,11 @@
     });
     (settingRows || []).forEach(function (r) {
       if (r.key === "theme" && r.value) doc.theme = Object.assign({ name: null, log: null, mode: "light" }, r.value);
+      else if (r.key === K_GROUPS && r.value) {
+        /* v27: 노트 카드 묶음 — 두 기기가 같은 카드 id·제목·색을 봅니다 */
+        var gs = normalizeGroups(r.value);
+        if (gs.todo.length || gs.bucket.length || gs.log.length) doc.groups = gs;
+      }
       else if (String(r.key || "").indexOf(K_AVATAR) === 0) {
         /* v26: 프로필 사진 — 사람별 행을 이 기기의 '나/상대'로 바꿔 담습니다 */
         var aw = avatarWhoOf(r.key, swap);
@@ -513,6 +593,9 @@
   /* v26: 로컬 모드에서는 옮길 곳(원격)이 없으니 그대로 안내만 */
   LocalBackend.prototype.migrateLocal = function () { return Promise.resolve({ ok: false, reason: "local_mode" }); };
   LocalBackend.prototype.migratedFlag = function () { return null; };
+  /* v27: 로컬 모드는 groups·gid 가 이미 한 파일에 함께 저장되므로 복구할 것이 없습니다. */
+  LocalBackend.prototype.repairGroups = function () { return Promise.resolve({ ok: false, reason: "local_mode" }); };
+  LocalBackend.prototype.groupsRepairedFlag = function () { return null; };
   LocalBackend.prototype.subscribe = function () { return function () {}; };
 
   /* =====================================================================
@@ -627,11 +710,26 @@
     this.swap = !!(row && row.members && this.user && row.members.indexOf(this.user.id) === 1);
   };
 
+  /* v27: couples 행을 서버에서 다시 읽어 옵니다 (상대가 고친 이름·만난 날·색 반영) */
+  SupabaseBackend.prototype.refreshCouple = function () {
+    var self = this;
+    if (!this.client || !this.couple || !this.user) return Promise.resolve(this.couple);
+    return this.client.from("couples").select("*").eq("id", this.couple.id).then(function (res) {
+      if (res && !res.error && Array.isArray(res.data) && res.data.length) self.adopt(res.data[0]);
+      return self.couple;
+    }).catch(function () { return self.couple; });
+  };
+
   SupabaseBackend.prototype.load = function () {
     var self = this;
     return this.whoAmI().then(function (user) {
       if (!user) return null;                     // 로그인 화면으로
       return self.ensureCouple();
+    }).then(function (couple) {
+      if (!couple) return null;
+      /* v27: 상대가 커플 정보(이름·만난 날·문구·색)를 바꿨으면 다시 읽어 옵니다.
+         예전에는 메모리에 있던 값만 써서 couples 변경이 화면에 안 닿았어요. */
+      return self.refreshCouple().then(function () { return self.couple || couple; });
     }).then(function (couple) {
       if (!couple) return null;
       var client = self.client, cid = couple.id;
@@ -714,6 +812,18 @@
       jobs.push(client.from("settings").upsert(themeRow, { onConflict: "couple_id,key" }).then(function (r) {
         if (r.error) throw r.error;
         self.prev.settings.theme = themeRow;
+      }));
+    }
+
+    /* settings: v27 노트 카드 묶음(groups) — 카드 id·제목·제목색·순서를 두 기기가 함께 씁니다 */
+    var groupsValue = normalizeGroups(doc.groups);
+    var prevGroups = this.prev.settings[K_GROUPS];
+    var groupsChanged = !prevGroups || !prevGroups.value || !sameRow(prevGroups.value, groupsValue);
+    if (groupsChanged && (groupsValue.todo.length || groupsValue.bucket.length || groupsValue.log.length)) {
+      var groupsRow = { couple_id: cid, key: K_GROUPS, value: groupsValue };
+      jobs.push(client.from("settings").upsert(groupsRow, { onConflict: "couple_id,key" }).then(function (r) {
+        if (r.error) throw r.error;
+        self.prev.settings[K_GROUPS] = groupsRow;
       }));
     }
 
@@ -1029,6 +1139,16 @@
           }));
         }
 
+        /* ---- 4-1. v27 노트 카드 묶음(settings groups) — 원격에 아직 없을 때만 ---- */
+        var groupsRow = setRows.filter(function (r) { return r.key === K_GROUPS; })[0];
+        var localGroups = normalizeGroups(local.groups);
+        var localGroupTotal = localGroups.todo.length + localGroups.bucket.length + localGroups.log.length;
+        if (groupsEmpty(groupsRow && groupsRow.value) && localGroupTotal) {
+          jobs.push(client.from("settings").upsert({ couple_id: cid, key: K_GROUPS, value: localGroups }, { onConflict: "couple_id,key" }).then(function (r) {
+            if (r && r.error) throw r.error;
+          }));
+        }
+
         /* ---- 4-2. 프로필 사진 — 이 폰에 있던 사진을 각자 몫으로 올립니다 ---- */
         var pics = (local.couple && local.couple.pics) || {};
         var avatarKeys = ["me", "you"].filter(function (w) {
@@ -1090,6 +1210,154 @@
     }));
   }
 
+  /* =====================================================================
+     v27: v26 에서 gid·groups 없이 올라간 노트 카드 묶음 자동 복구
+     ---------------------------------------------------------------------
+     v26 까지 sync.js 는 notes 의 payload 에 gid 를, settings 에 groups 를
+     올리지 않았습니다. 그래서 이미 v26 으로 한 번 이전을 마친 폰
+     (twolog.migrated.<coupleId> 있음)은 원격 notes 에 카드 정보가 없고
+     화면에는 모든 항목이 기본 카드 한 개로 합쳐져 보입니다.
+
+     이 폰(localStorage["twolog:v1:state"])에는 원본 groups 와 항목별 gid 가
+     그대로 남아 있으므로, 로그인/앱 시작 때 한 번(플래그 twolog.groupsRepaired.<>):
+       · 로컬 groups 를 settings key="groups" 행으로 올리고
+       · 원격 notes 중 같은 항목(같은 id → 같은 kind+내용)의 payload 에
+         원래 gid(와 빠진 상세 메모·완료 여부)를 채워 넣고
+       · 원격에 없는 로컬 항목은 새로 넣습니다. (화면은 바로 다시 그립니다)
+     한 번 복구한 뒤에는 플래그 때문에 다시 돌지 않습니다.
+     ===================================================================== */
+  SupabaseBackend.prototype.groupsRepairedFlag = function () {
+    if (!this.couple) return null;
+    try {
+      var raw = localStorage.getItem(K_GROUPS_REPAIRED + this.couple.id);
+      if (!raw) return null;
+      var v = JSON.parse(raw);
+      return v && typeof v === "object" ? v : { at: 0 };
+    } catch (e) { return null; }
+  };
+
+  SupabaseBackend.prototype.repairGroups = function (opts) {
+    var self = this;
+    var force = !!(opts && opts.force);
+    if (!this.couple || !this.user) return Promise.resolve({ ok: false, reason: "no_couple" });
+    var cid = this.couple.id;
+    var local = readLocalDoc();
+    if (!local) return Promise.resolve({ ok: false, reason: "no_local" });
+
+    var localGroups = normalizeGroups(local.groups);
+    var localGroupTotal = localGroups.todo.length + localGroups.bucket.length + localGroups.log.length;
+    var localNotes = arr(local.todos).length + arr(local.bucket).length + arr(local.logs).length;
+    if (!localGroupTotal || !localNotes) return Promise.resolve({ ok: false, reason: "no_groups" });
+
+    var flagKey = K_GROUPS_REPAIRED + cid;
+    if (!force) {
+      var already = false;
+      try { already = !!localStorage.getItem(flagKey); } catch (e) {}
+      if (already) return Promise.resolve({ ok: false, skipped: "already" });
+    }
+
+    var client = this.client;
+    var swap = !!this.swap;
+    var flip = function (who) {
+      if (who !== "me" && who !== "you") return "both";
+      if (!swap) return who;
+      return who === "me" ? "you" : "me";
+    };
+    var whoToken = function (w) {
+      if (!w || w === "함께" || w === "both") return "both";
+      if (w === "나" || w === "me") return "me";
+      return "you";
+    };
+
+    return Promise.all([
+      client.from("notes").select("*").eq("couple_id", cid),
+      client.from("settings").select("*").eq("couple_id", cid)
+    ]).then(function (parts) {
+      parts.forEach(function (r) { if (r && r.error) throw r.error; });
+      var noteRows = parts[0].data || [];
+      var setRows = parts[1].data || [];
+      var groupsRow = setRows.filter(function (r) { return r.key === K_GROUPS; })[0];
+      var groupsMissing = groupsEmpty(groupsRow && groupsRow.value);
+
+      var live = noteRows.filter(function (r) { return !r.deleted; });
+      var missingGid = live.filter(function (r) {
+        return NOTE_ARR[r.kind] && !((r.payload || {}).gid);
+      }).length;
+
+      /* 이미 카드 묶음도 있고 모든 항목에 gid 가 있으면 할 일이 없음 */
+      if (!force && !groupsMissing && !missingGid) return { ok: false, skipped: "nothing" };
+
+      /* ---- 1. 원격 항목 ↔ 로컬 항목 맞추기 ---- */
+      var used = {};                      // 로컬 항목 id
+      var patches = [];                   // payload 를 보탤 원격 행
+      live.forEach(function (r) {
+        var arrKey = NOTE_ARR[r.kind];
+        if (!arrKey) return;
+        var items = arr(local[arrKey]);
+        var p = r.payload || {};
+        var it = items.filter(function (x) { return x && String(x.id) === String(r.id); })[0];
+        if (!it) {
+          var label = noteLabel(r.kind, p);
+          it = items.filter(function (x) { return x && noteLabel(r.kind, x) === label; })[0];
+        }
+        if (!it) return;
+        used[it.id] = true;
+        var patch = {};
+        if (!p.gid && it.gid) patch.gid = String(it.gid);
+        if ((r.kind === "todo" || r.kind === "bucket") && p.memo === undefined && it.memo) patch.memo = String(it.memo);
+        if (r.kind === "log" && p.done === undefined && typeof it.done === "boolean") patch.done = it.done;
+        if (Object.keys(patch).length) {
+          patches.push({
+            id: r.id, couple_id: r.couple_id || cid, kind: r.kind, sort: r.sort || 0, deleted: !!r.deleted,
+            payload: Object.assign({}, p, patch)
+          });
+        }
+      });
+
+      /* ---- 2. 원격에 아예 없는 로컬 항목은 새 행으로 ---- */
+      var added = [];
+      var sortMax = -1;
+      live.forEach(function (r) { var v = Number(r.sort); if (!isNaN(v) && v > sortMax) sortMax = v; });
+      Object.keys(NOTE_ARR).forEach(function (kind) {
+        arr(local[NOTE_ARR[kind]]).forEach(function (it) {
+          if (!it || typeof it !== "object") return;
+          if (used[it.id]) return;
+          added.push({
+            id: String(it.id || freshId()), couple_id: cid, kind: kind, sort: ++sortMax,
+            deleted: false, payload: notePayload(kind, it, flip, whoToken)
+          });
+        });
+      });
+
+      var jobs = [];
+      if (groupsMissing && localGroupTotal) {
+        jobs.push(client.from("settings").upsert({ couple_id: cid, key: K_GROUPS, value: localGroups }, { onConflict: "couple_id,key" }).then(function (r) {
+          if (r && r.error) throw r.error;
+        }));
+      }
+      if (patches.length) jobs.push(writeChunks(client, "notes", patches));
+      if (added.length) jobs.push(writeChunks(client, "notes", added));
+
+      var wroteGroups = groupsMissing && !!localGroupTotal;
+      if (!jobs.length) return { ok: false, skipped: "nothing" };
+
+      return Promise.all(jobs).then(function () {
+        return self.load().then(function (doc) {
+          var counts = groupCount(localGroups);
+          try {
+            localStorage.setItem(flagKey, JSON.stringify({
+              at: Date.now(), groups: counts, fixed: patches.length, added: added.length, groupsRow: wroteGroups
+            }));
+          } catch (e) {}
+          return { ok: true, groups: counts, fixed: patches.length, added: added.length, groupsRow: wroteGroups, state: doc };
+        });
+      });
+    }).catch(function (e) {
+      warn("groups repair failed", e);
+      return { ok: false, reason: "failed", error: String(e && e.message || e) };
+    });
+  };
+
   /* Realtime: 상대가 바꾸면 다시 읽어서 화면에 반영 */
   SupabaseBackend.prototype.subscribe = function (onRemote) {
     var self = this;
@@ -1140,6 +1408,32 @@
         status.state = "online";
         if (listener) listener(doc);
       });
+    }
+
+    /* v27: 앱이 다시 앞으로 나올 때 서버의 최신 상태를 당겨 옵니다.
+       (홈 화면 앱·모바일 Safari 는 쉬는 동안 Realtime 연결이 끊길 수 있어요) */
+    var pullTimer = null;
+    function pullNow() {
+      if (!remote || !backend.couple || !backend.load) return Promise.resolve(null);
+      /* 아직 서버로 보내지 않은 변경이 있으면 그 저장이 끝난 뒤에 맞춥니다 */
+      if (saveTimer || backend.saving) return Promise.resolve(null);
+      return backend.load().then(function (doc) {
+        if (!doc) return null;
+        var ui = lastDoc ? lastDoc.ui : null;
+        if (ui) doc.ui = Object.assign(doc.ui || {}, ui);
+        var changed = true;
+        try { changed = !lastDoc || JSON.stringify(doc) !== JSON.stringify(lastDoc); } catch (e) { changed = true; }
+        lastDoc = doc;
+        status.at = Date.now();
+        status.state = "online";
+        if (changed && listener) listener(doc);
+        return doc;
+      }).catch(function () { status.state = "offline"; return null; });
+    }
+    function schedulePull(delay) {
+      if (!remote) return;
+      clearTimeout(pullTimer);
+      pullTimer = setTimeout(function () { pullTimer = null; pullNow(); }, delay == null ? 300 : delay);
     }
 
     var store = {
@@ -1285,6 +1579,26 @@
         done: function () { return remote && backend.migratedFlag ? backend.migratedFlag() : null; }
       },
 
+      /* v27: v26 에서 카드 정보 없이 올라간 노트 카드 묶음 — 이 폰의 원본으로 1회 복구 */
+      repairGroups: function (opts) {
+        if (!remote) return Promise.resolve({ ok: false, reason: "local_mode" });
+        if (!backend.repairGroups) return Promise.resolve({ ok: false, reason: "unsupported" });
+        return backend.repairGroups(opts || {}).then(function (res) {
+          if (res && res.ok && res.state) {
+            var ui = lastDoc ? lastDoc.ui : null;
+            if (ui) res.state.ui = Object.assign(res.state.ui || {}, ui);
+            lastDoc = res.state;
+          }
+          return res;
+        });
+      },
+      groupsRepaired: function () {
+        return remote && backend.groupsRepairedFlag ? backend.groupsRepairedFlag() : null;
+      },
+
+      /* v27: 지금 서버 상태를 바로 당겨오기 (테스트·수동 확인용) */
+      pull: pullNow,
+
       /* 이 기기 식별(충돌 방지용) */
       deviceId: (function () {
         try {
@@ -1295,13 +1609,19 @@
       })()
     };
 
-    /* 저장 누락 방지: 앱이 가려지거나 닫힐 때 바로 씁니다. */
+    /* 저장 누락 방지: 앱이 가려지거나 닫힐 때 바로 쓰고,
+       다시 앞으로 나오면(v27) 서버의 최신 상태를 조용히 당겨 옵니다. */
     try {
       global.addEventListener("pagehide", function () { store.flush(); });
-      document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") store.flush(); });
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "hidden") store.flush();
+        else schedulePull(250);
+      });
+      global.addEventListener("focus", function () { schedulePull(250); });
+      global.addEventListener("pageshow", function () { schedulePull(250); });
       global.addEventListener("online", function () {
         status.state = remote ? "online" : "local";
-        store.flush();
+        store.flush().then(function () { schedulePull(600); });
       });
     } catch (e) {}
 
