@@ -195,6 +195,7 @@ store.couple.myCode() / join(code) / leave()
 ```bash
 pip install playwright && playwright install chromium
 python3 tests/v25.py       # v25: Supabase 연결(remote) — 로그인 화면 · 가입/로그인 · 초대 코드/연결 · 스키마 없을 때 · local 회귀
+python3 tests/live.py      # 배포 주소가 방금 올린 버전을 서빙하는지(HTTP 200 · twolog-vNN · 콘솔 오류 없음)
 python3 tests/smoke.py      # 5탭 · 일정 · 할일 · 사진 업로드/저장 · manifest · 서비스워커 · 새로 열어도 유지
 python3 tests/v19.py        # v19: 컬러 시트 · 항목 이름 15px 검정 통일 · 확인 버튼 글씨 검정 · 노트 카드 탭→목록 · 꾹 눌러 이동 · 완료 항목 아래로 · 테두리 없는 달력 · 일정 검색 · 공휴일 빨강
 python3 tests/v18.py        # v18: 홈 간격 · 사진첩 하루 3폴라로이드+뷰어 · 노트 탭 분리/글씨 · 이모지+이름 한 칸 · 꾹 눌러 순서 · 그날 타임라인 · 4자리 잠금 · PDF
