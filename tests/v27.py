@@ -919,6 +919,32 @@ with sync_playwright() as p:
       sel: document.querySelectorAll('#sheet .pr-sws .sw.sel').length}) """)
     check("컬러를 고르면 프로필·일정 색으로 저장되고 하나만 선택 표시",
           col["colors"] == "#EA994D" and col["sched"] == "#EA994D" and col["sel"] == 1, col)
+
+    # ---- 7-4. 닉네임은 프사 옆 칸에서 그대로 저장
+    page.fill('#personForm input[name="name"]', "소영이")
+    page.locator('#personForm button[type="submit"]').click()
+    page.wait_for_timeout(700)
+    nick = page.evaluate("""() => {
+      const s = JSON.parse(localStorage.getItem('twolog:v1:state') || '{}');
+      return {me: (window.TwoLogUI.state.couple || {}).me, stored: (s.couple || {}).me,
+              sheet: document.getElementById('sheetWrap').classList.contains('open')};
+    }""")
+    check("닉네임을 프사 옆 칸에서 바꾸면 저장됨",
+          nick["me"] == "소영이" and nick["stored"] == "소영이" and not nick["sheet"], nick)
+
+    # ---- 7-5. 사진 지우기는 프사 위 작은 × 로 (글씨 버튼 없이)
+    page.locator('#s-set [data-act="personSheet"][data-who="me"]').click()
+    page.wait_for_timeout(450)
+    page.locator("#sheet .pr-del").click()
+    page.wait_for_timeout(700)
+    cleared = page.evaluate("""() => {
+      const s = JSON.parse(localStorage.getItem('twolog:v1:state') || '{}');
+      return {pics: Object.keys(((s.couple || {}).pics) || {}),
+              img: !!document.querySelector('#sheet .pr-av img'),
+              del: !!document.querySelector('#sheet .pr-del')};
+    }""")
+    check("프사 위 × 를 누르면 사진이 지워지고 × 도 사라짐",
+          cleared["pics"] == [] and not cleared["img"] and not cleared["del"], cleared)
     check("프로필 시트 확인 중 오류 없음", len(errs) == 0, errs[:3])
     ctx.close()
 
