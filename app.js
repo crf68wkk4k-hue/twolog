@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v23";
+  var APP_VERSION = "v24";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -919,7 +919,10 @@
 
     /* v23: 일정 막대를 16px + 사이 3px(19px)로 띄우고, 한 주에 세 줄까지 펼칩니다.
        네 줄을 넘는 일정만 날짜 칸의「외 N」으로 알려 줘요. */
-    var LANE_H = 19, TOP_H = 26, ROW_MIN = 64, MAX_LANE = 3;
+    /* v24: 세 줄이 서로 붙지 않고 날짜 숫자·다음 주와도 부딪히지 않게 간격을 넉넉히.
+       TOP_H = 날짜 숫자 아래에서 첫 줄까지, LANE_H = 한 줄 높이(막대 16 + 사이 6),
+       ROW_PAD = 마지막 줄 아래 여백입니다. */
+    var LANE_H = 22, TOP_H = 32, ROW_MIN = 68, ROW_PAD = 12, MAX_LANE = 3;
     html += '<div class="cal-grid">';
     for (var w = 0; w < cells.length / 7; w++) {
       var wk = cells.slice(w * 7, w * 7 + 7);
@@ -955,10 +958,13 @@
         if (ovDs) ovf[ovDs] = (ovf[ovDs] || 0) + 1;
       });
       var ovfCount = Object.keys(ovf).length ? ovf : null;
-      var rowsH = Math.max(ROW_MIN, TOP_H + Math.min(lanes.length, MAX_LANE) * LANE_H + 8 + (ovfCount ? 12 : 0));
+      /* v24: 공휴일 이름이 있는 주는 그 이름 아래에서 일정 줄이 시작하게 조금 내립니다 */
+      var holRow = wk.some(function (dsH) { return !!dsH && !!holName(dsH); });
+      var topBase = TOP_H + (holRow ? 13 : 0);
+      var rowsH = Math.max(ROW_MIN, topBase + Math.min(lanes.length, MAX_LANE) * LANE_H + (ovfCount ? 20 : ROW_PAD));
       /* v21: 마지막 주에 일정이 없으면 그 빈 줄만큼 높이를 줄여 — 달력과 아래 일정이 훨씬 가깝게 */
       var lastRow = (w === cells.length / 7 - 1);
-      if (lastRow && !shown.length && !ovfCount) rowsH = TOP_H + 10;
+      if (lastRow && !shown.length && !ovfCount) rowsH = topBase + 10;
 
       html += '<div class="cal-row" style="height:' + rowsH + 'px"><div class="cal-daygrid">';
       for (var ci2 = 0; ci2 < 7; ci2++) {
@@ -982,7 +988,7 @@
         html += '<div class="cal-bars">';
         shown.forEach(function (b) {
           var left = b.sCol / 7 * 100, width = (b.eCol - b.sCol + 1) / 7 * 100;
-          var top = TOP_H + b.lane * LANE_H;
+          var top = topBase + b.lane * LANE_H;
           var edge = evColor(b.e);
           /* 여러 칸에 걸친 일정은 막대 전체 폭의 가운데에 제목을 놓습니다 */
           var mid = b.eCol > b.sCol ? " mid" : "";
@@ -1440,7 +1446,7 @@
       '<button type="button" class="cal-arrow" data-act="pcalNext" aria-label="다음 달">' + IC.right + "</button>" +
       "</div></div>" +
       '<div class="pcal-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>' +
-      '<div class="pcal-grid" data-pcal="1">';
+      '<div class="pcal-grid" data-pcal="1" data-rows="' + (cells.length / 7) + '">';
 
     cells.forEach(function (dayNo) {
       if (!dayNo) { h += '<div class="pcell blank"></div>'; return; }
@@ -1461,6 +1467,31 @@
     return h;
   }
 
+  /* v24: 사진 달력 칸 높이 — 화면의 세로 여유를 재서 5주·6주 달력이 탭바 바로 위까지 차도록 잡아요.
+     폭보다 세로로 길게(폭의 최대 2배) 키우되, 그 이상은 사진이 길쭉해져서 멈춥니다. */
+  function fitPhotoCal() {
+    var scr = $("#s-photo");
+    if (!scr) return;
+    var grid = scr.querySelector(".pcal-grid");
+    if (!grid || grid.children.length < 7) return;
+    var host = $("#screens");
+    var rows = Math.round(grid.children.length / 7);
+    var gBox = grid.getBoundingClientRect();
+    var hostBox = host ? host.getBoundingClientRect() : null;
+    var top = gBox.top - (hostBox ? hostBox.top : 0) + (host ? host.scrollTop : 0);
+    var room = (host ? host.clientHeight : window.innerHeight) - top - 12;
+    var gap = parseFloat(getComputedStyle(grid).rowGap) || 4;
+    var colW = grid.children[0] ? grid.children[0].getBoundingClientRect().width : 0;
+    var byRoom = (room - gap * (rows - 1)) / rows;
+    var h = Math.round(Math.min(Math.max(byRoom, 76), Math.max(82, colW * 2)));
+    /* 사진이 하나도 없는 달은 칸을 조금만 키워 「이 달에 담은 사진이 없어요」가 화면 안에 보이게 */
+    if (scr.querySelector(".pcal-empty")) h = Math.min(h, 76);
+    grid.style.setProperty("--pcell-h", h + "px");
+  }
+  window.addEventListener("resize", function () {
+    if (current === "photo") fitPhotoCal();
+  });
+
   function renderPhoto() {
     /* v21: 사진첩은 제목·「N장의 순간」 없이 오른쪽 + 버튼만 — 상단 여백도 군더더기 없이 */
     /* v23: + 옆에 달력 아이콘 — 누르면 그 달 사진을 달력으로 (다시 누르면 목록으로) */
@@ -1474,6 +1505,7 @@
     if (pcOn) {
       h += photoCalHtml();
       $("#s-photo").innerHTML = h;
+      fitPhotoCal();
       return;
     }
     /* 앨범 대신 날짜로 묶어요 — 하루에 담은 순간이 한 줄에 모입니다 */

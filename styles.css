@@ -380,35 +380,38 @@ html[data-mode="dark"] .segs .seg-btn.active{background:var(--ink); border-color
 
 /* ---------- photos: 날짜별 폴라로이드 (v17) ---------- */
 /* v23: 사진첩 달력 보기 — 한 달만, 날짜 칸에 그날 사진을 가득 채움 */
-.pcal{margin:12px 9px 0}
-.pcal-hd{display:flex; align-items:center; justify-content:space-between; padding:2px 6px 10px}
-.pcal-ym{font-size:19px; font-weight:700; letter-spacing:-.035em; color:var(--ink); font-variant-numeric:tabular-nums}
-.pcal-nav{display:flex; align-items:center; gap:2px}
-.pcal-nav .cal-arrow{width:28px; height:28px}
-.pcal-week{display:grid; grid-template-columns:repeat(7,1fr); padding:0 0 6px}
-.pcal-week span{text-align:center; font-size:11px; font-weight:600; color:var(--ink-3)}
+/* v24: 더 크게 — 좌우 여백을 줄여 7칸이 화면 폭을 다 쓰고, 칸 높이는 화면 세로 여유에 맞춰
+   앱(fitPhotoCal)이 --pcell-h 로 잡아 줍니다. 5주·6주 달력이 탭바에 가리지 않는 선까지 꽉 차요. */
+.pcal{margin:10px 8px 0; display:flex; flex-direction:column}
+.pcal-hd{display:flex; align-items:center; justify-content:space-between; padding:2px 4px 12px}
+.pcal-ym{font-size:23px; font-weight:700; letter-spacing:-.04em; color:var(--ink); font-variant-numeric:tabular-nums}
+.pcal-nav{display:flex; align-items:center; gap:4px}
+.pcal-nav .cal-arrow{width:32px; height:32px}
+.pcal-nav .cal-arrow svg{width:17px; height:17px}
+.pcal-week{display:grid; grid-template-columns:repeat(7,1fr); padding:0 0 8px}
+.pcal-week span{text-align:center; font-size:12px; font-weight:600; color:var(--ink-3)}
 .pcal-week span:first-child{color:var(--hol)}
 .pcal-week span:last-child{color:#8FA0A8}
-.pcal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:3px}
-.pcell{position:relative; aspect-ratio:1/1; display:block; padding:0; border:0; background:transparent;
+.pcal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px}
+.pcell{position:relative; height:var(--pcell-h, 84px); display:block; padding:0; border:0; background:transparent;
   overflow:hidden; border-radius:0; font:inherit; color:inherit; cursor:pointer}
 .pcell.blank{visibility:hidden}
 /* 사진 위에서도 날짜가 잘 보이게 왼쪽 위만 살짝 어둡게 */
 .pcell.has::before{content:""; position:absolute; inset:0; pointer-events:none;
   background:radial-gradient(130% 100% at 0 0, rgba(0,0,0,.5), rgba(0,0,0,0) 62%)}
 .pcell img,.pcell svg{width:100%; height:100%; display:block; object-fit:cover}
-.pcell .pn{position:absolute; display:block; font-size:11px; font-weight:700; color:var(--ink-3);
+.pcell .pn{position:absolute; display:block; font-size:12.5px; font-weight:700; color:var(--ink-3);
   font-variant-numeric:tabular-nums; letter-spacing:-.02em}
 /* 사진이 없는 날 — 숫자만 가운데에 깔끔하게 */
-.pcell:not(.has) .pn{inset:0; display:flex; align-items:center; justify-content:center; font-size:12px}
+.pcell:not(.has) .pn{inset:0; display:flex; align-items:center; justify-content:center; font-size:14px}
 .pcell.today:not(.has) .pn{color:var(--accent)}
 /* 사진이 있는 날 — 왼쪽 위 날짜, 오른쪽 아래 장수 */
-.pcell.has .pn{top:3px; left:4px; color:#FFFFFF; text-shadow:0 1px 3px rgba(0,0,0,.6)}
-.pcell.has .pn{top:3px; left:4px; color:#FFFFFF; z-index:1; text-shadow:0 1px 2px rgba(0,0,0,.9), 0 0 3px rgba(0,0,0,.7)}
-.pcell .pc{position:absolute; right:3px; bottom:3px; z-index:1; display:flex; align-items:center; gap:2px;
-  font-size:9.5px; font-weight:700; line-height:14px; padding:0 3px; color:#FFFFFF;
+.pcell.has .pn{top:4px; left:5px; color:#FFFFFF; z-index:1; font-size:13px;
+  text-shadow:0 1px 2px rgba(0,0,0,.9), 0 0 3px rgba(0,0,0,.7)}
+.pcell .pc{position:absolute; right:4px; bottom:4px; z-index:1; display:flex; align-items:center; gap:3px;
+  font-size:11px; font-weight:700; line-height:16px; padding:0 4px; color:#FFFFFF;
   background:rgba(17,17,17,.5); letter-spacing:-.01em}
-.pcell .pc svg{width:9px; height:9px}
+.pcell .pc svg{width:11px; height:11px}
 .pcal-empty{padding:26px 6px 10px; font-size:12.5px; color:var(--ink-3); text-align:center}
 .album{margin:22px 20px 0}
 .album-hd{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px}

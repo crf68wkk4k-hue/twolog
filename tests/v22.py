@@ -83,11 +83,11 @@ with sync_playwright() as p:
 
     # ---------------- 0. 서비스워커 캐시 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
-    # v23: 캐시 버전은 배포마다 올라가므로 v23 으로
-    check("sw.js 캐시 버전 twolog-v23", 'const VERSION = "twolog-v23"' in sw,
+    # v24: 캐시 버전은 배포마다 올라가므로 v24 으로
+    check("sw.js 캐시 버전 twolog-v24", 'const VERSION = "twolog-v24"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
     app_js = page.request.get(URL + "app.js").text()
-    check("app.js 버전 상수 v23", 'var APP_VERSION = "v23"' in app_js)
+    check("app.js 버전 상수 v24", 'var APP_VERSION = "v24"' in app_js)
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장되는 일반 모드로 옮겨요
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -404,8 +404,8 @@ with sync_playwright() as p:
               topOfPage: hr.top < window.innerHeight * 0.2};
     })()""")
     check("My 탭에 버전 표시 있음", my.get("ok"), my)
-    # v23: 화면에 찍히는 버전도 배포마다 올라가므로 v23
-    check("버전 문구가 v23", "v23" in str(my.get("txt")), my.get("txt"))
+    # v24: 화면에 찍히는 버전도 배포마다 올라가므로 v24
+    check("버전 문구가 v24", "v24" in str(my.get("txt")), my.get("txt"))
     check("버전이 My 머리줄 맨 위에", my.get("vTop", 999) <= my.get("hTop", 0) + 40 and my.get("topOfPage"), my)
     check("버전이 오른쪽 끝", 12 <= my.get("right", 999) <= 26, my.get("right"))
     check("버전이 계정 목록보다 위", bool(my.get("aboveList")), my.get("aboveList"))

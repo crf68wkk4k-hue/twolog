@@ -86,8 +86,8 @@ with sync_playwright() as p:
 
     # ---------------- 서비스워커 캐시 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
-    # v23: 캐시 버전은 배포마다 올라가므로 v23 으로 (앱 버전 상수와 같은 값)
-    check("sw.js 캐시 버전 twolog-v23", 'const VERSION = "twolog-v23"' in sw,
+    # v24: 캐시 버전은 배포마다 올라가므로 v24 으로 (앱 버전 상수와 같은 값)
+    check("sw.js 캐시 버전 twolog-v24", 'const VERSION = "twolog-v24"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장되는 일반 모드로 옮겨요
