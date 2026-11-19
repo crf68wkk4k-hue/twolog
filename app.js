@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v34";
+  var APP_VERSION = "v35";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -286,6 +286,8 @@
   /* 저장: 화면에서 곧바로 호출할 수 있도록 동기 함수로 두고, 실제 쓰기는 sync.js 가 처리합니다. */
   function save() {
     if (!S || !Store) return;
+    /* v35: 모드·색·폰트는 이 폰에만 남는 값이라 저장할 때마다 기기 테마에도 함께 적어 둡니다 */
+    captureLocalTheme();
     try { Store.persist(S); } catch (e) {}
   }
 
@@ -321,6 +323,7 @@
     var keepUi = S ? S.ui : null;
     S = normalizeState(res.state);
     if (keepUi) S.ui = keepUi;
+    applyLocalTheme();
     S.auth.out = false;
     var u = Store && Store.backend && Store.backend.user;
     if (u && u.email) S.auth.email = u.email;
@@ -357,6 +360,7 @@
       var keepUi = S ? S.ui : null;
       S = normalizeState(res.state);
       if (keepUi) S.ui = keepUi;
+      applyLocalTheme();
       S.auth.out = false;
       var u = Store && Store.backend && Store.backend.user;
       if (u && u.email) S.auth.email = u.email;
@@ -607,6 +611,93 @@
     document.querySelectorAll('input.js-page[data-page="' + page + '"]').forEach(function (inp) {
       if (val && inp.value.toUpperCase() !== val) inp.value = val;
     });
+  }
+
+  /* ==========================================================================
+     v35: 화면 모드·컬러·폰트는 「이 폰」에만 저장해요.
+     --------------------------------------------------------------------------
+     라이트/다크 · 페이지 캡션 색 · 홈 제목 색 · 일정 색(소영·준영·공동) · 폰트는
+     커플 공간(서버)으로 올리지 않고 이 기기의 localStorage 키 하나에만 둡니다.
+     그래서 내가 다크로 바꾸거나 색을 바꿔도 상대 폰 화면은 그대로예요.
+     일정·노트·사진·디데이·닉네임·프로필 사진은 예전처럼 함께 동기화됩니다.
+     ========================================================================== */
+  var K_LOCAL_THEME = "twolog:v1:localTheme";
+  var LT = null;                    /* 이 기기의 테마 {mode, cap, pages, homeTitleBg, font, sched, colors} */
+  var LT_HEX = /^#[0-9A-F]{6}$/;
+
+  function ltHex(v) {
+    var s = String(v == null ? "" : v).toUpperCase();
+    return LT_HEX.test(s) ? s : "";
+  }
+  /* 지금 화면(S)의 모드·색·폰트를 이 기기 테마 모양으로 뽑습니다 */
+  function themeFromState() {
+    var t = (S && S.theme) || {};
+    var sc = (S && S.couple && S.couple.sched) || {};
+    var cc = (S && S.couple && S.couple.colors) || {};
+    var pages = {};
+    Object.keys(t.pages || {}).forEach(function (k) {
+      var c = ltHex((t.pages || {})[k]);
+      if (c) pages[k] = c;
+    });
+    return {
+      v: 1,
+      mode: t.mode === "dark" ? "dark" : "light",
+      cap: ltHex(t.cap),
+      pages: pages,
+      homeTitleBg: ltHex(t.homeTitleBg),
+      font: fontOf(t.font).k,
+      sched: { me: ltHex(sc.me), you: ltHex(sc.you), both: ltHex(sc.both) },
+      colors: { me: ltHex(cc.me), you: ltHex(cc.you) }
+    };
+  }
+  function localThemeRead() {
+    try {
+      var raw = localStorage.getItem(K_LOCAL_THEME);
+      var o = raw ? JSON.parse(raw) : null;
+      return o && typeof o === "object" ? o : null;
+    } catch (e) { return null; }
+  }
+  function localThemeWrite(t) {
+    try { localStorage.setItem(K_LOCAL_THEME, JSON.stringify(t || {})); } catch (e) {}
+  }
+  /* 앱을 열거나 상대 기록을 받을 때: 저장해 둔 이 폰의 테마를 S 위에 다시 얹습니다.
+     저장된 값이 없으면(예전 버전에서 올라온 기기) 지금 값으로 한 번만 이어받아 저장해요. */
+  function applyLocalTheme(noSeed) {
+    if (!S) return;
+    LT = localThemeRead();
+    if (!LT) {
+      /* 아직 저장된 기기 테마가 없는 기기: 로그인 화면(빈 상태)에서는 기본값을
+         굳혀 두지 않고, 진짜 기록을 받았을 때 한 번만 이어받습니다. */
+      if (noSeed) return;
+      LT = themeFromState(); localThemeWrite(LT); return;
+    }
+    S.theme = S.theme || {};
+    S.theme.mode = LT.mode === "dark" ? "dark" : "light";
+    S.theme.cap = ltHex(LT.cap);
+    var pages = {};
+    Object.keys(LT.pages || {}).forEach(function (k) {
+      var c = ltHex((LT.pages || {})[k]);
+      if (c) pages[k] = c;
+    });
+    S.theme.pages = pages;
+    S.theme.homeTitleBg = ltHex(LT.homeTitleBg) || null;
+    S.theme.font = fontOf(LT.font).k;
+    S.couple = S.couple || {};
+    S.couple.sched = S.couple.sched || {};
+    ["me", "you", "both"].forEach(function (w) {
+      S.couple.sched[w] = ltHex((LT.sched || {})[w]) || SCHED_DEFAULT[w];
+    });
+    S.couple.colors = S.couple.colors || {};
+    ["me", "you"].forEach(function (w) {
+      var c = ltHex((LT.colors || {})[w]);
+      if (c) S.couple.colors[w] = c; else delete S.couple.colors[w];
+    });
+  }
+  /* 모드·색·폰트를 바꿀 때마다 이 폰의 테마도 함께 적어 둡니다 (save 가 불러 줍니다) */
+  function captureLocalTheme() {
+    if (!S) return;
+    LT = themeFromState();
+    localThemeWrite(LT);
   }
 
   /* ------------------------------------------------------------------ types */
@@ -2933,6 +3024,8 @@
       '<p class="cp-note" style="margin-top:10px">제목 줄과 저장·완료 버튼에 같은 색이 칠해져요. 일정 목록은 흰 바탕으로 남아요.</p></div>';
     h += '<div class="cp"><div class="cp-hd"><span>폰트</span><span class="cp-val">' + esc(fontOf(t.font).n) + '</span></div>' +
       '<div class="font-list">' + fontRows() + "</div></div>";
+    /* v35: 이 설정들은 이 폰에만 저장된다는 한 줄 안내 */
+    h += '<p class="cp-note" style="margin:14px 0 0;text-align:center">화면 모드·색·폰트는 내 폰에만 저장돼요</p>';
     h += '<div style="height:16px"></div><button class="btn-primary" data-close="1">완료</button>';
     return h;
   }
@@ -3033,6 +3126,8 @@
     h += '<div class="my-gap"></div>';
     h += '<div class="sec"><h2>꾸미기</h2></div>';
     h += '<div class="list">' + menuRow("openThemeManager", "🎨", "테마 관리", themeSummary()) + "</div>";
+    /* v35: 모드·색·폰트는 각자 폰에만 */
+    h += '<div class="set-hint" style="margin:10px 20px 0">화면 모드·컬러·폰트는 이 폰에만 저장돼요. 내가 바꿔도 상대 폰 화면은 그대로예요.</div>';
 
     /* ---- 3. 알림 설정 ---- */
     h += '<div class="my-gap"></div>';
@@ -4085,7 +4180,7 @@
       Store.flush().then(function () {
         return Store.reload();
       }).then(function (doc) {
-        if (doc) { var k = S.ui; S = normalizeState(doc); S.ui = k; applyTheme(); renderAll(); }
+        if (doc) { var k = S.ui; S = normalizeState(doc); S.ui = k; applyLocalTheme(); applyTheme(); renderAll(); }
         toast(Store.status.state === "offline" ? "연결을 기다리는 중이에요" : "동기화했어요");
       }).catch(function () { toast("지금은 연결할 수 없어요"); });
       return;
@@ -4476,6 +4571,7 @@
                   var keepUi = S.ui;
                   S = normalizeState(next);
                   S.ui = keepUi;
+                  applyLocalTheme();
                   applyTheme(); renderAll(); loadPhotoUrls();
                 }
                 closeSheet();
@@ -4519,6 +4615,8 @@
           });
         }).then(function (got) {
           S = normalizeState(got.doc || emptyState());
+          /* v35: 로그인해 진짜 기록을 받으면 이 폰 테마를 다시 얹습니다 */
+          applyLocalTheme();
           S.auth.out = false;
           S.auth.email = email;
           applyTheme(); go("home"); renderAll();
@@ -4735,6 +4833,8 @@
     Store = store;
     var base = state === "demo" ? seed() : (state || emptyState());
     S = normalizeState(base);
+    /* v35: 이 폰에 저장해 둔 모드·색·폰트를 먼저 엎어 둡니다 */
+    applyLocalTheme(!!(opts && opts.signedOut));
     /* v28: 앱을 새로 켜면 캘린더는 지난번에 보던 달이 아니라 오늘의 달로 열립니다 */
     syncCalToday();
     if (opts && opts.signedOut) { S.auth.out = true; S.auth.email = ""; }
@@ -4750,10 +4850,13 @@
   function applyRemote(doc) {
     if (!doc) return;
     var ui = S ? S.ui : null;
+    var prev = S;
     var unchanged = false;
-    try { unchanged = JSON.stringify(stripUi(doc)) === JSON.stringify(stripUi(S)); } catch (e) {}
     S = normalizeState(doc);
     if (ui) S.ui = ui;
+    /* v35: 상대가 무엇을 바꿨든 화면 모드·색·폰트는 내 폰 설정을 그대로 유지합니다 */
+    applyLocalTheme();
+    if (prev) { try { unchanged = JSON.stringify(stripUi(S)) === JSON.stringify(stripUi(prev)); } catch (e) {} }
     if (unchanged) return;
     applyTheme();
     renderAll();

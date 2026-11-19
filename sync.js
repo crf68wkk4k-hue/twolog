@@ -269,17 +269,16 @@
     return Promise.resolve(null);
   }
 
-  /* 로컬 couple 설정 → couples 행 (상대 기기라면 '나/상대'를 뒤집어 저장) */
+  /* 로컬 couple 설정 → couples 행 (상대 기기라면 '나/상대'를 뒤집어 저장)
+     v35: 프로필·일정 색(colors·sched)은 이제 이 폰에만 저장하는 값이라 올리지 않습니다.
+     이름·만난 날·문구·D-day 표기만 함께 씁니다. */
   function couplePatchOf(couple, swap) {
     var c = couple || {};
-    var cc = c.colors || {}, sc = c.sched || {};
     return {
       me: swap ? c.you : c.me,
       you: swap ? c.me : c.you,
       since: c.since,
-      phrase: c.phrase || "함께한 지", fmt: c.fmt === "Y" ? "Y" : "D",
-      colors: swap ? { me: cc.you, you: cc.me } : cc,
-      sched: swap ? { me: sc.you, you: sc.me, both: sc.both } : sc
+      phrase: c.phrase || "함께한 지", fmt: c.fmt === "Y" ? "Y" : "D"
     };
   }
 
@@ -568,6 +567,8 @@
       });
     });
     (settingRows || []).forEach(function (r) {
+      /* v35: 예전 버전이 올려 둔 테마 행은 «이 폰에 아직 저장된 테마가 없을 때 한 번»
+         이어받는 용도로만 씁니다. app.js 가 기기 테마(localTheme)로 늘 덮어써요. */
       if (r.key === "theme" && r.value) doc.theme = Object.assign({ name: null, log: null, mode: "light" }, r.value);
       else if (r.key === K_GROUPS && r.value) {
         /* v27: 노트 카드 묶음 — 두 기기가 같은 카드 id·제목·색을 봅니다 */
@@ -888,14 +889,8 @@
       return { id: p.id, couple_id: p.couple_id, date: p.date, album: p.album, title: p.title, place: p.place, memo: p.memo, art: p.art, cap_bg: p.cap_bg, storage_path: p.storage_path, sort: p.sort };
     }), this.prev.photos));
 
-    /* settings: 테마 */
-    var themeRow = { couple_id: cid, key: "theme", value: doc.theme || {} };
-    if (!this.prev.settings.theme || !sameRow(this.prev.settings.theme.value, themeRow.value)) {
-      jobs.push(client.from("settings").upsert(themeRow, { onConflict: "couple_id,key" }).then(function (r) {
-        if (r.error) throw r.error;
-        self.prev.settings.theme = themeRow;
-      }));
-    }
+    /* v35: 테마(settings key="theme")는 올리지 않습니다 — 화면 모드·캡션 색·홈 제목 색·폰트는
+       각자 폰(app.js 의 localTheme)에만 저장하고, 상대 폰의 화면을 바꾸지 않아요. */
 
     /* settings: v27 노트 카드 묶음(groups) — 카드 id·제목·제목색·순서를 두 기기가 함께 씁니다 */
     var groupsValue = normalizeGroups(doc.groups);
@@ -1223,14 +1218,7 @@
           }
         }
 
-        /* ---- 4. 테마(settings) — 원격에 테마가 없을 때만 ---- */
-        var themeRow = setRows.filter(function (r) { return r.key === "theme"; })[0];
-        var themeEmpty = !themeRow || !themeRow.value || !Object.keys(themeRow.value).length;
-        if (themeEmpty && local.theme && Object.keys(local.theme).length) {
-          jobs.push(client.from("settings").upsert({ couple_id: cid, key: "theme", value: local.theme }, { onConflict: "couple_id,key" }).then(function (r) {
-            if (r && r.error) throw r.error;
-          }));
-        }
+        /* ---- 4. 테마(settings) — v35 부터는 올리지 않습니다 (각자 폰에만 저장) ---- */
 
         /* ---- 4-1. v27 노트 카드 묶음(settings groups) — 원격에 아직 없을 때만 ---- */
         var groupsRow = setRows.filter(function (r) { return r.key === K_GROUPS; })[0];
