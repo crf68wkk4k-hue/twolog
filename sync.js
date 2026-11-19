@@ -432,7 +432,7 @@
       p = { kind: o.kind === "food" ? "food" : "movie", title: o.title || "", rating: Number(o.rating) || 0,
         date: o.date || nowIso(), review: o.review || "", place: o.place || "", done: o.done !== false };
     } else {
-      p = { title: o.title || "", emoji: o.emoji || "📌", kind: o.kind === "memo" ? "memo" : "check",
+      p = { title: o.title || "", emoji: o.emoji || "", kind: o.kind === "memo" ? "memo" : "check",
         items: arr(o.items).map(function (it) { return { id: it.id, text: it.text || "", memo: it.memo || "", done: !!it.done }; }) };
     }
     if (o.gid) p.gid = String(o.gid);        // 어느 카드(리스트)에 들어 있는지
@@ -533,7 +533,7 @@
           if (gid) log.gid = gid;
           doc.logs.push(log);
         } else if (r.kind === "list") {
-          var list = { id: r.id, title: p.title || "", emoji: p.emoji || "📌", kind: p.kind === "memo" ? "memo" : "check",
+          var list = { id: r.id, title: p.title || "", emoji: p.emoji || "", kind: p.kind === "memo" ? "memo" : "check",
             items: arr(p.items).map(function (it) { return { id: it.id || randId(), text: it.text || "", memo: it.memo || "", done: !!it.done }; }) };
           if (gid) list.gid = gid;
           doc.lists.push(list);

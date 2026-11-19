@@ -169,7 +169,8 @@ with sync_playwright() as p:
     emo_inputs = page.locator("#sheet .nt-emo").count()
     names = page.evaluate("Array.from(document.querySelectorAll('#sheet #noteForm .nt-nm')).map(i => i.name + '=' + i.value)")
     check("이모지 칸이 사라짐", emo_inputs == 0, emo_inputs)
-    check("탭 이름이 한 칸에 함께 표시", names[:3] == ["t_todo=📝 메모", "t_bucket=🎯 버킷리스트", "t_log=🎬 영화·먹방"], names[:3])
+    # v33: 기본 탭은 이모지 없이 이름만
+    check("탭 이름이 한 칸에 함께 표시", names[:3] == ["t_todo=메모", "t_bucket=버킷리스트", "t_log=영화·먹방"], names[:3])
     page.screenshot(path=os.path.join(SHOT, "note-settings-v18.png"))
     # 이모지 없이 이름만 넣어도 그대로 보이게
     page.fill("#sheet input[name='t_log']", "함께 보는 기록")

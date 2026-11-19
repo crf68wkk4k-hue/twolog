@@ -1,7 +1,7 @@
 """투로그 v29 확인 — 노트 맨 윗줄의 네모 설정 버튼을 지우고 그 자리에 동그란 +, 알약 탭은 조금 작게.
 
-1) 버전: sw.js 캐시 twolog-v32 · APP_VERSION v32
-2) 노트 맨 윗줄(📖 노트) 오른쪽에 동그란 점선 + 가 있고, 누르면 「새 리스트」 시트가 열림
+1) 버전: sw.js 캐시 twolog-v33 · APP_VERSION v33
+2) 노트 맨 윗줄(📖 노트) 오른쪽에 동그란 점선 + 가 있고, 누르면 「새 카테고리」 시트가 열림
 3) 예전 네모 설정 버튼(톱니 아이콘)은 사라짐 — 알약 탭 아래 칩 줄에도 + 는 없음
 4) 알약 탭(메모·버킷리스트·영화·먹방)이 조금 작아짐: 높이 40px · 글씨 14px · 글씨 잘림 없음
    (v28: 높이 44px · 글씨 15.5px)
@@ -184,11 +184,11 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check("sw.js 캐시 버전 twolog-v32", 'const VERSION = "twolog-v32"' in sw,
+    check("sw.js 캐시 버전 twolog-v33", 'const VERSION = "twolog-v33"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v32", 'var APP_VERSION = "v32"' in app_js,
+    check("app.js 버전 상수 v33", 'var APP_VERSION = "v33"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v32", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v33", 'const SHELL = "shell-" + VERSION' in sw)
     check("예전 칩 줄 + 스타일(.lst-new)은 남아 있지 않음", ".lst-new" not in css)
 
     # ==================================================================
@@ -233,17 +233,16 @@ with sync_playwright() as p:
     page.locator("#s-diary .hdr .note-add").click()
     page.wait_for_timeout(600)
     sh = sheet_state(page)
-    check("+ 를 누르면 「새 리스트」 시트가 열림", sh["open"] and sh["head"] == "새 리스트", sh)
+    # v33: + 시트 이름이 「새 카테고리」로 바뀌고 이모지 고르는 줄은 사라졌어요
+    check("+ 를 누르면 「새 카테고리」 시트가 열림", sh["open"] and sh["head"] == "새 카테고리", sh)
     page.screenshot(path=os.path.join(SHOT, "note-v29-newlist.png"))
 
     page.fill('#sheet input[name="title"]', "장보기")
-    page.locator('#sheet [data-act="lpick"][data-emoji="🛒"]').click()
-    page.wait_for_timeout(150)
     page.locator("#sheet .btn-primary").click()
     page.wait_for_timeout(800)
     ns = note_state(page)
     check("새 카테고리 탭이 만들어짐", [l["title"] for l in ns["lists"]] == ["장보기"], ns["lists"])
-    check("칩 줄에 새 탭이 붙고 바로 열림", ns["chips"] == ["🛒장보기"] and ns["cur"] == "장보기",
+    check("칩 줄에 새 탭이 붙고 바로 열림", ns["chips"] == ["장보기"] and ns["cur"] == "장보기",
           (ns["chips"], ns["cur"]))
     check("칩 줄에도 + 는 여전히 없음", note_header(page).get("plusInChipBar") is False)
 

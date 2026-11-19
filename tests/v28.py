@@ -1,6 +1,6 @@
 """투로그 v28 확인 — 캘린더는 열 때 이번 달 · 일정 시트 날짜+요일 · 하단 일정 수정 · 노트 + 탭 추가.
 
-1) 버전: sw.js 캐시 twolog-v32 · APP_VERSION v32
+1) 버전: sw.js 캐시 twolog-v33 · APP_VERSION v33
 2) 앱을 새로 켜면(새로고침) 저장해 둔 지난달 대신 이번 달로
 3) 탭에서 캘린더로 들어오면 이번 달 + 오늘 날짜 (다른 달 → 다른 탭 → 돌아오면 이번 달)
 4) 달 안에서 화살표·손가락 밀기로 넘기는 이동은 그대로 (그 달에 머무는 동안 유지)
@@ -170,11 +170,11 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v32", 'const VERSION = "twolog-v32"' in sw,
+    check("sw.js 캐시 버전 twolog-v33", 'const VERSION = "twolog-v33"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v32", 'var APP_VERSION = "v32"' in app_js,
+    check("app.js 버전 상수 v33", 'var APP_VERSION = "v33"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v32", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v33", 'const SHELL = "shell-" + VERSION' in sw)
 
     # ==================================================================
     # 2. 앱을 새로 켜면 이번 달 (저장된 지난달은 무시)
@@ -524,16 +524,15 @@ with sync_playwright() as p:
     page.wait_for_timeout(600)
     sheet = page.evaluate("""() => ({open: document.getElementById('sheetWrap').classList.contains('open'),
       head: (document.querySelector('#sheet .sheet-hd h2') || {}).textContent})""")
-    check("+ 를 누르면 새 리스트 시트가 열림", sheet["open"] and sheet["head"] == "새 리스트", sheet)
+    # v33: + 시트는 「새 카테고리」 — 이모지 고르는 줄이 없어졌어요
+    check("+ 를 누르면 새 카테고리 시트가 열림", sheet["open"] and sheet["head"] == "새 카테고리", sheet)
 
     page.fill('#sheet input[name="title"]', "장보기")
-    page.locator('#sheet [data-act="lpick"][data-emoji="🛒"]').click()
-    page.wait_for_timeout(150)
     page.locator('#sheet .btn-primary').click()
     page.wait_for_timeout(800)
     ns = note_state(page)
     check("새 카테고리 탭이 만들어짐", [l["title"] for l in ns["lists"]] == ["장보기"], ns["lists"])
-    check("새 탭 칩이 바로 열림", ns["chips"] == ["🛒장보기"] and ns["cur"] == "장보기", (ns["chips"], ns["cur"]))
+    check("새 탭 칩이 바로 열림", ns["chips"] == ["장보기"] and ns["cur"] == "장보기", (ns["chips"], ns["cur"]))
     check("새 탭 화면에 To-do 입력칸", "To-do" in ns["body"], ns["body"][:80])
 
     page.fill('#s-diary #listAddForm input[name="text"]', "우유 사기")
@@ -565,8 +564,6 @@ with sync_playwright() as p:
     page.locator("#s-diary .note-add").click()
     page.wait_for_timeout(500)
     page.fill('#sheet input[name="title"]', "여행 준비")
-    page.locator('#sheet [data-act="lpick"][data-emoji="🧳"]').click()
-    page.wait_for_timeout(150)
     page.locator('#sheet .btn-primary').click()
     page.wait_for_timeout(800)
     page.fill('#s-diary #listAddForm input[name="text"]', "여권 챙기기")
@@ -609,7 +606,7 @@ with sync_playwright() as p:
     tab(page_b, 2, 700)
     nb_b = note_state(page_b)
     check("상대 폰에 새 카테고리 탭이 함께 뜸", [l["title"] for l in nb_b["lists"]] == ["여행 준비"], nb_b["lists"])
-    check("상대 폰 칩에도 보임", nb_b["chips"] == ["🧳여행 준비"], nb_b["chips"])
+    check("상대 폰 칩에도 보임", nb_b["chips"] == ["여행 준비"], nb_b["chips"])
     page_b.locator("#s-diary .lchip").first.click()
     page_b.wait_for_timeout(600)
     nb_b2 = note_state(page_b)

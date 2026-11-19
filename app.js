@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v32";
+  var APP_VERSION = "v33";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -184,6 +184,15 @@
     if (typeof S.note[k].e !== "string") S.note[k].e = NOTE_DEF[k].e;
     if (typeof S.note[k].n !== "string" || !S.note[k].n) S.note[k].n = NOTE_DEF[k].n;
   });
+  /* v33: 예전 기본 이모지(📝·🎯·🎬)가 저장돼 있던 기기는 한 번만 지워 이름만 남겨요.
+     내가 일부러 다른 이모지를 넣어 둔 탭은 건드리지 않습니다. */
+  if (!S.mig.noteEmo) {
+    var OLD_NOTE_EMO = { todo: "📝", bucket: "🎯", log: "🎬" };
+    ["todo", "bucket", "log"].forEach(function (k) {
+      if (S.note[k] && S.note[k].e === OLD_NOTE_EMO[k]) S.note[k].e = "";
+    });
+    S.mig.noteEmo = 1;
+  }
   if (S.couple.fmt !== "Y") S.couple.fmt = "D";
   if (typeof S.couple.phrase !== "string" || !S.couple.phrase.trim()) S.couple.phrase = defaultPhrase();
   if (!S.mig.phrase) {
@@ -262,7 +271,7 @@
     if (!l || typeof l !== "object") return;
     if (!l.id) l.id = uid();
     if (l.kind !== "memo") l.kind = "check";
-    if (!l.emoji) l.emoji = "📌";
+    if (typeof l.emoji !== "string") l.emoji = "";   /* v33: 이모지 없이 쓰는 카테고리 */
     if (!Array.isArray(l.items)) l.items = [];
   });
   S.lists = S.lists.filter(function (l) { return l && typeof l === "object"; });
@@ -497,7 +506,8 @@
     return FONTS[0];
   }
   /* 노트 기본 탭 이름 — 설정에서 바꿀 수 있어요 */
-  var NOTE_DEF = { todo: { e: "📝", n: "메모" }, bucket: { e: "🎯", n: "버킷리스트" }, log: { e: "🎬", n: "영화·먹방" } };
+  /* v33: 기본 탭은 이모지 없이 이름만 — 「메모」·「버킷리스트」·「영화·먹방」 */
+  var NOTE_DEF = { todo: { e: "", n: "메모" }, bucket: { e: "", n: "버킷리스트" }, log: { e: "", n: "영화·먹방" } };
   function pageCap(page) {
     var t = S.theme || {};
     /* 모든 페이지에 한 번에 쓰는 캡션 색(theme.cap)이 먼저, 예전 페이지별 설정은 그다음 */
@@ -1758,50 +1768,46 @@
     return '<div class="sheet-hd"><h2>' + title + '</h2><button class="icon-btn" data-close="1" aria-label="닫기">' + IC.x + "</button></div>";
   }
 
-  var LIST_EMOJI = ["📌", "🧳", "🛒", "🍽️", "🎁", "✅"];
-
+  /* v33: 이모지 고르는 줄은 없어졌어요 — 이름과 항목 형식만 정합니다.
+     아래 「탭 이름 수정」으로 메모·버킷리스트·영화·먹방 이름을 바꾸는 노트 설정도 바로 열려요. */
   function formNewList(l) {
-    var curEmo = l ? (l.emoji || "📌") : "📌";
-    var emo = LIST_EMOJI.map(function (e) {
-      return '<button type="button" class="emk' + (e === curEmo ? " sel" : "") + '" data-act="lpick" data-emoji="' + e + '" aria-label="' + e + '">' + e + "</button>";
-    }).join("");
     var kindMemo = !!l && l.kind === "memo";
-    return sheetHead(l ? "리스트 수정" : "새 리스트") +
-      '<p class="sheet-sub">' + (l ? "이름·항목 형식·이모지를 바로 바꿀 수 있어요." : "노트 안에 내가 쓰고 싶은 리스트를 하나 더 만들어요.") + "</p>" +
+    return sheetHead(l ? "카테고리 수정" : "새 카테고리") +
+      '<p class="sheet-sub">' + (l ? "이름과 항목 형식을 바로 바꿀 수 있어요." : "노트에 내가 쓰고 싶은 카테고리를 하나 더 만들어요.") + "</p>" +
       '<form class="form" id="sheetForm">' +
-      '<div class="f"><label>리스트 이름</label><input class="field" name="title" value="' + (l ? esc(l.title) : "") + '" placeholder="예) 여행 준비물, 주말 데이트" required autocomplete="off"></div>' +
+      '<div class="f"><label>카테고리 이름</label><input class="field" name="title" value="' + (l ? esc(l.title) : "") + '" placeholder="예) 여행 준비물, 주말 데이트" required autocomplete="off"></div>' +
       '<div class="f"><label>형식</label><div class="seg seg-sm" data-group="lkind">' +
       '<button type="button" class="seg-btn' + (kindMemo ? "" : " active") + '" data-act="lkind" data-kind="check">체크리스트</button>' +
       '<button type="button" class="seg-btn' + (kindMemo ? " active" : "") + '" data-act="lkind" data-kind="memo">메모</button></div>' +
       '<input type="hidden" name="kind" value="' + (kindMemo ? "memo" : "check") + '"></div>' +
-      '<div class="f"><label>이모지</label><div class="emk-row">' + emo + "</div>" +
-      '<input type="hidden" name="emoji" value="' + esc(curEmo) + '"></div>' +
-      '<button class="btn-primary" type="submit">' + (l ? "저장하기" : "만들기") + "</button></form>";
+      '<input type="hidden" name="emoji" value="' + esc(l && l.emoji ? l.emoji : "") + '">' +
+      '<button class="btn-primary" type="submit">' + (l ? "저장하기" : "만들기") + "</button></form>" +
+      '<div style="height:10px"></div><button type="button" class="btn-line" data-act="noteSettings">탭 이름 수정 (노트 설정)</button>';
   }
 
   function formNoteSettings() {
     var h = sheetHead("노트 설정");
-    h += '<p class="sheet-sub">탭 이름과 내 리스트를 여기서 정리해요. 이모지와 이름을 한 칸에 함께 적으면 돼요.</p>';
+    h += '<p class="sheet-sub">탭 이름과 내 카테고리를 여기서 정리해요.</p>';
     h += '<form class="form" id="noteForm" style="margin-top:12px">';
     h += '<div class="set-lbl">탭 이름</div>';
     NOTE_BASE.forEach(function (k) {
       var t = noteTab(k);
       /* v18: 이모지 칸을 따로 두지 않고 한 칸에 — 「📝 메모」처럼 이모지와 이름을 함께 적어요 */
       h += '<div class="nt-row">' +
-        '<input class="field nt-nm" name="t_' + k + '" value="' + esc(t.e ? t.e + " " + t.n : t.n) + '" placeholder="예) 📝 메모" aria-label="탭 이름" autocomplete="off">' +
+        '<input class="field nt-nm" name="t_' + k + '" value="' + esc(t.e ? t.e + " " + t.n : t.n) + '" placeholder="예) 메모" aria-label="탭 이름" autocomplete="off">' +
         "</div>";
     });
-    h += '<div class="set-lbl" style="margin-top:20px">내 리스트</div>';
-    if (!S.lists.length) h += '<div class="set-hint" style="margin-top:0">아직 만든 리스트가 없어요. 아래에서 새로 만들 수 있어요.</div>';
+    h += '<div class="set-lbl" style="margin-top:20px">내 카테고리</div>';
+    if (!S.lists.length) h += '<div class="set-hint" style="margin-top:0">아직 만든 카테고리가 없어요. 아래에서 새로 만들 수 있어요.</div>';
     S.lists.forEach(function (l) {
       h += '<div class="nt-row">' +
-        '<input class="field nt-nm" name="l_' + l.id + '" value="' + esc(listLabel(l)) + '" placeholder="예) 🧳 여행 준비물" aria-label="리스트 이름" autocomplete="off">' +
+        '<input class="field nt-nm" name="l_' + l.id + '" value="' + esc(listLabel(l)) + '" placeholder="예) 여행 준비물" aria-label="카테고리 이름" autocomplete="off">' +
         '<button type="button" class="nt-del" data-act="delListFromNote" data-id="' + l.id + '">삭제</button></div>';
     });
-    h += '<div class="nt-new"><div class="set-lbl">새 리스트</div>' +
+    h += '<div class="nt-new"><div class="set-lbl">새 카테고리</div>' +
       '<div class="nt-row">' +
-      '<input class="field nt-nm" name="new_n" placeholder="예) 📌 여행 준비물" aria-label="새 리스트 이름" autocomplete="off">' +
-      '<select class="field nt-kind" name="new_kind" aria-label="새 리스트 형식"><option value="check">체크</option><option value="memo">메모</option></select>' +
+      '<input class="field nt-nm" name="new_n" placeholder="예) 여행 준비물" aria-label="새 카테고리 이름" autocomplete="off">' +
+      '<select class="field nt-kind" name="new_kind" aria-label="새 카테고리 형식"><option value="check">체크</option><option value="memo">메모</option></select>' +
       "</div></div>";
     h += '<div style="height:14px"></div><button class="btn-primary" type="submit">저장하기</button></form>';
     h += '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
@@ -3350,10 +3356,10 @@
       openSheet(formNewList(), function (fd) {
         var title = String(fd.get("title") || "").trim();
         if (!title) { toast("이름을 먼저 적어 주세요"); return; }
-        var l = { id: uid(), title: title, emoji: fd.get("emoji") || "📌", kind: fd.get("kind") === "memo" ? "memo" : "check", items: [] };
+        var l = { id: uid(), title: title, emoji: fd.get("emoji") || "", kind: fd.get("kind") === "memo" ? "memo" : "check", items: [] };
         S.lists.push(l);
         S.ui.seg = "list:" + l.id;
-        save(); closeSheet(); renderDiary(); toast("리스트를 만들었어요");
+        save(); closeSheet(); renderDiary(); toast("카테고리를 만들었어요");
       });
       return;
     }
@@ -3373,14 +3379,6 @@
       lgrp.querySelectorAll(".seg-btn").forEach(function (b) { b.classList.toggle("active", b === el); });
       var lin = lgrp.parentNode.querySelector('input[name="kind"]');
       if (lin) lin.value = lk;
-      return;
-    }
-
-    if (act === "lpick") {
-      var erow = el.parentNode;
-      erow.querySelectorAll(".emk").forEach(function (b) { b.classList.toggle("sel", b === el); });
-      var ei = erow.parentNode.querySelector('input[name="emoji"]');
-      if (ei) ei.value = el.getAttribute("data-emoji");
       return;
     }
 
@@ -3508,9 +3506,9 @@
         var L3 = findList(eLid);
         if (!L3) return;
         var title = String(fd.get("title") || "").trim();
-        if (!title) { toast("리스트 이름을 적어 주세요"); return; }
+        if (!title) { toast("카테고리 이름을 적어 주세요"); return; }
         L3.title = title;
-        L3.emoji = fd.get("emoji") || "📌";
+        L3.emoji = fd.get("emoji") || "";
         L3.kind = fd.get("kind") === "memo" ? "memo" : "check";
         save(); closeSheet(); renderDiary(); toast("리스트를 저장했어요");
       });
