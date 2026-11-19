@@ -1,6 +1,6 @@
 """투로그 v28 확인 — 캘린더는 열 때 이번 달 · 일정 시트 날짜+요일 · 하단 일정 수정 · 노트 + 탭 추가.
 
-1) 버전: sw.js 캐시 twolog-v31 · APP_VERSION v31
+1) 버전: sw.js 캐시 twolog-v32 · APP_VERSION v32
 2) 앱을 새로 켜면(새로고침) 저장해 둔 지난달 대신 이번 달로
 3) 탭에서 캘린더로 들어오면 이번 달 + 오늘 날짜 (다른 달 → 다른 탭 → 돌아오면 이번 달)
 4) 달 안에서 화살표·손가락 밀기로 넘기는 이동은 그대로 (그 달에 머무는 동안 유지)
@@ -170,11 +170,11 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v31", 'const VERSION = "twolog-v31"' in sw,
+    check("sw.js 캐시 버전 twolog-v32", 'const VERSION = "twolog-v32"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v31", 'var APP_VERSION = "v31"' in app_js,
+    check("app.js 버전 상수 v32", 'var APP_VERSION = "v32"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v31", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v32", 'const SHELL = "shell-" + VERSION' in sw)
 
     # ==================================================================
     # 2. 앱을 새로 켜면 이번 달 (저장된 지난달은 무시)

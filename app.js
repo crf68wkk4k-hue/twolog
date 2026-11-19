@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v31";
+  var APP_VERSION = "v32";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -1101,9 +1101,10 @@
           /* 여러 칸에 걸친 일정은 막대 전체 폭의 가운데에 제목을 놓습니다 */
           var mid = b.eCol > b.sCol ? " mid" : "";
           /* v23: 이웃한 칸의 막대끼리 붙어 보이지 않게 좌우로 1.5px씩 비웁니다 */
+          /* v32: 달력 칸 일정 막대 글씨는 배경 밝기와 상관없이 늘 흰색(#FFFFFF)으로 통일 */
           html += '<span class="ebar' + (b.openL ? " openl" : "") + (b.openR ? " openr" : "") + mid +
             '" style="left:calc(' + left + "% + 1.5px); width:calc(" + width + "% - 3px); top:" + top + "px; background:" + edge +
-            "; color:" + inkOn(edge) + '">' + esc(b.e.title) + "</span>";
+            "; color:#FFFFFF" + '">' + esc(b.e.title) + "</span>";
         });
         html += "</div>";
       }
