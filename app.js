@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v30";
+  var APP_VERSION = "v31";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -248,6 +248,9 @@
     var st = String(e.date || "").slice(0, 10);
     if (!e.date || !/^\d{4}-\d{2}-\d{2}$/.test(st)) e.date = today;
     if (!e.endDate || !/^\d{4}-\d{2}-\d{2}$/.test(String(e.endDate)) || String(e.endDate) < String(e.date)) e.endDate = e.date;
+    /* v31: 일정에 고른 색은 대문자 #RRGGBB 만 인정 — 아니면 담당자 색을 씁니다 */
+    var ecolNow = String(e.color == null ? "" : e.color).toUpperCase();
+    e.color = /^#[0-9A-F]{6}$/.test(ecolNow) ? ecolNow : "";
   });
   if (!Array.isArray(S.photos)) S.photos = [];
   S.photos.forEach(function (p) {
@@ -1417,6 +1420,14 @@
     });
     /* openSheet 가 열린 카드 표시를 비우므로 시트를 띄운 뒤에 기억해요 */
     openCard = { tab: k, gid: gid };
+  }
+
+  /* v31: 지금 열린 시트가 노트 카드 상세(openGroupSheet)이고, 누른 것이 그 안의 항목일 때.
+     이때 항목 × 는 «시트는 그대로 두고 목록만» 새로 그립니다. */
+  function inCardSheet(el) {
+    if (!openCard) return false;
+    if (!sheet || !sheetWrap || !sheetWrap.classList.contains("open")) return false;
+    return !!(el && el.closest && el.closest("#sheet .card-items"));
   }
 
   /* 시트를 닫지 않고 항목을 토글·추가·삭제할 때 카드 시트만 다시 그림 */
@@ -3524,7 +3535,10 @@
     if (act === "delTodo") {
       var dtId = el.getAttribute("data-id");
       S.todos = S.todos.filter(function (x) { return x.id !== dtId; });
-      save(); closeSheet(); renderDiary(); toast("지웠어요"); return;
+      save();
+      /* v31: 카드 시트 안에서 지울 때는 시트를 닫지 않고 목록만 새로 그려요 */
+      if (inCardSheet(el)) { renderDiary(); toast("지웠어요"); return; }
+      closeSheet(); renderDiary(); toast("지웠어요"); return;
     }
 
     if (act === "editBucket") {
@@ -3549,7 +3563,10 @@
     if (act === "delBucket") {
       var dbId = el.getAttribute("data-id");
       S.bucket = S.bucket.filter(function (x) { return x.id !== dbId; });
-      save(); closeSheet(); renderDiary(); toast("버킷을 삭제했어요"); return;
+      save();
+      /* v31: 카드 시트 안에서는 시트를 닫지 않고 목록만 새로 그려요 */
+      if (inCardSheet(el)) { renderDiary(); toast("버킷을 삭제했어요"); return; }
+      closeSheet(); renderDiary(); toast("버킷을 삭제했어요"); return;
     }
 
     if (act === "editLog") {
@@ -3631,7 +3648,10 @@
     if (act === "delLog") {
       var lid = el.getAttribute("data-id");
       S.logs = S.logs.filter(function (l) { return l.id !== lid; });
-      save(); closeSheet(); renderDiary(); toast("기록을 삭제했어요"); return;
+      save();
+      /* v31: 카드 시트 안에서는 시트를 닫지 않고 목록만 새로 그려요 */
+      if (inCardSheet(el)) { renderDiary(); toast("기록을 삭제했어요"); return; }
+      closeSheet(); renderDiary(); toast("기록을 삭제했어요"); return;
     }
 
     if (act === "openTheme") { openSheet(formTheme(), null); return; }

@@ -287,8 +287,58 @@
     return (me === "" || me === "나" || me === "상대") && (you === "" || you === "상대" || you === "나");
   }
 
-  /* 겹치지 않게 같은 내용은 건너뛰기 위한 지문 */
-  function sigEvent(r) { return [r.date, r.time || "", r.title || "", r.type || "", r.who || "", r.memo || ""].join("|"); }
+  /* v31: 일정 하나의 «여러 날 종료일»과 «고른 색»을 events.memo(text) 한 칸에 함께 담습니다.
+     스키마를 바꾸지 않으려고 JSON 문자열로 넣어요. 예) {"end":"2026-11-21","color":"#F7C6D4"}
+       · 하루짜리·색 없음  → "" (예전과 같은 빈 값)
+       · 예전 행은 memo 에 «YYYY-MM-DD»(종료일)만 들어 있어서 그것도 그대로 읽습니다 */
+  var EV_COLOR = /^#[0-9A-F]{6}$/;
+  function evColorOf(v) {
+    var c = String(v == null ? "" : v).toUpperCase();
+    return EV_COLOR.test(c) ? c : "";
+  }
+  function isoDate(v) {
+    var s = String(v == null ? "" : v).slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+  }
+  function encodeEventMemo(e) {
+    var start = isoDate(e && e.date);
+    var end = isoDate(e && e.endDate);
+    if (!end || !start || end <= start) end = "";
+    var color = evColorOf(e && e.color);
+    if (!end && !color) return "";
+    var o = {};
+    if (end) o.end = end;
+    if (color) o.color = color;
+    return JSON.stringify(o);
+  }
+  function decodeEventMemo(memo, date) {
+    var start = isoDate(date);
+    var out = { endDate: start, color: "" };
+    var raw = String(memo == null ? "" : memo).trim();
+    if (!raw) return out;
+    if (raw.charAt(0) === "{") {
+      var o = null;
+      try { o = JSON.parse(raw); } catch (err) { o = null; }
+      if (o && typeof o === "object") {
+        var end = isoDate(o.end);
+        if (end && end > out.endDate) out.endDate = end;
+        out.color = evColorOf(o.color);
+        return out;
+      }
+    }
+    /* 예전 행: memo 칸에 «YYYY-MM-DD» 만 (여러 날 일정의 종료일) */
+    var legacy = isoDate(raw);
+    if (legacy && legacy > out.endDate) out.endDate = legacy;
+    return out;
+  }
+
+  /* 겹치지 않게 같은 내용은 건너뛰기 위한 지문
+     v31: memo 를 그대로 비교하면 예전 행(«YYYY-MM-DD»)과 새 행(JSON)이 같은 일정인데도
+     다른 것으로 보여서, 풀어 읽은 종료일·색으로 비교합니다. */
+  function sigEvent(r) {
+    var d = decodeEventMemo(r.memo, r.date);
+    return [r.date, r.time || "", r.title || "", r.type || "", r.who || "", d.endDate, d.color].join("|");
+  }
   /* v27: 노트 지문은 «무엇을 적었는지»만 봅니다.
      payload 에 gid·memo·done 이 더해지기 전(v26)에 올라간 행과 같은 내용을
      다시 가져오기 했을 때 중복으로 들어가지 않게 하려는 것. */
@@ -338,8 +388,8 @@
       rows.events.push({
         id: String(e.id), couple_id: coupleId,
         title: e.title || "", date: e.date || nowIso(), time: e.time || "",
-        /* 여러 날 일정의 종료일은 memo 칸에 담아 둡니다 (스키마 변경 없이 동기화) */
-        type: e.type || "date", memo: e.endDate && e.endDate > e.date ? e.endDate : "", who: flip(e.who)
+        /* v31: 여러 날 종료일 + 고른 색을 memo 칸에 함께 (스키마 변경 없이 동기화) */
+        type: e.type || "date", memo: encodeEventMemo(e), who: flip(e.who)
       });
     });
     var push = function (kind, obj, sort, payload) {
@@ -459,9 +509,10 @@
     };
 
     (eventRows || []).forEach(function (r) {
-      var rMemo = String(r.memo || "");
-      var rEnd = /^\d{4}-\d{2}-\d{2}$/.test(rMemo) && rMemo > String(r.date || "") ? rMemo : String(r.date || "");
-      doc.events.push({ id: r.id, date: r.date, endDate: rEnd, time: r.time || "", title: r.title || "", type: r.type || "date", memo: "", who: flip(r.who) });
+      /* v31: memo 에서 여러 날 종료일과 고른 색을 함께 복원 (예전 «YYYY-MM-DD» 행도 읽음) */
+      var rD = decodeEventMemo(r.memo, r.date);
+      doc.events.push({ id: r.id, date: r.date, endDate: rD.endDate, time: r.time || "", title: r.title || "",
+        type: r.type || "date", memo: "", color: rD.color, who: flip(r.who) });
     });
     /* v27: gid(카드 묶음)·memo(상세 메모)·done 도 함께 복원합니다 */
     (noteRows || []).filter(function (r) { return !r.deleted; }).sort(function (a, b) { return (a.sort || 0) - (b.sort || 0); })
