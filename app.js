@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v33";
+  var APP_VERSION = "v34";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -58,7 +58,9 @@
     search: svg('<circle cx="10.8" cy="10.8" r="6.2"/><path d="M15.4 15.4l4.1 4.1"/>', 20),
     grid: svg('<rect x="3.6" y="3.6" width="7" height="7"/><rect x="13.4" y="3.6" width="7" height="7"/><rect x="3.6" y="13.4" width="7" height="7"/><rect x="13.4" y="13.4" width="7" height="7"/>', 18),
     /* v28: 노트 알약 탭 옆 — 「목록 +」 아이콘 */
-    listPlus: svg('<path d="M4.6 6.4h9.2M4.6 11h6.4M4.6 15.6h4.4"/><path d="M17.6 12.4v6.2M14.5 15.5h6.2"/>', 20)
+    listPlus: svg('<path d="M4.6 6.4h9.2M4.6 11h6.4M4.6 15.6h4.4"/><path d="M17.6 12.4v6.2M14.5 15.5h6.2"/>', 20),
+    /* v34: + 시트의 카테고리 순서를 끌어 옮기는 3줄 손잡이 (≡) */
+    grip: svg('<path d="M5 8h14M5 12h14M5 16h14"/>', 20)
   };
   var STAR = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.8l2.86 5.94 6.54.9-4.77 4.55 1.18 6.5L12 17.6l-5.81 3.09 1.18-6.5L2.6 9.64l6.54-.9z"/></svg>';
 
@@ -193,6 +195,9 @@
     });
     S.mig.noteEmo = 1;
   }
+  /* v34: 노트 카테고리(탭) 순서 — 기본 탭 3개와 내가 만든 카테고리를 한 줄에 섞어 놓을 수 있어요.
+     예) ["todo", "list:ab12", "bucket", "log"] / 없던 값은 아래 noteOrderList() 가 정리합니다. */
+  if (!Array.isArray(S.noteOrder)) S.noteOrder = [];
   if (S.couple.fmt !== "Y") S.couple.fmt = "D";
   if (typeof S.couple.phrase !== "string" || !S.couple.phrase.trim()) S.couple.phrase = defaultPhrase();
   if (!S.mig.phrase) {
@@ -1172,6 +1177,26 @@
   }
   function noteLabel(k) { var t = noteTab(k); return t.e ? t.e + " " + t.n : t.n; }
 
+  /* v34: 노트 카테고리(탭) 순서 — 기본 탭과 내가 만든 카테고리를 한 목록으로 다뤄요.
+     저장된 S.noteOrder 를 그대로 쓰되, 없어진 리스트는 빼고 새로 만든 리스트는 맨 뒤에 붙입니다. */
+  function noteAllKeys() {
+    var keys = NOTE_BASE.slice();
+    (S.lists || []).forEach(function (l) { keys.push("list:" + l.id); });
+    return keys;
+  }
+  function noteOrderList() {
+    var valid = noteAllKeys();
+    var src = Array.isArray(S.noteOrder) ? S.noteOrder : [];
+    var out = [];
+    src.forEach(function (k) {
+      k = String(k || "");
+      if (valid.indexOf(k) >= 0 && out.indexOf(k) < 0) out.push(k);
+    });
+    valid.forEach(function (k) { if (out.indexOf(k) < 0) out.push(k); });
+    S.noteOrder = out;
+    return out.slice();
+  }
+
   /* v18: 이모지 + 이름을 한 칸에서 받아 — 앞의 이모지만 떼어 저장해요 */
   function splitEmojiName(s) {
     var t = String(s == null ? "" : s).trim();
@@ -1212,19 +1237,19 @@
     html += '<header class="hdr' + capCls("diary") + '"' + capStyle("diary") + ' data-pg="diary"><div>' +
       '<h1 class="note-h1" title="꾹 누르면 탭 이름을 바꿀 수 있어요"><span class="eh">📖</span> 노트</h1></div>' +
       '<div class="hdr-acts"><button type="button" class="round-btn note-add" data-act="newList" aria-label="새 카테고리 탭 추가" title="새 카테고리 탭 추가">' + IC.listPlus + "</button></div></header>";
-    html += '<div class="segs">';
-    NOTE_BASE.forEach(function (k) { html += segBtn(seg, k, noteLabel(k)); });
-    html += "</div>";
-    /* v29: + 는 맨 윗줄 오른쪽으로 옮겼고, 이 줄에는 내가 만든 카테고리 칩만 둡니다 */
-    if (S.lists.length) {
-      html += '<div class="lstbar"><div class="lst-scroll">';
-      S.lists.forEach(function (l) {
-        var on = seg === "list:" + l.id;
-        html += '<button class="lchip' + (on ? " active" : "") + '" data-act="seg" data-seg="list:' + l.id + '" aria-label="' + esc(listLabel(l)) + '">' +
+    html += '<div class="segs note-segs">';
+    /* v34: 기본 탭과 내가 만든 카테고리를 저장된 순서 그대로 한 줄에 — ≡ 로 옮긴 순서가 여기 그대로 보입니다 */
+    noteOrderList().forEach(function (k) {
+      if (k.indexOf("list:") === 0) {
+        var l = findList(k.slice(5));
+        if (!l) return;
+        html += '<button class="lchip' + (seg === k ? " active" : "") + '" data-act="seg" data-seg="' + esc(k) + '" aria-label="' + esc(listLabel(l)) + '">' +
           (l.emoji ? '<span class="le">' + esc(l.emoji) + "</span>" : "") + "<span>" + esc(l.title) + "</span></button>";
-      });
-      html += "</div></div>";
-    }
+      } else {
+        html += segBtn(seg, k, noteLabel(k));
+      }
+    });
+    html += "</div>";
     var body;
     if (seg === "todo") body = viewTodo();
     else if (seg === "bucket") body = viewBucket();
@@ -1768,21 +1793,149 @@
     return '<div class="sheet-hd"><h2>' + title + '</h2><button class="icon-btn" data-close="1" aria-label="닫기">' + IC.x + "</button></div>";
   }
 
-  /* v33: 이모지 고르는 줄은 없어졌어요 — 이름과 항목 형식만 정합니다.
-     아래 「탭 이름 수정」으로 메모·버킷리스트·영화·먹방 이름을 바꾸는 노트 설정도 바로 열려요. */
+  /* v34: + 시트 한 장에서 «새 카테고리 추가 · 탭 이름 수정 · ≡ 로 순서 바꾸기»를 한 번에 해요.
+     (v33 까지 따로 있던 「카테고리 이름」「형식」 라벨·버튼과 「탭 이름 수정」 링크는 없앴습니다) */
   function formNewList(l) {
-    var kindMemo = !!l && l.kind === "memo";
-    return sheetHead(l ? "카테고리 수정" : "새 카테고리") +
-      '<p class="sheet-sub">' + (l ? "이름과 항목 형식을 바로 바꿀 수 있어요." : "노트에 내가 쓰고 싶은 카테고리를 하나 더 만들어요.") + "</p>" +
-      '<form class="form" id="sheetForm">' +
-      '<div class="f"><label>카테고리 이름</label><input class="field" name="title" value="' + (l ? esc(l.title) : "") + '" placeholder="예) 여행 준비물, 주말 데이트" required autocomplete="off"></div>' +
-      '<div class="f"><label>형식</label><div class="seg seg-sm" data-group="lkind">' +
-      '<button type="button" class="seg-btn' + (kindMemo ? "" : " active") + '" data-act="lkind" data-kind="check">체크리스트</button>' +
-      '<button type="button" class="seg-btn' + (kindMemo ? " active" : "") + '" data-act="lkind" data-kind="memo">메모</button></div>' +
-      '<input type="hidden" name="kind" value="' + (kindMemo ? "memo" : "check") + '"></div>' +
-      '<input type="hidden" name="emoji" value="' + esc(l && l.emoji ? l.emoji : "") + '">' +
-      '<button class="btn-primary" type="submit">' + (l ? "저장하기" : "만들기") + "</button></form>" +
-      '<div style="height:10px"></div><button type="button" class="btn-line" data-act="noteSettings">탭 이름 수정 (노트 설정)</button>';
+    var h = sheetHead(l ? "카테고리 수정" : "새 카테고리");
+    h += '<p class="sheet-sub">' + (l ? "이름을 바꾸고 순서를 정리한 뒤 저장해요." : "새 카테고리를 더하고, 탭 이름과 순서를 한 번에 정리해요.") + "</p>";
+    h += '<form class="form" id="sheetForm">';
+    h += '<div class="f"><input class="field" name="title" value="" placeholder="새 카테고리 이름" aria-label="새 카테고리 이름" autocomplete="off"></div>';
+    h += '<div class="set-lbl" style="margin-top:18px">노트 카테고리</div>';
+    h += '<div class="nord" id="noteOrderList">';
+    noteOrderList().forEach(function (k) { h += noteOrderRow(k); });
+    h += "</div>";
+    h += '<div class="nord-hint">≡ 를 끌어 위아래로 옮기면 노트 탭 순서가 바뀌어요.</div>';
+    h += '<input type="hidden" name="del" id="noteDelIds" value="">';
+    h += '<div style="height:14px"></div><button class="btn-primary" type="submit">저장하기</button></form>';
+    return h;
+  }
+
+  /* + 시트의 카테고리 한 줄 — 3줄 손잡이 · 이름 칸 · (내가 만든 카테고리만) 삭제 */
+  function noteOrderRow(k) {
+    var isList = k.indexOf("list:") === 0;
+    var name = "", id = "";
+    if (isList) {
+      var l = findList(k.slice(5));
+      if (!l) return "";
+      name = listLabel(l);
+      id = l.id;
+    } else {
+      name = noteLabel(k);
+    }
+    return '<div class="nord-row" data-key="' + esc(k) + '">' +
+      '<button type="button" class="nord-grip" data-act="nordGrip" aria-label="순서 바꾸기 — 끌거나 위·아래 화살표" title="끌어서 위아래로 옮겨요">' + IC.grip + "</button>" +
+      '<input class="field nord-nm" name="n_' + esc(k) + '" value="' + esc(name) + '" aria-label="카테고리 이름" autocomplete="off">' +
+      (isList ? '<button type="button" class="nt-del nord-del" data-act="nordDel" data-id="' + esc(id) + '" aria-label="삭제">삭제</button>' : "") +
+      "</div>";
+  }
+
+  /* v34: + 시트의 ≡ 손잡이 — 터치·마우스로 끌어 순서를 실시간으로 바꿔요.
+     손가락이 지나는 줄의 위/아래 절반을 보고 그 자리로 자리를 교체합니다. */
+  var nordDrag = null;
+  function nordRowAt(box, y) {
+    var rows = Array.prototype.slice.call(box.querySelectorAll(".nord-row"));
+    for (var i = 0; i < rows.length; i++) {
+      var b = rows[i].getBoundingClientRect();
+      if (y >= b.top && y <= b.bottom) return rows[i];
+    }
+    return null;
+  }
+  function nordMove(row, dir) {
+    if (!row) return false;
+    if (dir < 0 && row.previousElementSibling) { row.parentNode.insertBefore(row, row.previousElementSibling); return true; }
+    if (dir > 0 && row.nextElementSibling) { row.parentNode.insertBefore(row.nextElementSibling, row); return true; }
+    return false;
+  }
+  function nordEnd() {
+    if (!nordDrag) return;
+    nordDrag.row.classList.remove("dragging");
+    nordDrag = null;
+  }
+  document.addEventListener("pointerdown", function (ev) {
+    var g = ev.target && ev.target.closest ? ev.target.closest("#sheet .nord-grip") : null;
+    if (!g) return;
+    var row = g.closest(".nord-row"), box = g.closest(".nord");
+    if (!row || !box) return;
+    ev.preventDefault();                 /* 끄는 동안 시트가 스크롤되지 않도록 */
+    nordDrag = { grip: g, row: row, box: box, id: ev.pointerId };
+    row.classList.add("dragging");
+    try { g.setPointerCapture(ev.pointerId); } catch (e) {}
+  }, true);
+  document.addEventListener("pointermove", function (ev) {
+    if (!nordDrag || ev.pointerId !== nordDrag.id) return;
+    if (ev.cancelable) ev.preventDefault();
+    var row = nordDrag.row, over = nordRowAt(nordDrag.box, ev.clientY);
+    if (!over || over === row) return;
+    var b = over.getBoundingClientRect();
+    if (ev.clientY > b.top + b.height / 2) {
+      if (over.nextElementSibling !== row) nordDrag.box.insertBefore(row, over.nextElementSibling);
+    } else if (over.previousElementSibling !== row) {
+      nordDrag.box.insertBefore(row, over);
+    }
+  }, true);
+  document.addEventListener("pointerup", nordEnd, true);
+  document.addEventListener("pointercancel", nordEnd, true);
+  /* 손잡이를 고르고 ↑ ↓ 키로도 옮길 수 있게 */
+  document.addEventListener("keydown", function (ev) {
+    var g = ev.target && ev.target.closest ? ev.target.closest("#sheet .nord-grip") : null;
+    if (!g) return;
+    var d = ev.key === "ArrowUp" ? -1 : (ev.key === "ArrowDown" ? 1 : 0);
+    if (!d) return;
+    ev.preventDefault();
+    if (nordMove(g.closest(".nord-row"), d)) g.focus();
+  }, true);
+
+  /* v34: + 시트 저장 — 위 칸의 새 이름은 새 카테고리로, 아래 줄들의 이름·순서는 노트 탭 이름·순서로 반영해요. */
+  function saveNoteSheet() {
+    var box = document.querySelector("#sheet #noteOrderList");
+    var rows = box ? Array.prototype.slice.call(box.querySelectorAll(".nord-row")) : [];
+    var order = [], names = {};
+    rows.forEach(function (r) {
+      var k = r.getAttribute("data-key") || "";
+      if (!k) return;
+      var inp = r.querySelector(".nord-nm");
+      order.push(k);
+      names[k] = inp ? String(inp.value || "") : "";
+    });
+    if (rows.length) {
+      /* 기본 탭 이름 — 「이모지 + 이름」을 적으면 앞 이모지와 이름으로 나눠 저장해요 */
+      NOTE_BASE.forEach(function (k) {
+        if (!(k in names)) return;
+        var sp = splitEmojiName(names[k]);
+        S.note[k] = { e: sp.n ? sp.e : "", n: sp.n || NOTE_DEF[k].n };
+      });
+      (S.lists || []).slice().forEach(function (l) {
+        var k = "list:" + l.id;
+        if (!(k in names)) return;
+        var sp = splitEmojiName(names[k]);
+        if (sp.n) { l.title = sp.n; l.emoji = sp.e; }
+      });
+    }
+    /* 「삭제」를 누른 카테고리는 저장할 때 지워요 (닫으면 그대로) */
+    var delInp = document.querySelector("#sheet #noteDelIds");
+    var delIds = delInp && delInp.value ? delInp.value.split(",").filter(Boolean) : [];
+    if (delIds.length) {
+      S.lists = (S.lists || []).filter(function (l) { return delIds.indexOf(l.id) < 0; });
+      if (delIds.some(function (id) { return S.ui.seg === "list:" + id; })) S.ui.seg = "todo";
+    }
+    /* 새 카테고리 — 위 칸에 이름을 적었으면 체크리스트 형식·이모지 없이 맨 뒤에 더해요 */
+    var newInp = document.querySelector('#sheet input[name="title"]');
+    var newName = newInp ? String(newInp.value || "").trim() : "";
+    var added = false;
+    if (newName) {
+      var nl = { id: uid(), title: newName, emoji: "", kind: "check", items: [] };
+      S.lists.push(nl);
+      order.push("list:" + nl.id);
+      S.ui.seg = "list:" + nl.id;
+      added = true;
+    }
+    S.noteOrder = order;
+    noteOrderList();                       /* 없어진 키 정리 · 새로 생긴 리스트는 맨 뒤에 */
+    var cur = S.ui.seg || "todo";
+    var okCur = NOTE_BASE.indexOf(cur) >= 0 || (cur.indexOf("list:") === 0 && !!findList(cur.slice(5)));
+    if (!okCur) S.ui.seg = "todo";
+    save(); closeSheet(); renderDiary();
+    toast(added ? "카테고리를 만들었어요" : "노트 설정을 저장했어요");
   }
 
   function formNoteSettings() {
@@ -3186,6 +3339,9 @@
     /* v28: 탭에서 캘린더로 들어올 때는 늘 이번 달로.
        일정 검색 결과처럼 «그 달로 가야 하는» 이동은 opts.keepCal 로 그 달을 지킵니다. */
     if (name === "cal" && current !== "cal" && !(opts && opts.keepCal)) syncCalToday();
+    /* v34: 노트 탭으로 들어올 때는 늘 「메모」부터 — 다른 탭에서 고른 노트 탭은
+       노트 화면에 머무는 동안만 유지돼요 (v28 캘린더와 같은 방식). */
+    if (name === "diary" && current !== "diary" && !(opts && opts.keepSeg)) S.ui.seg = "todo";
     current = name;
     showScreen(name);
     $("#screens").scrollTop = 0;
@@ -3228,7 +3384,7 @@
     if (act === "navSeg") {
       var ns = el.getAttribute("data-seg");
       if (ns) { S.ui.seg = ns; save(); }
-      go(el.getAttribute("data-screen") || "diary");
+      go(el.getAttribute("data-screen") || "diary", { keepSeg: true });
       return;
     }
 
@@ -3353,14 +3509,18 @@
     }
 
     if (act === "newList") {
-      openSheet(formNewList(), function (fd) {
-        var title = String(fd.get("title") || "").trim();
-        if (!title) { toast("이름을 먼저 적어 주세요"); return; }
-        var l = { id: uid(), title: title, emoji: fd.get("emoji") || "", kind: fd.get("kind") === "memo" ? "memo" : "check", items: [] };
-        S.lists.push(l);
-        S.ui.seg = "list:" + l.id;
-        save(); closeSheet(); renderDiary(); toast("카테고리를 만들었어요");
-      });
+      /* v34: + 시트 하나에서 새 카테고리 추가 · 탭 이름 수정 · 순서 바꾸기를 모두 해요 */
+      openSheet(formNewList(), function () { saveNoteSheet(); });
+      return;
+    }
+
+    if (act === "nordDel") {
+      /* 줄을 지우면 화면에서만 빼 두고, 저장할 때 S.lists 에서 지웁니다 */
+      var nRow = el.closest(".nord-row");
+      var nId = el.getAttribute("data-id") || "";
+      if (nRow && nRow.parentNode) nRow.parentNode.removeChild(nRow);
+      var nDelInp = document.querySelector("#sheet #noteDelIds");
+      if (nDelInp && nId) nDelInp.value = nDelInp.value ? nDelInp.value + "," + nId : nId;
       return;
     }
 
@@ -3502,16 +3662,7 @@
       var eLid = el.getAttribute("data-id");
       var eL = findList(eLid);
       if (!eL) return;
-      openSheet(formNewList(eL), function (fd) {
-        var L3 = findList(eLid);
-        if (!L3) return;
-        var title = String(fd.get("title") || "").trim();
-        if (!title) { toast("카테고리 이름을 적어 주세요"); return; }
-        L3.title = title;
-        L3.emoji = fd.get("emoji") || "";
-        L3.kind = fd.get("kind") === "memo" ? "memo" : "check";
-        save(); closeSheet(); renderDiary(); toast("리스트를 저장했어요");
-      });
+      openSheet(formNewList(eL), function () { saveNoteSheet(); });
       return;
     }
 

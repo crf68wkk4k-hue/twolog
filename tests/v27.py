@@ -1,6 +1,6 @@
 """투로그 v27 확인 — 노트 카드 묶음(groups·gid) 동기화 · v26 기기 자동 복구 · 달력 글씨.
 
-1) 버전: sw.js 캐시 twolog-v33 · APP_VERSION v33 · sync.js 에 repairGroups
+1) 버전: sw.js 캐시 twolog-v34 · APP_VERSION v34 · sync.js 에 repairGroups
 2) 달력 아래 선택한 날 일정 글씨가 커짐(제목 16px · 이름 12.5px → v28 13.5px)
 3) v26 으로 이미 한 번 이전을 마친 폰 재현
    (원격 notes 38개에 gid·memo 없음 + settings 에 groups 없음 + twolog.migrated.<cid> 있음,
@@ -177,9 +177,9 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     sync_js = page.request.get(URL + "sync.js").text()
-    check("sw.js 캐시 버전 twolog-v33", 'const VERSION = "twolog-v33"' in sw,
+    check("sw.js 캐시 버전 twolog-v34", 'const VERSION = "twolog-v34"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:1])
-    check("app.js 버전 상수 v33", 'var APP_VERSION = "v33"' in app_js)
+    check("app.js 버전 상수 v34", 'var APP_VERSION = "v34"' in app_js)
     check("sync.js 에 gid·groups 동기화가 있음",
           "notePayload" in sync_js and 'K_GROUPS = "groups"' in sync_js and "repairGroups" in sync_js)
     ctx.close()

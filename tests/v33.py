@@ -1,6 +1,6 @@
 """투로그 v33 확인 — 노트 탭의 이모지를 걷어내고, 카테고리(탭) 설정을 쓰기 쉽게.
 
-1) 버전: sw.js 캐시 twolog-v33 · APP_VERSION v33 · My 탭 「버전 v33」
+1) 버전: sw.js 캐시 twolog-v34 · APP_VERSION v34 · My 탭 「버전 v34」
 2) 기본 탭 「메모」·「버킷리스트」·「영화·먹방」에 이모지가 없음 (예전 📝·🎯·🎬)
 3) 예전에 저장된 기본 이모지는 한 번만 정리 — 내가 넣은 다른 이모지(🌙)는 그대로
 4) + 시트: 「새 카테고리」 — 이모지 고르는 줄·안내가 없고, 이름·형식만
@@ -148,11 +148,11 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v33", 'const VERSION = "twolog-v33"' in sw,
+    check("sw.js 캐시 버전 twolog-v34", 'const VERSION = "twolog-v34"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v33", 'var APP_VERSION = "v33"' in app_js,
+    check("app.js 버전 상수 v34", 'var APP_VERSION = "v34"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v33", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v34", 'const SHELL = "shell-" + VERSION' in sw)
 
     # ==================================================================
     # 2. 기본 탭 — 이모지 없이 이름만
@@ -185,16 +185,19 @@ with sync_playwright() as p:
     check("시트에 「이모지」 글씨 없음", "이모지" not in sh["text"], sh["text"][:200])
     flabels = page.evaluate("Array.from(document.querySelectorAll('#sheet .f > label'))"
                              ".map(e => e.textContent.trim())")
-    check("시트 항목은 이름·형식만", flabels == ["카테고리 이름", "형식"], flabels)
+    # v34: 「카테고리 이름」「형식」 라벨은 없어지고, 바로 적는 칸 하나 + 아래 카테고리 목록
+    check("「카테고리 이름」「형식」 라벨 없음", flabels == [], flabels)
+    check("시트에 새 카테고리 이름 칸",
+          page.evaluate("(document.querySelector('#sheet input[name=\\'title\\']') || {}).placeholder")
+          == "새 카테고리 이름")
     bottom = page.evaluate("""() => {
       const b = document.querySelector('#sheet .btn-line');
       if (!b) return null;
       return {act: b.getAttribute('data-act'), txt: b.textContent.trim(),
               inSheet: !!b.closest('#sheet')};
     }""")
-    check("시트 아래 「탭 이름 수정 (노트 설정)」 버튼",
-          bottom is not None and bottom["act"] == "noteSettings" and bottom["inSheet"] is True
-          and bottom["txt"] == "탭 이름 수정 (노트 설정)", bottom)
+    # v34: 「탭 이름 수정」 링크는 + 시트 안으로 합쳐져 사라졌어요
+    check("시트 아래 「탭 이름 수정 (노트 설정)」 버튼 없음", bottom is None, bottom)
     check("시트에 이모지 없이 안내 문구", "카테고리" in sh["text"], sh["text"][:200])
     page.screenshot(path=os.path.join(SHOT, "note-v33-newcat.png"))
 
@@ -227,14 +230,13 @@ with sync_playwright() as p:
           and nv2["chips"] == ["장보기"], (nv2["lists"], nv2["chips"]))
 
     # ==================================================================
-    # 5. + 시트 아래 버튼 → 노트 설정, 탭 이름 수정
+    # 5. 탭 이름 수정 — 「📖 노트」 제목을 꾹 눌러 노트 설정 (v34: + 시트로도 됨)
     # ==================================================================
-    page.locator("#s-diary .hdr .note-add").click()
-    page.wait_for_timeout(600)
-    page.locator('#sheet [data-act="noteSettings"]').click()
-    page.wait_for_timeout(700)
+    close_sheet(page)
+    long_press_note_title(page)
+    page.wait_for_timeout(300)
     sh2 = sheet_state(page)
-    check("+ 시트 아래 버튼으로 「노트 설정」이 열림", sh2["open"] and sh2["head"] == "노트 설정", sh2)
+    check("노트 설정이 열림", sh2["open"] and sh2["head"] == "노트 설정", sh2)
     check("노트 설정에 이모지 칸(.nt-emo) 없음", page.locator("#sheet .nt-emo").count() == 0)
     check("노트 설정에 이모지 고르는 줄 없음", page.locator("#sheet .emk-row").count() == 0)
     check("이모지 안내 문구 사라짐",
@@ -280,7 +282,7 @@ with sync_playwright() as p:
     # ==================================================================
     tab(page, 4, 600)
     ver = page.evaluate("((document.querySelector('#s-set .app-ver') || {}).textContent || '').trim()")
-    check("My 탭 맨 위에 「버전 v33」", ver == "버전 v33", ver)
+    check("My 탭 맨 위에 「버전 v34」", ver == "버전 v34", ver)
     page.screenshot(path=os.path.join(SHOT, "my-v33.png"))
 
     for idx, name, sid in ((0, "홈", "s-home"), (1, "캘린더", "s-cal"), (3, "사진첩", "s-photo")):

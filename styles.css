@@ -597,6 +597,35 @@ html[data-mode="dark"] .pview .pv-nav{background:rgba(40,40,44,.86); color:#F2F2
 .lchip.active{background:var(--ink); border-color:var(--ink); color:var(--bg)}
 .lchip.active i{background:var(--bg)}
 .lchip:active{opacity:.85}
+/* v34: 노트 카테고리 탭 — 기본 탭과 내가 만든 카테고리를 저장된 순서대로 한 줄에.
+   세 개면 지금처럼 화면 폭을 고르게 나누고, 많아지면 옆으로 넘겨요. */
+.segs.note-segs{overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch}
+.segs.note-segs::-webkit-scrollbar{display:none}
+.segs .seg-btn{min-width:72px}
+.segs .lchip{flex:0 0 auto; height:40px; max-width:170px; padding:0 10px; font-size:13.5px}
+/* v34: + 시트의 카테고리 목록 — 3줄(≡) 손잡이로 위아래 순서를 바꿔요 */
+.nord{display:flex; flex-direction:column; gap:6px; margin-top:8px}
+.nord-row{
+  display:flex; align-items:center; gap:4px; padding:4px 4px 4px 2px;
+  border:1px solid var(--line); background:var(--surface); border-radius:10px
+}
+.nord-row.dragging{border-color:var(--ink); background:var(--surface-2); box-shadow:0 6px 16px rgba(28,28,30,.14)}
+.nord-grip{
+  flex:0 0 32px; width:32px; height:38px; padding:0; display:flex; align-items:center; justify-content:center;
+  border:0; background:transparent; color:var(--ink-3); cursor:grab;
+  touch-action:none; -webkit-user-select:none; user-select:none
+}
+.nord-grip:active{cursor:grabbing; color:var(--ink)}
+.nord-row.dragging .nord-grip{color:var(--ink)}
+.nord-row .nord-nm{
+  flex:1 1 auto; min-width:0; height:38px; padding:0 2px; border:0; background:transparent;
+  font-size:14.5px; font-weight:600; color:var(--ink); letter-spacing:-.02em
+}
+.nord-row .nord-nm:focus{outline:none}
+.nord-row .nt-del{height:34px; padding:0 9px}
+.nord-hint{font-size:11px; color:var(--ink-3); line-height:1.6; margin-top:9px}
+html[data-mode="dark"] .nord-row{border-color:rgba(255,255,255,.14); background:#1D1D20}
+html[data-mode="dark"] .nord-row.dragging{background:#26262A}
 .emk-row{display:flex; gap:6px}
 .emk{width:40px; height:38px; flex:0 0 40px; border:1px solid var(--line); background:var(--surface); font-size:17px; line-height:1; display:flex; align-items:center; justify-content:center}
 .emk.sel{border-color:var(--ink); background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--ink)}

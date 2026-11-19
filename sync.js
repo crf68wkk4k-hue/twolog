@@ -49,6 +49,9 @@
      localStorage["twolog.groupsRepaired.<coupleId>"] = {at, groups:{todo,bucket,log}, notes} */
   var K_GROUPS_REPAIRED = "twolog.groupsRepaired.";
   var K_GROUPS = "groups";           // settings 테이블의 노트 카드 묶음 행
+  /* v34: 노트 탭 이름과 순서 — settings 테이블의 key="note_meta" 행
+     value = { tabs: {todo:{e,n}, bucket:{...}, log:{...}}, order: ["todo","list:<id>",...] } */
+  var K_NOTE_META = "note_meta";
   var NOTE_ARR = { todo: "todos", bucket: "bucket", log: "logs" };
 
   function isRemote() { return !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey); }
@@ -464,6 +467,24 @@
     return !(arr(value.todo).length + arr(value.bucket).length + arr(value.log).length);
   }
 
+  /* v34: 노트 탭 이름·순서(note_meta) — 두 기기가 같은 탭 이름과 순서를 봅니다.
+     예전 기기·예전 데이터는 값이 없으면 그냥 건너뛰고, 앱의 기본값(메모·버킷리스트·영화·먹방)을 씁니다. */
+  function noteMetaOf(doc) {
+    var note = (doc && doc.note) || {};
+    var tabs = {};
+    ["todo", "bucket", "log"].forEach(function (k) {
+      var t = note[k] && typeof note[k] === "object" ? note[k] : {};
+      tabs[k] = { e: typeof t.e === "string" ? t.e : "", n: typeof t.n === "string" ? t.n : "" };
+    });
+    var order = arr(doc && doc.noteOrder).map(function (k) { return String(k); });
+    return { tabs: tabs, order: order };
+  }
+  function noteMetaEmpty(value) {
+    if (!value || typeof value !== "object") return true;
+    var hasName = ["todo", "bucket", "log"].some(function (k) { return !!(value.tabs && value.tabs[k] && value.tabs[k].n); });
+    return !hasName && !arr(value.order).length;
+  }
+
   function noteWhoLabel(who, flip, couple) {
     var t = flip(who);
     if (t === "me") return "나";
@@ -552,6 +573,16 @@
         /* v27: 노트 카드 묶음 — 두 기기가 같은 카드 id·제목·색을 봅니다 */
         var gs = normalizeGroups(r.value);
         if (gs.todo.length || gs.bucket.length || gs.log.length) doc.groups = gs;
+      }
+      else if (r.key === K_NOTE_META && r.value && !noteMetaEmpty(r.value)) {
+        /* v34: 노트 탭 이름·순서 — 예전 데이터(값 없음)면 앱 기본값 그대로 */
+        var nm = r.value;
+        doc.note = {};
+        ["todo", "bucket", "log"].forEach(function (k) {
+          var t = (nm.tabs || {})[k];
+          if (t && typeof t === "object") doc.note[k] = { e: typeof t.e === "string" ? t.e : "", n: typeof t.n === "string" ? t.n : "" };
+        });
+        if (arr(nm.order).length) doc.noteOrder = arr(nm.order).map(function (k) { return String(k); });
       }
       else if (String(r.key || "").indexOf(K_AVATAR) === 0) {
         /* v26: 프로필 사진 — 사람별 행을 이 기기의 '나/상대'로 바꿔 담습니다 */
@@ -878,6 +909,17 @@
       }));
     }
 
+    /* settings: v34 노트 탭 이름·순서(note_meta) — 기본 탭 이름과 카테고리 순서를 두 기기가 함께 씁니다 */
+    var noteMetaValue = noteMetaOf(doc);
+    var prevNoteMeta = this.prev.settings[K_NOTE_META];
+    if (!prevNoteMeta || !sameRow(prevNoteMeta.value, noteMetaValue)) {
+      var noteMetaRow = { couple_id: cid, key: K_NOTE_META, value: noteMetaValue };
+      jobs.push(client.from("settings").upsert(noteMetaRow, { onConflict: "couple_id,key" }).then(function (r) {
+        if (r.error) throw r.error;
+        self.prev.settings[K_NOTE_META] = noteMetaRow;
+      }));
+    }
+
     return Promise.all(jobs).then(function () {
       self.prev = {
         couple: Object.assign({}, prevCouple, couplePatch),
@@ -1196,6 +1238,15 @@
         var localGroupTotal = localGroups.todo.length + localGroups.bucket.length + localGroups.log.length;
         if (groupsEmpty(groupsRow && groupsRow.value) && localGroupTotal) {
           jobs.push(client.from("settings").upsert({ couple_id: cid, key: K_GROUPS, value: localGroups }, { onConflict: "couple_id,key" }).then(function (r) {
+            if (r && r.error) throw r.error;
+          }));
+        }
+
+        /* ---- 4-1-1. v34 노트 탭 이름·순서(note_meta) — 원격에 아직 없을 때만 ---- */
+        var noteMetaRow = setRows.filter(function (r) { return r.key === K_NOTE_META; })[0];
+        var localMeta = noteMetaOf(local);
+        if (noteMetaEmpty(noteMetaRow && noteMetaRow.value) && !noteMetaEmpty(localMeta)) {
+          jobs.push(client.from("settings").upsert({ couple_id: cid, key: K_NOTE_META, value: localMeta }, { onConflict: "couple_id,key" }).then(function (r) {
             if (r && r.error) throw r.error;
           }));
         }
