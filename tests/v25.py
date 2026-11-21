@@ -108,9 +108,9 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     sync_src = page.request.get(URL + "sync.js").text()
-    check("sw.js 캐시 버전 twolog-v35", 'const VERSION = "twolog-v35"' in sw,
+    check("sw.js 캐시 버전 twolog-v36", 'const VERSION = "twolog-v36"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:1])
-    check("app.js 버전 상수 v35", 'var APP_VERSION = "v35"' in app_js)
+    check("app.js 버전 상수 v36", 'var APP_VERSION = "v36"' in app_js)
     check("sync.js CONFIG.supabaseUrl 반영", PROJ in sync_src,
           [l.strip() for l in sync_src.splitlines() if "supabaseUrl:" in l][:1])
     check("sync.js CONFIG.supabaseAnonKey 반영(publishable)", PUB_KEY in sync_src)
@@ -219,7 +219,7 @@ with sync_playwright() as p:
               offline: /오프라인/.test(s.innerText),
               code: (window.TwoLogStore.couple.myCode() || '')};
     })()""")
-    check("My 탭 맨 윗줄 「버전 v35」", "v35" in my["ver"], my["ver"])
+    check("My 탭 맨 윗줄 「버전 v36」", "v36" in my["ver"], my["ver"])
     check("My 탭에 가입 이메일 표시", EMAIL in my["txt"], my["txt"][:120])
     check("동기화 「두 대 실시간 동기화 중」 · 배지 「자동」", my["synced"] and "자동" in my["chip"], my["chip"])
     check("계정 만들 때 초대 코드 6자리가 자동 생성", re.fullmatch(r"\d{6}", my["code"]) is not None, my["code"])

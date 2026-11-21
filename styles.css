@@ -604,12 +604,32 @@ html[data-mode="dark"] .pview .pv-nav{background:rgba(40,40,44,.86); color:#F2F2
 .segs .seg-btn{min-width:72px}
 .segs .lchip{flex:0 0 auto; height:40px; max-width:170px; padding:0 10px; font-size:13.5px}
 /* v34: + 시트의 카테고리 목록 — 3줄(≡) 손잡이로 위아래 순서를 바꿔요 */
-.nord{display:flex; flex-direction:column; gap:6px; margin-top:8px}
+/* v36: 새 카테고리 이름 — 네모칸 대신 밑줄만 있는 칸(일정 제목 칸과 같은 톤) + 옆에 「추가」 */
+.nord-new-row{display:flex; align-items:center; gap:8px}
+.nord-new{
+  flex:1 1 auto; min-width:0; height:44px; padding:0 2px;
+  border:0; border-bottom:1.5px solid var(--line); border-radius:0; background:transparent;
+  font-size:17px; font-weight:700; color:var(--ink); letter-spacing:-.02em
+}
+.nord-new:focus{outline:none; border-bottom-color:var(--ink)}
+.nord-new::placeholder{font-size:15px; font-weight:600; color:var(--ink-3); letter-spacing:-.02em}
+.nord-add-btn{
+  flex:0 0 auto; height:36px; padding:0 13px; border:1px solid var(--line); border-radius:8px;
+  background:var(--surface); font-size:12.5px; font-weight:700; color:var(--ink);
+  letter-spacing:-.02em; white-space:nowrap
+}
+.nord-add-btn:active{background:var(--surface-2)}
+html[data-mode="dark"] .nord-add-btn{border-color:rgba(255,255,255,.18); background:#1D1D20}
+.nord{position:relative; display:flex; flex-direction:column; gap:6px; margin-top:8px}
 .nord-row{
   display:flex; align-items:center; gap:4px; padding:4px 4px 4px 2px;
   border:1px solid var(--line); background:var(--surface); border-radius:10px
 }
-.nord-row.dragging{border-color:var(--ink); background:var(--surface-2); box-shadow:0 6px 16px rgba(28,28,30,.14)}
+/* v36: 끌고 있는 줄 — 손가락을 따라 떠 있고, 자리를 비켜 주는 줄들은 JS 가 FLIP 으로 밀어 줍니다 */
+.nord-row.dragging{
+  position:relative; z-index:5; border-color:var(--ink); background:var(--surface-2);
+  box-shadow:0 10px 24px rgba(28,28,30,.18); will-change:transform
+}
 .nord-grip{
   flex:0 0 32px; width:32px; height:38px; padding:0; display:flex; align-items:center; justify-content:center;
   border:0; background:transparent; color:var(--ink-3); cursor:grab;
@@ -624,6 +644,8 @@ html[data-mode="dark"] .pview .pv-nav{background:rgba(40,40,44,.86); color:#F2F2
 .nord-row .nord-nm:focus{outline:none}
 .nord-row .nt-del{height:34px; padding:0 9px}
 .nord-hint{font-size:11px; color:var(--ink-3); line-height:1.6; margin-top:9px}
+/* v36: 안내 문구를 「노트 카테고리」 라벨 바로 아래로 — 목록과의 여백을 줄여 한 묶음으로 */
+.nord-hint.nord-hint-top{margin-top:4px}
 html[data-mode="dark"] .nord-row{border-color:rgba(255,255,255,.14); background:#1D1D20}
 html[data-mode="dark"] .nord-row.dragging{background:#26262A}
 .emk-row{display:flex; gap:6px}

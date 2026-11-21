@@ -349,6 +349,10 @@
     return String(v == null ? "" : v);
   }
   function sigNote(r) { return String(r.kind || "") + "|" + noteLabel(r.kind, r.payload); }
+  /* v36: 공백만 다른 같은 항목인지 보는 열쇠 — 앞뒤·연속 공백을 하나로 줄여 비교합니다.
+     (이걸 안 하면 「나무도마」와 「나무도마 」가 다른 항목으로 보여 같은 줄이 한 번 더 올라갔어요) */
+  function noteTrim(v) { return String(v == null ? "" : v).replace(/\s+/g, " ").trim(); }
+  function noteMatchKey(kind, p) { return String(kind || "") + "\u0000" + noteTrim(noteLabel(kind, p)); }
   function sigPhoto(r) { return [r.date, r.album || "", r.title || "", r.memo || ""].join("|"); }
 
   /* v26: 프로필 사진(아바타)은 settings 테이블에 **사람별 한 줄**로 올립니다.
@@ -1374,6 +1378,23 @@
         return NOTE_ARR[r.kind] && !((r.payload || {}).gid);
       }).length;
 
+      /* v36: 원격에 이미 들어 있는 항목의 열쇠 — 공백만 달라도 다시 더하지 않습니다.
+         · remoteKeys  : 같은 내용 + 같은 카드(gid)  · 아직 카드가 없던 예전 행은 어느 카드든(noGid) */
+      var remoteKeys = {};
+      var remoteNoGidKeys = {};
+      live.forEach(function (r) {
+        if (!NOTE_ARR[r.kind]) return;
+        var rp = r.payload || {};
+        var mk = noteMatchKey(r.kind, rp);
+        if (rp.gid) remoteKeys[mk + "\u0000" + String(rp.gid)] = true;
+        else remoteNoGidKeys[mk] = true;
+      });
+      var remoteListTitles = {};
+      live.forEach(function (r) {
+        if (r.kind !== "list") return;
+        remoteListTitles[noteTrim((r.payload || {}).title)] = true;
+      });
+
       /* 이미 카드 묶음도 있고 모든 항목에 gid 가 있으면 할 일이 없음 */
       if (!force && !groupsMissing && !missingGid) return { ok: false, skipped: "nothing" };
 
@@ -1387,8 +1408,14 @@
         var p = r.payload || {};
         var it = items.filter(function (x) { return x && String(x.id) === String(r.id); })[0];
         if (!it) {
-          var label = noteLabel(r.kind, p);
-          it = items.filter(function (x) { return x && noteLabel(r.kind, x) === label; })[0];
+          /* v36: 공백·줄바꿈만 다른 같은 항목은 같은 것으로 보고 맞춥니다.
+             카드(gid)가 적힌 원격 행이면 같은 카드 안의 항목을 먼저 고릅니다. */
+          var label = noteMatchKey(r.kind, p);
+          var same = items.filter(function (x) { return x && noteMatchKey(r.kind, x) === label; });
+          if (p.gid) {
+            it = same.filter(function (x) { return x.gid && String(x.gid) === String(p.gid); })[0];
+          }
+          if (!it) it = same[0];
         }
         if (!it) return;
         used[it.id] = true;
@@ -1412,6 +1439,10 @@
         arr(local[NOTE_ARR[kind]]).forEach(function (it) {
           if (!it || typeof it !== "object") return;
           if (used[it.id]) return;
+          /* v36: 원격에 이미 같은 내용(공백만 다른 것 포함)이 있으면 다시 넣지 않습니다 */
+          var mk = noteMatchKey(kind, it);
+          if (remoteNoGidKeys[mk]) return;
+          if (it.gid && remoteKeys[mk + "\u0000" + String(it.gid)]) return;
           added.push({
             id: String(it.id || freshId()), couple_id: cid, kind: kind, sort: ++sortMax,
             deleted: false, payload: notePayload(kind, it, flip, whoToken)
@@ -1426,13 +1457,15 @@
         var p = r.payload || {};
         var l = localLists.filter(function (x) { return x && String(x.id) === String(r.id); })[0];
         if (!l) l = localLists.filter(function (x) { return x && String(x.title || "") === String(p.title || ""); })[0];
+        if (!l) l = localLists.filter(function (x) { return x && noteTrim(x.title) === noteTrim(p.title); })[0];
         if (!l) return;
         usedLists[l.id] = true;
         var srcItems = arr(p.items);
         var touched = false;
         var items = srcItems.map(function (it) {
           var mine = arr(l.items).filter(function (x) { return x && String(x.id) === String(it.id); })[0] ||
-            arr(l.items).filter(function (x) { return x && String(x.text || "") === String(it.text || ""); })[0];
+            arr(l.items).filter(function (x) { return x && String(x.text || "") === String(it.text || ""); })[0] ||
+            arr(l.items).filter(function (x) { return x && noteTrim(x.text) === noteTrim(it.text); })[0];
           if (!mine) return it;
           if (it.memo === undefined && mine.memo) { touched = true; return Object.assign({}, it, { memo: String(mine.memo) }); }
           return it;
@@ -1445,6 +1478,8 @@
       });
       localLists.forEach(function (l) {
         if (!l || typeof l !== "object" || usedLists[l.id]) return;
+        /* v36: 원격에 같은 이름(공백만 다른 것 포함)의 리스트가 있으면 또 만들지 않습니다 */
+        if (remoteListTitles[noteTrim(l.title)]) return;
         added.push({
           id: String(l.id || freshId()), couple_id: cid, kind: "list", sort: ++sortMax,
           deleted: false, payload: notePayload("list", l, flip, whoToken)
@@ -1495,14 +1530,32 @@
     return this.unsubscribe;
   };
 
+  /* v36: Realtime 로 다시 읽을 때, 저장이 기다리거나(saveTimer) 진행 중(backend.saving)이면
+     서버를 다시 읽지 않고 저장이 끝난 뒤로 미룹니다.
+     예전에는 체크·수정한 직후에 이 재읽기가 돌면 아직 저장되지 않은 서버의 예전 상태로
+     화면을 덮어써서, 체크한 항목이 다시 안 체크된 것처럼 보였습니다. */
   SupabaseBackend.prototype.scheduleReload = function (onRemote) {
     var self = this;
     clearTimeout(this.reloadTimer);
-    this.reloadTimer = setTimeout(function () {
-      self.load().then(function (doc) {
-        if (doc && onRemote) onRemote(doc);
-      }).catch(function (e) { warn("reload failed", e); });
-    }, 450);
+    var tries = 0;
+    var busy = function () { return !!(self.storeBusy && self.storeBusy()); };
+    var fire = function (delay) {
+      self.reloadTimer = setTimeout(function () {
+        if (busy()) {
+          if (++tries < 20) { fire(150); return; }   // 저장이 끝나면 바로 이어서
+          return;                                     // 계속 편집 중이면 이번 재읽기는 건너뜁니다
+        }
+        self.load().then(function (doc) {
+          /* 읽는 사이에 저장이 시작됐으면 이 결과는 옛 상태 — 버리고 다시 미룹니다 */
+          if (busy()) {
+            if (++tries < 20) fire(200);
+            return;
+          }
+          if (doc && onRemote) onRemote(doc);
+        }).catch(function (e) { warn("reload failed", e); });
+      }, delay);
+    };
+    fire(450);
   };
 
   /* =====================================================================
@@ -1517,6 +1570,12 @@
     var saveTimer = null;
     var lastDoc = null;
     var status = { state: remote ? "connecting" : "local", at: 0, pending: 0 };
+
+    /* v36: 지금 저장이 기다리거나(saveTimer) 진행 중(backend.saving)인지 —
+       Realtime 재읽기(scheduleReload)·당겨오기(pullNow)가 그 순간의 편집을
+       서버의 옛 상태로 덮어쓰지 않도록 backend 가 이 함수를 물어봅니다. */
+    function storeBusy() { return !!(saveTimer || backend.saving); }
+    try { backend.storeBusy = storeBusy; } catch (e) {}
 
     /* 상대 기기 변경 구독 — 로그인 전에 시작해도, 로그인 뒤 자동으로 붙습니다. */
     function ensureSubscribed() {

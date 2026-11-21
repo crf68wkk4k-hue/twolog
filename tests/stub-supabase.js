@@ -123,8 +123,16 @@ class Query {
     return err("unsupported");
   }
 
-  then(onOk, onBad) { return Promise.resolve(this.run()).then(onOk, onBad); }
-  catch(onBad) { return Promise.resolve(this.run()).catch(onBad); }
+  then(onOk, onBad) {
+    /* v36 테스트: window.__STUB_WRITE_DELAY(ms) 를 정해 두면 «쓰기» 응답만 그만큼 늦어집니다.
+       (저장이 끝나기 전에 Realtime 이벤트가 오는 상황을 만들어 보려고 — 읽기는 그대로 빨라요) */
+    const d = Number((typeof window !== "undefined" && window.__STUB_WRITE_DELAY) || 0);
+    if (d > 0 && this.kind !== "select") {
+      return new Promise((res) => setTimeout(res, d)).then(() => this.run()).then(onOk, onBad);
+    }
+    return Promise.resolve(this.run()).then(onOk, onBad);
+  }
+  catch(onBad) { return this.then(null, onBad); }
 }
 
 const TINY_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
