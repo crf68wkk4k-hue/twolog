@@ -49,6 +49,9 @@
      localStorage["twolog.groupsRepaired.<coupleId>"] = {at, groups:{todo,bucket,log}, notes} */
   var K_GROUPS_REPAIRED = "twolog.groupsRepaired.";
   var K_GROUPS = "groups";           // settings 테이블의 노트 카드 묶음 행
+  /* v43: 두 사람 생일 — couples 행에 칸이 없어 settings 의 key="birthdays" 행에 담습니다.
+     (예전에는 앱 안에만 있어서, 서버에서 커플 정보를 다시 읽으면 생일이 사라졌어요) */
+  var K_BDAY = "birthdays";
   /* v34: 노트 탭 이름과 순서 — settings 테이블의 key="note_meta" 행
      value = { tabs: {todo:{e,n}, bucket:{...}, log:{...}}, order: ["todo","list:<id>",...] } */
   var K_NOTE_META = "note_meta";
@@ -465,17 +468,62 @@
     return rows;
   }
 
+  /* v43: 모눈 다이어리 내용(자유 배치 글 상자 · 사진 · 손그림 · 글씨 모양)을 payload 에 싣는 공통 코드.
+     예전에는 «내 카테고리(list)» 행에만 담겨서, 기본 카테고리(할 일·버킷·영화·먹방)를 「모눈 메모」로
+     바꿔 쓴 다이어리는 서버에 저장했다가 다시 읽으면 날짜만 남고 글·사진이 사라졌습니다. */
+  function diaryExtra(o) {
+    var x = {};
+    if (!o) return x;
+    if (Array.isArray(o.texts) && o.texts.length) {
+      x.texts = o.texts.filter(function (t) { return t && String(t.text || "").trim(); }).map(function (t) {
+        return { id: String(t.id || ""), x: Number(t.x) || 0, y: Number(t.y) || 0,
+          text: String(t.text || ""), size: Number(t.size) || 16.5,
+          color: String(t.color || ""), align: t.align === "center" ? "center" : "left" };
+      });
+    }
+    if (Array.isArray(o.imgs) && o.imgs.length) {
+      x.imgs = o.imgs.filter(function (m) { return m && m.src; }).map(function (m) {
+        var sz = Number(m.size);
+        return { id: String(m.id || ""), src: String(m.src), size: sz === 1 || sz === 3 ? sz : 2,
+          x: m.x == null ? null : Number(m.x), y: m.y == null ? null : Number(m.y),
+          w: m.w == null ? null : Number(m.w) };
+      });
+    }
+    if (o.sty && typeof o.sty === "object") {
+      x.sty = { size: Number(o.sty.size) || 2, color: String(o.sty.color || ""),
+        align: o.sty.align === "center" ? "center" : "left" };
+    }
+    if (Array.isArray(o.pen) && o.pen.length) x.pen = o.pen;
+    return x;
+  }
+  function mergeDiaryExtra(p, o) {
+    var ex = diaryExtra(o);
+    Object.keys(ex).forEach(function (k) { p[k] = ex[k]; });
+    return p;
+  }
+  /* 서버에서 읽은 payload → 항목에 글 상자·사진·손그림 되살리기 */
+  function applyDiaryExtra(dst, p) {
+    if (!dst || !p) return dst;
+    var ex = diaryExtra(p);
+    Object.keys(ex).forEach(function (k) { dst[k] = ex[k]; });
+    return dst;
+  }
+
   /* v27: 노트 한 항목 → payload (stateToRows·repairGroups 가 함께 씁니다) */
   function notePayload(kind, obj, flip, whoToken) {
     var o = obj || {};
     var p;
     if (kind === "todo") {
       p = { text: o.text || "", memo: o.memo || "", done: !!o.done, who: flip(whoToken(o.who)) };
+      mergeDiaryExtra(p, o);
     } else if (kind === "bucket") {
       p = { title: o.title || "", cat: o.cat || "기타", memo: o.memo || "", done: !!o.done, status: o.status || "" };
+      mergeDiaryExtra(p, o);
     } else if (kind === "log") {
       p = { kind: o.kind === "food" ? "food" : "movie", title: o.title || "", rating: Number(o.rating) || 0,
-        date: o.date || nowIso(), review: o.review || "", place: o.place || "", done: o.done !== false };
+        date: o.date || nowIso(), review: o.review || "", memo: o.memo || "",
+        place: o.place || "", done: o.done !== false };
+      mergeDiaryExtra(p, o);
     } else {
       /* v38: 속지 레이아웃 kind — check · memo · review · expense 를 그대로 싣고,
          항목의 별점·장소·날짜·금액(rating·place·date·amount)도 잃지 않게 함께 담아요. */
@@ -591,6 +639,20 @@
     return !hasName && !hasKind && !arr(value.order).length;
   }
 
+  /* v43: 생일 {me,you} — couples 행처럼 «만든 사람» 기준으로 맞춰 담고(swap), 읽을 때 되돌려요 */
+  function bdayValueOf(couple, swap) {
+    var b = (couple && couple.birthdays) || {};
+    var me = String(b.me == null ? "" : b.me).trim().slice(0, 10);
+    var you = String(b.you == null ? "" : b.you).trim().slice(0, 10);
+    return swap ? { me: you, you: me } : { me: me, you: you };
+  }
+  function bdayFromRow(value, swap) {
+    var v = value && typeof value === "object" ? value : {};
+    var me = String(v.me == null ? "" : v.me).trim().slice(0, 10);
+    var you = String(v.you == null ? "" : v.you).trim().slice(0, 10);
+    return swap ? { me: you, you: me } : { me: me, you: you };
+  }
+
   function noteWhoLabel(who, flip, couple) {
     var t = flip(who);
     if (t === "me") return "나";
@@ -657,16 +719,20 @@
           var todo = extra({ id: r.id, text: p.text || "", memo: p.memo || "", done: !!p.done, who: noteWhoLabel(p.who, flip, doc.couple) });
           if (gid) todo.gid = gid;
           if (p.date) todo.date = String(p.date);
+          applyDiaryExtra(todo, p);
           doc.todos.push(todo);
         } else if (r.kind === "bucket") {
-          var buck = extra({ id: r.id, title: p.title || "", cat: p.cat || "기타", memo: p.memo || "", done: !!p.done, status: p.status || undefined });
+          var buck = extra({ id: r.id, title: p.title || p.text || "", cat: p.cat || "기타", memo: p.memo || "", done: !!p.done, status: p.status || undefined });
           if (gid) buck.gid = gid;
           if (p.date) buck.date = String(p.date);
+          applyDiaryExtra(buck, p);
           doc.bucket.push(buck);
         } else if (r.kind === "log") {
-          var log = extra({ id: r.id, kind: p.kind === "food" ? "food" : "movie", title: p.title || "", rating: Number(p.rating) || 0,
-            date: p.date || nowIso(), review: p.review || "", place: p.place || "", done: p.done !== false });
+          var log = extra({ id: r.id, kind: p.kind === "food" ? "food" : "movie", title: p.title || p.text || "",
+            rating: Number(p.rating) || 0, date: p.date || nowIso(), review: p.review || "",
+            memo: p.memo || "", place: p.place || "", done: p.done !== false });
           if (gid) log.gid = gid;
+          applyDiaryExtra(log, p);
           doc.logs.push(log);
         } else if (r.kind === "list") {
           var list = { id: r.id, title: p.title || "", emoji: p.emoji || "",
@@ -721,6 +787,10 @@
       /* v35: 예전 버전이 올려 둔 테마 행은 «이 폰에 아직 저장된 테마가 없을 때 한 번»
          이어받는 용도로만 씁니다. app.js 가 기기 테마(localTheme)로 늘 덮어써요. */
       if (r.key === "theme" && r.value) doc.theme = Object.assign({ name: null, log: null, mode: "light" }, r.value);
+      else if (r.key === K_BDAY && r.value) {
+        /* v43: 저장해 둔 두 사람 생일 (프로필 편집에서 고친 값) */
+        doc.couple.birthdays = bdayFromRow(r.value, swap);
+      }
       else if (r.key === K_GROUPS && r.value) {
         /* v27: 노트 카드 묶음 — 두 기기가 같은 카드 id·제목·색을 봅니다 */
         var gs = normalizeGroups(r.value);
@@ -1058,6 +1128,19 @@
       jobs.push(client.from("settings").upsert(groupsRow, { onConflict: "couple_id,key" }).then(function (r) {
         if (r.error) throw r.error;
         self.prev.settings[K_GROUPS] = groupsRow;
+      }));
+    }
+
+    /* settings: v43 두 사람 생일 — 프로필 편집에서 고친 생일을 서버에 남겨
+       (앱을 다시 켜거나 Realtime 으로 커플 정보를 다시 읽어도) 값이 사라지지 않게 */
+    var bdayValue = bdayValueOf(doc.couple, !!this.swap);
+    var prevBday = this.prev.settings[K_BDAY];
+    var bdayChanged = !prevBday || !sameRow(prevBday.value, bdayValue);
+    if (bdayChanged && (bdayValue.me || bdayValue.you || prevBday)) {
+      var bdayRow = { couple_id: cid, key: K_BDAY, value: bdayValue };
+      jobs.push(client.from("settings").upsert(bdayRow, { onConflict: "couple_id,key" }).then(function (r) {
+        if (r.error) throw r.error;
+        self.prev.settings[K_BDAY] = bdayRow;
       }));
     }
 

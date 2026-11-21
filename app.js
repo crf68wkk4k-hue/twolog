@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v42";
+  var APP_VERSION = "v43";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -1175,6 +1175,12 @@
     var p = parseBirthday(v);
     return p ? p.m + "월 " + p.d + "일" : "";
   }
+  /* v43: 「1992년 6월 26일」처럼 연·월·일을 다 보여 주는 글 (프로필 생일 칸 아래) */
+  function bdayFullText(v) {
+    var p = parseBirthday(v);
+    if (!p) return "";
+    return (p.y ? p.y + "년 " : "") + p.m + "월 " + p.d + "일";
+  }
   /* 달력(input[type=date])에 넣을 값 — 연도를 모르면 소영은 1992, 상대는 올해로 채워요 */
   function bdayInput(who) {
     var p = parseBirthday((S.couple.birthdays || {})[who]);
@@ -2099,6 +2105,10 @@
   var D41_MINW = 0.16;          /* 사진 최소 폭 (종이 폭 대비) */
   var D41_TXMIN = 12, D41_TXMAX = 40;
   var d41CropState = null;
+  /* v43: 두 손가락으로 사진을 벌리거나 오므려 크기 바꾸기 */
+  var d41Pointers = {};         /* pointerId → {x, y, id} */
+  var d41TapKey = "", d41TapAt = 0;   /* 글 상자를 두 번 톡 누르면 입력(키보드) */
+  var d41Pinch = null;          /* {id, im, d0, w0, x0, y0, mx, my} */
 
   function d41Num(v, d) { var n = Number(v); return isFinite(n) ? n : d; }
   function d41Clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
@@ -2289,10 +2299,91 @@
       var k = el.classList.contains("d41-tx") ? "tx:" + el.getAttribute("data-tx") : "img:" + el.getAttribute("data-img");
       el.classList.toggle("sel", k === sel);
     });
+    /* v43: 다른 곳을 고르면 방금 만든 빈 글 상자를 남기지 않아요 */
+    d41PruneEmpty(sel && sel.indexOf("tx:") === 0 ? sel.slice(3) : "");
     var p = document.getElementById("d41Panel");
     if (!p) return;
     if (sel && sel.indexOf("img:") === 0) { p.hidden = false; p.innerHTML = d41ImgPanel(); d41Grow(); }
     else if (sel && sel.indexOf("tx:") === 0) { p.hidden = false; p.innerHTML = d41TextPanel(); d41Grow(); }
+  }
+
+  /* ---------------- v43: 빈 글 상자 정리 · 포커스 · 즉시 삭제 ---------------- */
+  var d41Ime = false;                     /* 한글 조합 중에는 빈 상자를 지우지 않아요 */
+  function d41EmptyText(t) { return !String(t && t.text != null ? t.text : "").replace(/\u00a0/g, " ").trim(); }
+  function d41FocusedTx() {
+    var a = document.activeElement;
+    var box = a && a.closest ? a.closest(".d41-tx") : null;
+    return box ? String(box.getAttribute("data-tx") || "") : "";
+  }
+  function d41BlurAll() {
+    var a = document.activeElement;
+    if (a && a.blur && a.classList && a.classList.contains("d41-txt")) { try { a.blur(); } catch (e) {} }
+  }
+  /* 아무 글자도 안 쓴 글 상자를 지워요 — exceptId 상자와 한글 조합 중인 상자는 남깁니다.
+     화면은 통째로 다시 그리지 않고 그 상자만 걷어내서, 끌고 있던 다른 상자는 끊기지 않아요. */
+  function d41PruneEmpty(exceptId) {
+    if (!diary || d41Ime) return 0;
+    var keep = String(exceptId || ""), gone = [];
+    diary.texts = (diary.texts || []).filter(function (t) {
+      if (t.id === keep || !d41EmptyText(t)) return true;
+      gone.push(t.id);
+      return false;
+    });
+    if (!gone.length) return 0;
+    gone.forEach(function (id) {
+      var el = document.querySelector('#d41Nodes .d41-tx[data-tx="' + id + '"]');
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+      if (diary.sel === "tx:" + id) diary.sel = null;
+    });
+    d41Grow();
+    d41Sync();
+    return gone.length;
+  }
+  /* 글 상자에 입력(키보드) — 누른 자리에 커서를 놓아요 */
+  function d41FocusText(id, x, y) {
+    var ed = document.querySelector('#d41Nodes .d41-tx[data-tx="' + id + '"] .d41-txt');
+    if (!ed) return;
+    try { ed.focus(); } catch (e) {}
+    try {
+      var rng = null;
+      if (x != null && document.caretRangeFromPoint) {
+        var r = document.caretRangeFromPoint(x, y);
+        if (r && ed.contains(r.startContainer)) rng = r;
+      }
+      if (!rng) {
+        rng = document.createRange();
+        rng.selectNodeContents(ed);
+        rng.collapse(false);
+      }
+      var sl = window.getSelection && window.getSelection();
+      if (sl) { sl.removeAllRanges(); sl.addRange(rng); }
+    } catch (e) {}
+  }
+  function d41DelText(id) {
+    if (!diary || !id) return;
+    var before = (diary.texts || []).length;
+    diary.texts = (diary.texts || []).filter(function (x) { return x.id !== id; });
+    if (diary.texts.length === before) return;
+    if (diary.sel === "tx:" + id) diary.sel = null;
+    var el = document.querySelector('#d41Nodes .d41-tx[data-tx="' + id + '"]');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+    d41Grow();
+    d41Sync();
+    d41PanelRefresh();
+    toast("글 상자를 지웠어요");
+  }
+  function d41DelImg(id) {
+    if (!diary || !id) return;
+    var before = (diary.imgs || []).length;
+    diary.imgs = (diary.imgs || []).filter(function (x) { return x.id !== id; });
+    if (diary.imgs.length === before) return;
+    if (diary.sel === "img:" + id) diary.sel = null;
+    var el = document.querySelector('#d41Nodes .d41-imgb[data-img="' + id + '"]');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+    d41Grow();
+    d41Sync();
+    d41PanelRefresh();
+    toast("사진을 지웠어요");
   }
 
   function d41SetSize(px) {
@@ -2357,7 +2448,14 @@
       '<button type="button" class="d41-pb' + (align === "left" ? " on" : "") + '" data-act="d41Align" data-align="left">왼쪽</button>' +
       '<button type="button" class="d41-pb' + (align === "center" ? " on" : "") + '" data-act="d41Align" data-align="center">가운데</button>' +
       "</div></div>";
-    h += '<div class="d41-phint">' + (cur ? "이 글 상자에 적용돼요. 끌면 옮겨져요." : "종이를 누르면 그 자리에 글을 써요.") + "</div>";
+    /* v43: 고른 글 상자는 키보드를 내린 채로 다뤄요 — 「글 수정」을 눌러야 입력(키보드) */
+    if (cur) {
+      h += '<div class="d41-prow"><span class="d41-pl">입력</span><div class="d41-pbtns">' +
+        '<button type="button" class="d41-pb on" data-act="d41Edit" data-tx="' + esc(cur.id) + '">글 수정</button>' +
+        '<button type="button" class="d41-pb" data-act="d41Blur">키보드 내리기</button>' +
+        "</div></div>";
+    }
+    h += '<div class="d41-phint">' + (cur ? "한 번 더 누르면 글을 쓸 수 있어요. 끌면 옮겨져요." : "종이를 누르면 그 자리에 글을 써요.") + "</div>";
     return h;
   }
   function d41ImgPanel() {
@@ -2437,6 +2535,8 @@
   function d41PanelOpen(mode, keepSel) {
     if (!diary) return;
     diary.mode = mode;
+    /* v43: 도구를 바꿀 때도 빈 글 상자는 남기지 않아요 (방금 만든 상자는 keepSel 로 지켜요) */
+    if (!keepSel) d41PruneEmpty("");
     /* 도구를 고르면 사진 선택은 풀려요 — 펜·글씨 칸이 제대로 열리게 (새 글 상자는 그대로) */
     if (!keepSel && diary.sel) {
       diary.sel = null;
@@ -2457,7 +2557,7 @@
   }
 
   /* ---------------- 손가락으로 끌기 / 크기 조절 ---------------- */
-  function d41Track(ev, onStart, onMove, onEnd) {
+  function d41Track(ev, onStart, onMove, onEnd, onTap) {
     var sx = ev.clientX, sy = ev.clientY, moved = false;
     function mv(e) {
       if (!moved) {
@@ -2473,12 +2573,13 @@
       document.removeEventListener("pointerup", up, true);
       document.removeEventListener("pointercancel", up, true);
       if (moved) { try { e.preventDefault(); } catch (err) {} onEnd && onEnd(e); }
+      else if (onTap) { try { e.preventDefault(); } catch (err) {} onTap(e); }
     }
     document.addEventListener("pointermove", mv, true);
     document.addEventListener("pointerup", up, true);
     document.addEventListener("pointercancel", up, true);
   }
-  function d41StartMove(node, kind, id, ev) {
+  function d41StartMove(node, kind, id, ev, onTap) {
     var paper = document.getElementById("d41Paper");
     if (!paper) return;
     var W = d41WPx();
@@ -2487,6 +2588,7 @@
     var offX = ev.clientX - r.left, offY = ev.clientY - r.top;
     var nx = 0, ny = 0;
     d41Track(ev, function () { node.classList.add("drag"); }, function (e) {
+      if (d41Pinch) return;                       /* 두 손가락으로 크기 바꾸는 중 */
       var x = d41Clamp((e.clientX - offX - pr.left) / W, 0, kind === "img" ? 0.96 : 0.9);
       var y = Math.max(0, (e.clientY - offY - pr.top) / W);
       nx = x; ny = y;
@@ -2494,11 +2596,12 @@
       node.style.top = Math.round(y * W) + "px";
     }, function () {
       node.classList.remove("drag");
+      if (d41Pinch) return;
       if (!diary) return;
       var o = (kind === "img" ? diary.imgs : diary.texts).filter(function (t) { return t.id === id; })[0];
       if (o) { o.x = nx; o.y = ny; }
       d41Grow(); d41Sync();
-    });
+    }, onTap);
   }
   function d41StartResize(id, ev) {
     var node = document.querySelector('#d41Nodes .d41-imgb[data-img="' + id + '"]');
@@ -2510,11 +2613,13 @@
     var startW = node.getBoundingClientRect().width;
     var nw = im.w;
     d41Track(ev, function () { node.classList.add("drag"); }, function (e) {
+      if (d41Pinch) return;
       var w = d41Clamp((startW + (e.clientX - ev.clientX)) / W, D41_MINW, 1 - im.x);
       nw = w;
       node.style.width = (w * 100).toFixed(2) + "%";
     }, function () {
       node.classList.remove("drag");
+      if (d41Pinch) return;
       if (diary) { im.w = nw; }
       d41Grow(); d41Sync();
     });
@@ -2522,12 +2627,16 @@
   /* 빈 종이를 누르면 그 자리에 글 상자 */
   function d41AddTextAt(x, y) {
     if (!diary) return;
+    /* v43: 종이를 다시 누를 때, 앞서 만든 빈 상자는 쌓이지 않게 걷어내요 */
+    d41CommitTexts();
+    d41PruneEmpty("");
     x = d41Clamp(x, 0, 0.72);
     y = Math.max(0, y);
     var t = { id: uid(), x: x, y: y, text: "", size: diary.tsize || 16.5,
       color: diary.tcolor || "", align: diary.talign || "left" };
     diary.texts.push(t);
     diary.sel = "tx:" + t.id;
+    d41TapKey = "tx:" + t.id; d41TapAt = Date.now();
     d41RenderNodes();
     d41PanelOpen("text", true);
     d41Sync();
@@ -2542,97 +2651,288 @@
   function d41BindCanvas() {
     var paper = document.getElementById("d41Paper");
     if (!paper) return;
+    d41BindPinch(paper);
     paper.addEventListener("pointerdown", function (ev) {
       if (!diary || diary.mode === "pen") return;
       var t = ev.target;
+      /* v43: 글·사진 상자의 × — 누르는 순간 바로 지워요.
+         (아이폰에서 입력창 포커스가 풀리며 click 이 삼켜져도 지워지도록 pointerdown 에서 처리) */
+      var xb = t.closest ? t.closest(".d41-txx, .d41-imgx") : null;
+      if (xb) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (xb.classList.contains("d41-txx")) d41DelText(String(xb.getAttribute("data-tx") || ""));
+        else d41DelImg(String(xb.getAttribute("data-img") || ""));
+        return;
+      }
       var rz = t.closest ? t.closest(".d41-rz") : null;
       if (rz) { d41StartResize(rz.getAttribute("data-rz"), ev); return; }
       var node = t.closest ? t.closest(".d41-tx, .d41-imgb") : null;
       if (node) {
         var isTx = node.classList.contains("d41-tx");
         var id = isTx ? node.getAttribute("data-tx") : node.getAttribute("data-img");
-        if (t.closest(".d41-txx, .d41-imgx")) { d41Select(isTx ? "tx:" + id : "img:" + id); return; }
-        d41Select(isTx ? "tx:" + id : "img:" + id);
-        d41StartMove(node, isTx ? "tx" : "img", id, ev);
+        var key = isTx ? "tx:" + id : "img:" + id;
+        var now = Date.now();
+        /* v43: 처음 누르면 «고르기»만 — 키보드를 내리고 아래 T 툴바가 보이게.
+           같은 상자를 짧은 사이에 한 번 더 톡 누르면(끌지 않고) 그때 입력(키보드)을 열어요. */
+        var dblTap = isTx && diary.sel === key && d41TapKey === key && (now - d41TapAt) < 520;
+        d41Select(key);
+        if (!node.isConnected) return;
+        if (isTx) {
+          ev.preventDefault();
+          if (!dblTap) d41BlurAll();
+          d41TapKey = key; d41TapAt = now;
+          d41StartMove(node, "tx", id, ev,
+            dblTap ? function (e) { d41FocusText(id, e.clientX, e.clientY); } : null);
+        } else {
+          d41StartMove(node, "img", id, ev);
+        }
         return;
       }
       if (t === paper || (t.id === "d41Nodes")) {
         ev.preventDefault();
+        d41BlurAll();
         var r = paper.getBoundingClientRect();
         d41AddTextAt((ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.width);
       }
     });
+    /* 한글 조합 중에는 빈 상자 정리를 미뤄요 */
+    paper.addEventListener("compositionstart", function (ev) {
+      if (ev.target && ev.target.classList && ev.target.classList.contains("d41-txt")) d41Ime = true;
+    }, true);
+    paper.addEventListener("compositionend", function (ev) {
+      if (ev.target && ev.target.classList && ev.target.classList.contains("d41-txt")) d41Ime = false;
+    }, true);
   }
 
-  /* ---------------- 사진 자르기 ---------------- */
-  function d41CropSelPaint() {
-    var sel = document.getElementById("d41CropSel");
-    if (!sel || !d41CropState) return;
-    var s = d41CropState.sel;
-    sel.style.left = (s.x * 100).toFixed(2) + "%";
-    sel.style.top = (s.y * 100).toFixed(2) + "%";
-    sel.style.width = (s.w * 100).toFixed(2) + "%";
-    sel.style.height = (s.h * 100).toFixed(2) + "%";
+  /* ---------------- v43: 두 손가락으로 사진 크기 (핀치) ----------------
+     선택한 사진 위에서 두 손가락을 벌리면 커지고, 오므리면 작아져요.
+     손가락 사이의 가운데 점이 제자리에 있도록 자리(x·y)도 함께 맞춥니다. */
+  function d41PinchPts(id) {
+    var out = [];
+    Object.keys(d41Pointers).forEach(function (k) {
+      var p = d41Pointers[k];
+      if (!p) return;
+      if (!id || p.id === id) out.push(p);
+    });
+    return out;
+  }
+  function d41PinchEl(id) { return document.querySelector('#d41Nodes .d41-imgb[data-img="' + id + '"]'); }
+  function d41PinchStart(id) {
+    if (!diary || !id) return;
+    var im = (diary.imgs || []).filter(function (x) { return x.id === id; })[0];
+    var el = d41PinchEl(id);
+    var ps = d41PinchPts(id);
+    if (!im || !el || ps.length < 2) return;
+    var d0 = Math.sqrt(Math.pow(ps[0].x - ps[1].x, 2) + Math.pow(ps[0].y - ps[1].y, 2));
+    if (d0 < 12) return;                       /* 아주 살짝 벌린 것은 그냥 누른 것으로 */
+    var paper = document.getElementById("d41Paper");
+    if (!paper) return;
+    var pr = paper.getBoundingClientRect();
+    var W = Math.max(1, pr.width);
+    d41Pinch = { id: id, im: im, d0: d0, w0: im.w, x0: im.x, y0: im.y,
+      mx: ((ps[0].x + ps[1].x) / 2 - pr.left) / W, my: ((ps[0].y + ps[1].y) / 2 - pr.top) / W };
+    el.classList.add("drag");
+    d41Select("img:" + id);
+  }
+  function d41PinchMove(e) {
+    var st = d41Pinch;
+    if (!st || !diary) return;
+    var ps = d41PinchPts(st.id);
+    if (ps.length < 2) return;
+    if (e && e.cancelable) e.preventDefault();
+    var d = Math.sqrt(Math.pow(ps[0].x - ps[1].x, 2) + Math.pow(ps[0].y - ps[1].y, 2));
+    if (!d || !st.d0) return;
+    var w = d41Clamp(st.w0 * (d / st.d0), D41_MINW, 1);
+    var k = w / (st.w0 || 0.0001);
+    var x = d41Clamp(st.mx - (st.mx - st.x0) * k, 0, 1 - w);
+    var y = Math.max(0, st.my - (st.my - st.y0) * k);
+    st.im.w = w; st.im.x = x; st.im.y = y;
+    var el = d41PinchEl(st.id);
+    if (el) {
+      el.style.left = (x * 100).toFixed(2) + "%";
+      el.style.top = Math.round(y * d41WPx()) + "px";
+      el.style.width = (w * 100).toFixed(2) + "%";
+    }
+    d41Grow();
+    d41Sync();
+  }
+  function d41PinchEnd() {
+    var st = d41Pinch;
+    d41Pinch = null;
+    d41Pointers = {};
+    if (!st) return;
+    var el = d41PinchEl(st.id);
+    if (el) el.classList.remove("drag");
+    d41Grow();
+    d41Sync();
+  }
+  function d41BindPinch(paper) {
+    paper.addEventListener("pointerdown", function (ev) {
+      if (!diary || diary.mode === "pen") { return; }
+      var t = ev.target;
+      var node = t.closest ? t.closest(".d41-imgb") : null;
+      var id = node ? String(node.getAttribute("data-img") || "") : "";
+      d41Pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY, id: id };
+      if (d41Pinch) {
+        if (!id && d41PinchPts(d41Pinch.id).length >= 2) d41PinchMove(ev);
+        return;
+      }
+      if (id && d41PinchPts(id).length >= 2) { d41PinchStart(id); return; }
+      /* 사진 밖에 두 번째 손가락이 닿아도, 먼저 닿은 손가락이 사진 위였으면 그 사진을 */
+      var first = "";
+      Object.keys(d41Pointers).forEach(function (k) {
+        if (!first && d41Pointers[k].id && d41Pointers[k].id !== id) first = d41Pointers[k].id;
+      });
+      if (first && Object.keys(d41Pointers).length >= 2) d41PinchStart(first);
+    }, true);
+    paper.addEventListener("pointermove", function (ev) {
+      var p = d41Pointers[ev.pointerId];
+      if (p) { p.x = ev.clientX; p.y = ev.clientY; }
+      if (d41Pinch) d41PinchMove(ev);
+    }, true);
+    function up(ev) {
+      delete d41Pointers[ev.pointerId];
+      if (d41Pinch && d41PinchPts(d41Pinch.id).length < 2) d41PinchEnd();
+    }
+    paper.addEventListener("pointerup", up, true);
+    paper.addEventListener("pointercancel", up, true);
+  }
+
+  /* ---------------- 사진 자르기 (v43) ----------------
+     「자르기」를 누르면 원본 사진 전체를 크게 보여 주고, 그 위에 자르기 테두리가 떠요.
+       · 테두리 안쪽을 끌면 옮기고, 모서리·변 손잡이를 끌면 크기가 바뀌어요
+       · 「전체」로 되돌리고 「취소」면 원본 그대로 (누르자마자 잘리지 않아요)
+       · 「적용」을 눌렀을 때만 canvas.toDataURL 로 실제로 잘라 다이어리에 반영합니다
+     ---------------------------------------------------- */
+  var D41_CROP_MIN = 0.08;
+  var D41_CROP_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+  function d41CropPaint() {
+    var st = d41CropState;
+    if (!st) return;
+    var f = document.getElementById("d41CropFrame");
+    if (!f) return;
+    var r = st.rect;
+    f.style.left = (r.x * 100).toFixed(2) + "%";
+    f.style.top = (r.y * 100).toFixed(2) + "%";
+    f.style.width = (r.w * 100).toFixed(2) + "%";
+    f.style.height = (r.h * 100).toFixed(2) + "%";
+    var o = document.getElementById("d41CropSize");
+    if (o && st.nw && st.nh) {
+      o.textContent = Math.max(1, Math.round(st.nw * r.w)) + " × " + Math.max(1, Math.round(st.nh * r.h));
+    }
+  }
+  /* 사진이 화면 안에 다 들어오는 크기로 크게 — 세로로 긴 사진도 잘리지 않게 */
+  function d41CropFit() {
+    var img = document.getElementById("d41CropImg");
+    var stage = document.getElementById("d41CropStage");
+    var st = d41CropState;
+    if (!img || !stage || !st) return;
+    var nw = img.naturalWidth || 0, nh = img.naturalHeight || 0;
+    if (!nw || !nh) return;
+    st.nw = nw; st.nh = nh;
+    var ar = nw / nh;
+    var maxW = Math.max(160, Math.min(window.innerWidth - 52, 420));
+    var maxH = Math.max(150, Math.min(window.innerHeight * 0.5, 540));
+    var w = maxW, h = maxW / ar;
+    if (h > maxH) { h = maxH; w = maxH * ar; }
+    stage.style.width = Math.max(80, Math.round(w)) + "px";
+    stage.style.height = Math.max(60, Math.round(h)) + "px";
+    d41CropPaint();
   }
   function d41OpenCrop(id) {
     if (!diary) return;
     var im = (diary.imgs || []).filter(function (x) { return x.id === id; })[0];
     if (!im) { toast("자를 사진을 먼저 골라 주세요"); return; }
-    var form = document.querySelector("#sheet form.d41");
+    var form = document.querySelector("#sheet form.d41") || document.getElementById("sheet");
     if (!form) return;
     var old = document.getElementById("d41CropWrap");
     if (old) old.remove();
+    var hs = "";
+    D41_CROP_HANDLES.forEach(function (h) {
+      hs += '<span class="d41-ch d41-ch-' + h + '" data-h="' + h + '"></span>';
+    });
     var wrap = document.createElement("div");
     wrap.className = "d41-cropwrap";
     wrap.id = "d41CropWrap";
     wrap.innerHTML = '<div class="d41-cropcard">' +
       '<div class="d41-crophd"><b>사진 자르기</b>' +
       '<button type="button" class="d41-cropx" data-crop="cancel" aria-label="닫기">' + IC.x + "</button></div>" +
-      '<div class="d41-cropbox" id="d41CropBox"><img id="d41CropImg" src="' + esc(im.src) + '" alt="자를 사진" draggable="false">' +
-      '<div class="d41-cropsel" id="d41CropSel"></div></div>' +
-      '<div class="d41-phint">사진 위를 끌어 자를 부분을 정해요.</div>' +
-      '<div class="d41-cropacts"><button type="button" class="d41-cb ghost" data-crop="reset">전체</button>' +
-      '<button type="button" class="d41-cb ghost" data-crop="cancel">취소</button>' +
-      '<button type="button" class="d41-cb" data-crop="apply">적용</button></div></div>';
+      '<div class="d41-cropstage" id="d41CropStage">' +
+        '<img id="d41CropImg" src="' + esc(im.src) + '" alt="자를 사진" draggable="false">' +
+        '<div class="d41-cropframe" id="d41CropFrame">' + hs + "</div>" +
+      "</div>" +
+      '<div class="d41-crophint"><b id="d41CropSize"></b><span>테두리를 끌어 옮기고, 모서리를 끌어 크기를 바꿔요.</span></div>' +
+      '<div class="d41-cropacts">' +
+        '<button type="button" class="d41-cb ghost" data-crop="reset">전체</button>' +
+        '<button type="button" class="d41-cb ghost" data-crop="cancel">취소</button>' +
+        '<button type="button" class="d41-cb" data-crop="apply">적용</button></div></div>';
     form.appendChild(wrap);
-    d41CropState = { id: id, im: im, sel: { x: 0, y: 0, w: 1, h: 1 } };
-    d41CropSelPaint();
-    var box = document.getElementById("d41CropBox");
-    var drawing = false;
-    box.addEventListener("pointerdown", function (ev) {
-      if (ev.target.closest("[data-crop]")) return;
+    d41CropState = { id: id, im: im, rect: { x: 0, y: 0, w: 1, h: 1 }, nw: 0, nh: 0 };
+    var imgEl = document.getElementById("d41CropImg");
+    if (imgEl) {
+      if (imgEl.complete && imgEl.naturalWidth) d41CropFit();
+      else imgEl.addEventListener("load", d41CropFit);
+    }
+    d41CropPaint();
+
+    var stage = document.getElementById("d41CropStage");
+    stage.addEventListener("pointerdown", function (ev) {
+      var st = d41CropState;
+      if (!st) return;
+      if (ev.target.closest && ev.target.closest("[data-crop]")) return;
       ev.preventDefault();
-      var r = box.getBoundingClientRect();
-      var x0 = d41Clamp((ev.clientX - r.left) / r.width, 0, 1);
-      var y0 = d41Clamp((ev.clientY - r.top) / r.height, 0, 1);
-      drawing = true;
-      d41CropState.sel = { x: x0, y: y0, w: 0.02, h: 0.02 };
-      d41CropSelPaint();
+      ev.stopPropagation();
+      var r = stage.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      var s0 = { x: st.rect.x, y: st.rect.y, w: st.rect.w, h: st.rect.h };
+      var hEl = ev.target.closest ? ev.target.closest(".d41-ch") : null;
+      var handle = hEl ? String(hEl.getAttribute("data-h") || "") : "";
+      var inFrame = !!(ev.target.closest && ev.target.closest("#d41CropFrame"));
+      var sx = d41Clamp((ev.clientX - r.left) / r.width, 0, 1);
+      var sy = d41Clamp((ev.clientY - r.top) / r.height, 0, 1);
+      var mode = handle ? "resize" : (inFrame ? "move" : "draw");
       function mv(e) {
-        if (!drawing) return;
-        var x1 = d41Clamp((e.clientX - r.left) / r.width, 0, 1);
-        var y1 = d41Clamp((e.clientY - r.top) / r.height, 0, 1);
-        d41CropState.sel = { x: Math.min(x0, x1), y: Math.min(y0, y1),
-          w: Math.max(0.04, Math.abs(x1 - x0)), h: Math.max(0.04, Math.abs(y1 - y0)) };
-        d41CropSelPaint();
+        var ax = d41Clamp((e.clientX - r.left) / r.width, 0, 1);
+        var ay = d41Clamp((e.clientY - r.top) / r.height, 0, 1);
+        var dx = ax - sx, dy = ay - sy;
+        var x1 = s0.x, y1 = s0.y, x2 = s0.x + s0.w, y2 = s0.y + s0.h;
+        if (mode === "resize") {
+          if (handle.indexOf("w") >= 0) x1 = d41Clamp(s0.x + dx, 0, x2 - D41_CROP_MIN);
+          if (handle.indexOf("e") >= 0) x2 = d41Clamp(s0.x + s0.w + dx, x1 + D41_CROP_MIN, 1);
+          if (handle.indexOf("n") >= 0) y1 = d41Clamp(s0.y + dy, 0, y2 - D41_CROP_MIN);
+          if (handle.indexOf("s") >= 0) y2 = d41Clamp(s0.y + s0.h + dy, y1 + D41_CROP_MIN, 1);
+        } else if (mode === "move") {
+          x1 = d41Clamp(s0.x + dx, 0, 1 - s0.w);
+          y1 = d41Clamp(s0.y + dy, 0, 1 - s0.h);
+          x2 = x1 + s0.w; y2 = y1 + s0.h;
+        } else {
+          /* 빈 곳을 끌면 그만큼 새로 그려요 — 그냥 톡 누르면 테두리가 그대로 (작은 조각이 생기지 않아요) */
+          x1 = Math.min(sx, ax); y1 = Math.min(sy, ay);
+          x2 = Math.max(sx, ax); y2 = Math.max(sy, ay);
+          if (x2 - x1 < D41_CROP_MIN) x2 = Math.min(1, x1 + D41_CROP_MIN);
+          if (y2 - y1 < D41_CROP_MIN) y2 = Math.min(1, y1 + D41_CROP_MIN);
+        }
+        d41CropState.rect = { x: Math.min(x1, x2), y: Math.min(y1, y2),
+          w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
+        d41CropPaint();
       }
       function up() {
-        drawing = false;
         document.removeEventListener("pointermove", mv, true);
         document.removeEventListener("pointerup", up, true);
-        var s = d41CropState.sel;
-        s.w = Math.min(s.w, 1 - s.x); s.h = Math.min(s.h, 1 - s.y);
-        d41CropSelPaint();
+        document.removeEventListener("pointercancel", up, true);
       }
       document.addEventListener("pointermove", mv, true);
       document.addEventListener("pointerup", up, true);
+      document.addEventListener("pointercancel", up, true);
     });
+
     wrap.addEventListener("click", function (ev) {
       var b = ev.target.closest ? ev.target.closest("[data-crop]") : null;
-      if (!b) return;
+      if (!b || !d41CropState) return;
       var what = b.getAttribute("data-crop");
       if (what === "cancel") { d41CloseCrop(); return; }
-      if (what === "reset") { d41CropState.sel = { x: 0, y: 0, w: 1, h: 1 }; d41CropSelPaint(); return; }
+      if (what === "reset") { d41CropState.rect = { x: 0, y: 0, w: 1, h: 1 }; d41CropPaint(); return; }
       if (what === "apply") { d41ApplyCrop(); return; }
     });
   }
@@ -2645,12 +2945,21 @@
     var st = d41CropState;
     if (!st) return;
     var imgEl = document.getElementById("d41CropImg");
-    if (!imgEl) return;
-    var s = st.sel || { x: 0, y: 0, w: 1, h: 1 };
-    var nw = imgEl.naturalWidth || 0, nh = imgEl.naturalHeight || 0;
-    if (!nw || !nh) { toast("사진을 아직 불러오지 못했어요"); return; }
-    var sx = Math.round(nw * s.x), sy = Math.round(nh * s.y);
-    var sw = Math.max(8, Math.round(nw * s.w)), sh = Math.max(8, Math.round(nh * s.h));
+    if ((!st.nw || !st.nh) && imgEl) { st.nw = imgEl.naturalWidth || 0; st.nh = imgEl.naturalHeight || 0; }
+    if (!st.nw || !st.nh || !imgEl) { toast("사진을 아직 불러오지 못했어요"); return; }
+    var r = st.rect || { x: 0, y: 0, w: 1, h: 1 };
+    var x = d41Clamp(r.x, 0, 0.98), y = d41Clamp(r.y, 0, 0.98);
+    var w = d41Clamp(r.w, 0.02, 1 - x), h = d41Clamp(r.h, 0.02, 1 - y);
+    /* 테두리를 그대로 두었으면(= 자를 부분을 안 정했으면) 사진을 건드리지 않아요 */
+    if (x < 0.004 && y < 0.004 && w > 0.992 && h > 0.992) {
+      d41CloseCrop();
+      toast("자를 부분을 먼저 정해 주세요");
+      return;
+    }
+    var nw = st.nw, nh = st.nh;
+    var sx = Math.round(nw * x), sy = Math.round(nh * y);
+    var sw = Math.max(8, Math.min(Math.round(nw * w), nw - sx));
+    var sh = Math.max(8, Math.min(Math.round(nh * h), nh - sy));
     var scale = Math.min(1, 1200 / Math.max(sw, sh));
     var cv = document.createElement("canvas");
     cv.width = Math.max(8, Math.round(sw * scale));
@@ -2660,8 +2969,12 @@
       cx.drawImage(imgEl, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
       st.im.src = cv.toDataURL("image/jpeg", 0.9);
     } catch (e) { toast("사진을 자르지 못했어요"); return; }
+    var keep = "img:" + st.id;
     d41CloseCrop();
+    if (!diary) return;
+    diary.sel = keep;
     d41RenderNodes();
+    d41Select(keep);
     toast("사진을 잘랐어요");
   }
 
@@ -2871,9 +3184,16 @@
     if (PHOTO_URLS[p.id]) return PHOTO_URLS[p.id];
     return p.src || p.url || "";
   }
-  function photoImg(p, big) {
+  /* v43: 사진첩이 빨리 뜨도록 — 썸네일은 비동기 디코딩, 화면 밖 날짜는 lazy,
+     맨 아래(가장 최근 날짜) 사진은 eager 로 바로 그려요 */
+  function photoImg(p, big, eager) {
     var src = photoSrc(p);
-    if (src) return '<img src="' + esc(src) + '" alt="' + esc(p.title || p.album || "사진") + '"' + (big ? "" : ' loading="lazy" decoding="async"') + ">";
+    if (src) {
+      var attr = big ? ' decoding="async"'
+        : (eager ? ' loading="eager" decoding="async" fetchpriority="high"'
+                 : ' loading="lazy" decoding="async"');
+      return '<img src="' + esc(src) + '" alt="' + esc(p.title || p.album || "사진") + '"' + attr + ">";
+    }
     return art(p.art, big);
   }
   function capHtml(p, cls) {
@@ -3162,10 +3482,9 @@
           '" data-id="' + p.id + '" data-day="' + esc(day) +
           '" aria-label="' + (lastCell ? "이 날 사진 " + items.length + "장 모두 보기"
             : esc(p.title || p.album || "사진") + " 크게 보기") + '">' + photoImg(p) + "</button>" +
-          plus +
-          /* v41: 사진마다 «⋯» — 정보 수정·삭제 메뉴 (댓글은 날짜 한 칸으로 모았어요) */
-          '<button class="dg-more" type="button" data-act="photoMenu" data-id="' + esc(p.id) +
-          '" aria-label="사진 메뉴" title="정보 수정·삭제">' + IC.more + "</button></div>";
+          /* v43: 사진마다 붙던 «⋯» 수정 메뉴는 없앴어요 — 날짜·기록 이름·순서·빼기·추가는
+             오른쪽 위 연필(사진 수정) 시트에서 한 번에 해요. 사진 칸에는 「+N」만. */
+          plus + "</div>";
       });
       h += "</div>";
       /* v41: 그 날짜(챕터) 사진 전체에 댓글 한 칸만 — 프사 · 「댓글 달기」 · 「등록」 */
@@ -3214,13 +3533,14 @@
     /* v39: 3일 제한 없이 사진이 있는 날을 모두 — 예전 날짜가 위, 가장 최근 날짜가 아래(아래로 쌓임) */
     groups.reverse();
     var daysHtml = "";
-    groups.forEach(function (g) {
+    groups.forEach(function (g, gi) {
+      var lastGroup = gi === groups.length - 1;      /* 맨 아래 = 가장 최근 날짜 */
       /* v40: 3장을 넘기면 마지막 사진 오른쪽 아래에 작게 「+N」 만 (날짜 줄에는 안 적어요) */
       var rest = g.items.length - PHOTOS_PER_DAY;
       var meta = "";
       /* v18: 하루는 사진 3장까지 — 넘치면 세 번째에 +N, 눌러서 그날 사진을 모두 봐요 */
       var shown = g.items.slice(0, PHOTOS_PER_DAY);
-      daysHtml += '<div class="pday"><div class="pday-hd" role="button" tabindex="0" data-act="openPhotoDay" data-date="' + g.date + '">' + photoDayLabel(g.date) +
+      daysHtml += '<div class="pday' + (lastGroup ? " pday-last" : "") + '"><div class="pday-hd" role="button" tabindex="0" data-act="openPhotoDay" data-date="' + g.date + '">' + photoDayLabel(g.date) +
         photoDayTagHtml(g.date) +
         (meta ? '<span class="c">' + meta + "</span>" : "") + "</div>" +
         '<div class="polas">' +
@@ -3231,7 +3551,7 @@
           /* v40: 사진 아래 캡션 줄은 없앴어요 — 사진만 (예전 캡션 글씨는 저장돼 있어도 안 보여요) */
           return '<button class="pola" data-act="openPhotoDay" data-date="' + g.date +
             '" aria-label="' + esc(p.album || "사진") + ' — 그날 사진 모아보기">' +
-            '<span class="pola-pic">' + photoImg(p) + more + "</span></button>";
+            '<span class="pola-pic">' + photoImg(p, false, lastGroup) + more + "</span></button>";
         }).join("") + "</div></div>";
     });
     if (!groups.length) {
@@ -4135,10 +4455,21 @@
     var bd = c.birthdays || {};
     var h = sheetHead("기념일 & 생일");
 
-    /* 1. 문구는 맨 위에서 — 라벨은 「우리는」 */
-    h += '<form class="form" id="sheetForm">' +
-      '<div class="f"><label>우리는</label><input class="field" name="phrase" value="' + esc(ddayPhrase()) + '" placeholder="소영과 준영이 함께한 지" autocomplete="off"></div>' +
-      '<div class="f"><label>처음 만난 날</label><input class="field" type="date" name="since" value="' + c.since + '" required></div>' +
+    /* v43: 두 사람 프로필 편집은 시트 맨 위에서 (아래쪽 버튼은 없앰) */
+    h += '<div class="two dday-profs">' +
+      ['me', 'you'].map(function (w) {
+        var pnm = w === "me" ? c.me : c.you;
+        return '<button type="button" class="btn-line dday-prof" data-act="personSheet" data-who="' + w + '" data-back="1">' +
+          '<span class="pr-av dday-av' + (avPic(w) ? " pic" : "") + '" style="background:' + avColor(w) + '">' + avInner(w) + "</span>" +
+          esc(pnm) + " 프로필 편집</button>";
+      }).join("") +
+      "</div>" +
+      /* 1. 「상단 문구」(왼쪽)와 「처음 만난 날」(오른쪽)을 한 줄에 — 문구는 최대 14자까지 다 보이게 */
+      '<form class="form" id="sheetForm" style="margin-top:12px">' +
+      '<div class="dday-row">' +
+      '<div class="f dday-ph-f"><label>상단 문구</label><input class="field" name="phrase" maxlength="14" value="' + esc(ddayPhrase()) + '" placeholder="소영과 준영이 함께한 지" autocomplete="off"></div>' +
+      '<div class="f dday-since-f"><label>처음 만난 날</label><input class="field" type="date" name="since" value="' + c.since + '" required></div>' +
+      "</div>" +
       '<div class="f"><label>D-day 표기</label><div class="seg seg-sm" data-group="fmt">' +
       '<button type="button" class="seg-btn' + (c.fmt === "Y" ? "" : " active") + '" data-act="fmt" data-fmt="D">일수로 · D+365일</button>' +
       '<button type="button" class="seg-btn' + (c.fmt === "Y" ? " active" : "") + '" data-act="fmt" data-fmt="Y">연·일로 · 1년 4일째</button>' +
@@ -4165,12 +4496,7 @@
         '<span class="mile-go" aria-hidden="true">›</span></button>';
     });
     h += "</div>";
-    /* v42: 생일 달력 입력칸은 없애고, 프로필 편집에서 이름·사진·생일을 함께 고쳐요 */
-    h += '<div class="two" style="margin-top:14px">' +
-      '<button type="button" class="btn-line" data-act="personSheet" data-who="me" data-back="1">' + esc(c.me) + " 프로필 편집</button>" +
-      '<button type="button" class="btn-line" data-act="personSheet" data-who="you" data-back="1">' + esc(c.you) + " 프로필 편집</button>" +
-      "</div>";
-    h += '<button class="btn-primary" type="submit" style="margin-top:10px">저장하기</button></form>';
+    h += '<button class="btn-primary" type="submit" style="margin-top:14px">저장하기</button></form>';
     return h;
   }
 
@@ -4581,14 +4907,17 @@
       /* v41: 「기록 이름」과 「날짜」를 한 줄에 나란히 — 세로 여백을 줄였어요.
          기록 이름은 늘 빈 칸에서 시작(예전에 올린 이름이 따라 올라오지 않게),
          한 시트에서 「+ 추가」로 더 담을 때는 적어 둔 값이 그대로 남아요. */
+      /* v43: 「날짜」가 왼쪽 · 「기록 이름」이 오른쪽 (한 줄) */
       '<div class="up-row">' +
-      '<div class="f up-nm-f"><label>기록 이름</label><input class="field" name="album_tag" value=""' +
-      ' placeholder="예) 경주여행" autocomplete="off"></div>' +
       '<div class="f up-date-f"><label>날짜</label><input class="field up-date" type="date" name="date" value="' +
-      dv + '" required></div></div>' +
+      dv + '" required></div>' +
+      '<div class="f up-nm-f"><label>기록 이름</label><input class="field" name="album_tag" value=""' +
+      ' placeholder="예) 경주여행" autocomplete="off"></div></div>' +
       /* v40: 「캡션」 칸은 없앴어요 — 날짜·태그·고른 사진만 남깁니다 */
-      '<div class="up-hd"><span class="up-hd-t">선택한 사진 <b id="upCount">' + pendingFiles.length + '</b>장</span>' +
+      '<div class="up-hd"><span class="up-hd-t"><i class="up-hd-lb">사진</i><span class="up-hd-c"><b id="upCount">' +
+      pendingFiles.length + "</b>장</span></span>" +
       '<button type="button" class="up-add" data-act="upAdd">' + IC.plus + " 추가</button></div>" +
+      '<p class="up-guide">사진을 눌러 끌어 옮기면 순서를 바꿀 수 있어요.</p>' +
       '<div class="up-grid" id="upList">' + photoUpRowsHtml() + "</div>" +
       '<div class="up-bar" id="upBar"><i></i></div>' +
       '<button class="btn-primary" id="upBtn" type="submit">' + pendingFiles.length + "장 담기</button></form>" +
@@ -4627,14 +4956,16 @@
     dayEdit = { day: day, items: ids.map(function (id) { return { pid: id }; }), origIds: ids.slice() };
     upMode = "day";
     return sheetHead("사진 수정") +
-      '<p class="sheet-sub">이 날짜의 사진을 고치고, ≡ 로 순서를 바꿔요.</p>' +
       '<form class="form" id="sheetForm" data-form="photoDay">' +
+      /* v43: 「날짜」가 왼쪽 · 「기록 이름」이 오른쪽 (한 줄) */
       '<div class="up-row">' +
+      '<div class="f up-date-f"><label>날짜</label><input class="field up-date" type="date" name="date" value="' + day + '" required></div>' +
       '<div class="f up-nm-f"><label>기록 이름</label><input class="field" name="album_tag" value="' + esc(dateTagOf(day)) +
-      '" placeholder="예) 경주여행" autocomplete="off"></div>' +
-      '<div class="f up-date-f"><label>날짜</label><input class="field up-date" type="date" name="date" value="' + day + '" required></div></div>' +
-      '<div class="up-hd"><span class="up-hd-t">사진 <b id="upCount">' + dayEdit.items.length + '</b>장</span>' +
+      '" placeholder="예) 경주여행" autocomplete="off"></div></div>' +
+      '<div class="up-hd"><span class="up-hd-t"><i class="up-hd-lb">사진</i><span class="up-hd-c"><b id="upCount">' +
+      dayEdit.items.length + "</b>장</span></span>" +
       '<button type="button" class="up-add" data-act="upAdd">' + IC.plus + " 추가</button></div>" +
+      '<p class="up-guide">사진을 눌러 끌어 옮기면 순서를 바꿀 수 있어요.</p>' +
       '<div class="up-grid" id="upList">' + dayEditRows() + "</div>" +
       '<button class="btn-primary" type="submit">저장하기</button></form>' +
       '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
@@ -5006,15 +5337,24 @@
       (canPic && pic ? '<button type="button" class="pr-del" data-act="clearPic" data-who="' + who + '" aria-label="프로필 사진 지우기">×</button>' : "") +
       "</div>" +
       '<div class="pr-nm"><label class="pr-lbl" for="personName">닉네임</label>' +
-      '<input class="field" id="personName" name="name" value="' + esc(nm) + '" placeholder="닉네임" required autocomplete="off"></div>' +
+      '<input class="field" id="personName" name="name" value="' + esc(nm) + '" placeholder="닉네임" required autocomplete="off">' +
+      /* v43: 상대 프로필은 상대가 직접 — 닉네임 아래에 안내 한 줄 */
+      (isMe ? "" : '<p class="sheet-sub pr-note">프로필은 상대방이 직접 설정할 수 있어요.</p>') +
+      "</div>" +
       "</div>" +
       /* v42: 생일도 프로필에서 — 기념일 시트의 생일 달력 입력칸을 대신해요 */
+      /* v43: 생일은 연·월·일까지 고르는 날짜 칸(type="date") — 고른 날짜를 바로 아래에 보여 줘요 */
       '<div class="f" style="margin-top:16px"><label>생일</label>' +
-      '<input class="field pr-bday" type="date" name="bday" value="' + bdayInput(who) + '" aria-label="' + esc(nm) + ' 생일 달력"></div>' +
-      '<p class="sheet-sub" style="margin-top:6px">홈 D-day 시트에 「6월 26일 · D-217」처럼 보여요. 연도는 표시에만 쓰고 D-day는 월·일로 세요.</p>' +
+      '<input class="field pr-bday" type="date" name="bday" min="1900-01-01" max="' + today +
+      '" value="' + bdayInput(who) + '" aria-label="' + esc(nm) + ' 생일 — 연·월·일"></div>' +
+      '<p class="sheet-sub pr-bday-txt" id="prBdayTxt">' +
+      (bdayInput(who) ? bdayFullText(bdayInput(who)) + " · " : "") +
+      "연·월·일까지 고를 수 있어요. 홈 D-day 에는 월·일로 보여요.</p>" +
       (canPic ? "" : '<div class="set-hint" style="margin-top:10px;padding:0">프로필 사진은 ' + esc(nm) + " 본인 폰에서 바꿀 수 있어요.</div>") +
-      '<button class="btn-primary" type="submit" style="margin-top:18px">저장</button></form>';
-    h += '<div class="pr-color"><span class="set-lbl">컬러</span>' + prColorRow(who) + "</div>";
+      '<button class="btn-primary" type="submit" style="margin-top:18px">저장</button></form>' +
+      /* v43: 컬러 동그라미 한 줄 — 고르면 프로필 사진 대신 그 컬러로 */
+      '<div class="pr-color"><span class="set-lbl">컬러</span>' + prColorRow(who) +
+      '<p class="sheet-sub pr-color-hint">컬러를 고르면 프로필 사진 대신 동그라미 색으로 보여요.</p></div>';
     if (!isMe) {
       /* 상대 카드: 연결 끊기 · 재연결 */
       h += '<div class="pr-link">' +
@@ -5877,22 +6217,20 @@
     if (act === "d41Color") { d41SetColor(el.getAttribute("data-color") || ""); return; }
     if (act === "d41Align") { d41SetAlign(el.getAttribute("data-align")); return; }
     if (act === "d41TxDel") {
-      if (!diary) return;
-      var d41Tid = el.getAttribute("data-tx");
-      diary.texts = diary.texts.filter(function (x) { return x.id !== d41Tid; });
-      if (diary.sel === "tx:" + d41Tid) diary.sel = null;
-      d41RenderNodes();
+      d41DelText(String(el.getAttribute("data-tx") || ""));
       return;
     }
     if (act === "d41ImgDel") {
-      if (!diary) return;
-      var d41Did = el.getAttribute("data-img");
-      diary.imgs = diary.imgs.filter(function (x) { return x.id !== d41Did; });
-      if (diary.sel === "img:" + d41Did) diary.sel = null;
-      d41RenderNodes();
-      d41PanelRefresh();
+      d41DelImg(String(el.getAttribute("data-img") || ""));
       return;
     }
+    /* v43: 고른 글 상자에 입력(키보드) / 키보드 내리기 */
+    if (act === "d41Edit") {
+      var d41Eid = String(el.getAttribute("data-tx") || "");
+      if (d41Eid) d41FocusText(d41Eid);
+      return;
+    }
+    if (act === "d41Blur") { d41BlurAll(); return; }
     if (act === "d41ImgCrop") {
       var d41Cid2 = el.getAttribute("data-img") || (d41SelImg() || {}).id || "";
       d41OpenCrop(d41Cid2);
@@ -6415,7 +6753,11 @@
     }
 
     if (act === "pickOwner") {
-      setOwnerColor(el.getAttribute("data-who") || "me", el.getAttribute("data-color") || "");
+      var poWho = el.getAttribute("data-who") || "me";
+      var poInProfile = !!(el.closest && el.closest("#sheet .pr-sws"));
+      setOwnerColor(poWho, el.getAttribute("data-color") || "");
+      /* v43: 프로필에서 컬러를 고르면 프로필 사진 대신 그 컬러 동그라미로 (사진을 다시 올리면 사진이 우선) */
+      if (poInProfile && avPic(poWho) && canEditAvatar(poWho)) setAvatarPic(poWho, "");
       toast("색을 바꿨어요");
       return;
     }
@@ -7437,6 +7779,13 @@
     if (t && t.classList && t.classList.contains("js-capall")) setCapAll(t.value);
     if (t && t.classList && t.classList.contains("js-own")) setOwnerColor(t.getAttribute("data-who") || "me", t.value);
     if (t && t.classList && t.classList.contains("js-bday")) updateBdayRow(t);
+    /* v43: 프로필 생일 — 고른 연·월·일을 바로 아래에 */
+    if (t && t.classList && t.classList.contains("pr-bday")) {
+      var prb = document.getElementById("prBdayTxt");
+      if (prb) prb.textContent = (t.value ? bdayFullText(t.value) + " · " : "") +
+        "연·월·일까지 고를 수 있어요. 홈 D-day 에는 월·일로 보여요.";
+      return;
+    }
   });
 
   /* 파일 선택 → 프로필 사진 (동그란 아바타) */

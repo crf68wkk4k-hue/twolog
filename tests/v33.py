@@ -1,6 +1,6 @@
 """투로그 v33 확인 — 노트 탭의 이모지를 걷어내고, 카테고리(탭) 설정을 쓰기 쉽게.
 
-1) 버전: sw.js 캐시 twolog-v42 · APP_VERSION v42 · My 탭 「버전 v42」
+1) 버전: sw.js 캐시 twolog-v43 · APP_VERSION v43 · My 탭 「버전 v43」
 2) 기본 탭 「메모」·「버킷리스트」·「영화·먹방」에 이모지가 없음 (예전 📝·🎯·🎬)
 3) 예전에 저장된 기본 이모지는 한 번만 정리 — 내가 넣은 다른 이모지(🌙)는 그대로
 4) + 시트: 「새 카테고리」 — 이모지 고르는 줄·안내가 없고, 이름·형식만
@@ -148,11 +148,11 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v42", 'const VERSION = "twolog-v42"' in sw,
+    check("sw.js 캐시 버전 twolog-v43", 'const VERSION = "twolog-v43"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v42", 'var APP_VERSION = "v42"' in app_js,
+    check("app.js 버전 상수 v43", 'var APP_VERSION = "v43"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v42", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v43", 'const SHELL = "shell-" + VERSION' in sw)
 
     # ==================================================================
     # 2. 기본 탭 — 이모지 없이 이름만
@@ -292,7 +292,7 @@ with sync_playwright() as p:
     # ==================================================================
     tab(page, 4, 600)
     ver = page.evaluate("((document.querySelector('#s-set .app-ver') || {}).textContent || '').trim()")
-    check("My 탭 맨 위에 「버전 v42」", ver == "버전 v42", ver)
+    check("My 탭 맨 위에 「버전 v43」", ver == "버전 v43", ver)
     page.screenshot(path=os.path.join(SHOT, "my-v33.png"))
 
     for idx, name, sid in ((0, "홈", "s-home"), (1, "캘린더", "s-cal"), (3, "사진첩", "s-photo")):

@@ -1,6 +1,6 @@
 """투로그 v27 확인 — 노트 카드 묶음(groups·gid) 동기화 · v26 기기 자동 복구 · 달력 글씨.
 
-1) 버전: sw.js 캐시 twolog-v42 · APP_VERSION v42 · sync.js 에 repairGroups
+1) 버전: sw.js 캐시 twolog-v43 · APP_VERSION v43 · sync.js 에 repairGroups
 2) 달력 아래 선택한 날 일정 글씨가 커짐(제목 16px · 이름 12.5px → v28 13.5px)
 3) v26 으로 이미 한 번 이전을 마친 폰 재현
    (원격 notes 38개에 gid·memo 없음 + settings 에 groups 없음 + twolog.migrated.<cid> 있음,
@@ -177,9 +177,9 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     sync_js = page.request.get(URL + "sync.js").text()
-    check("sw.js 캐시 버전 twolog-v42", 'const VERSION = "twolog-v42"' in sw,
+    check("sw.js 캐시 버전 twolog-v43", 'const VERSION = "twolog-v43"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:1])
-    check("app.js 버전 상수 v42", 'var APP_VERSION = "v42"' in app_js)
+    check("app.js 버전 상수 v43", 'var APP_VERSION = "v43"' in app_js)
     check("sync.js 에 gid·groups 동기화가 있음",
           "notePayload" in sync_js and 'K_GROUPS = "groups"' in sync_js and "repairGroups" in sync_js)
     ctx.close()
@@ -653,8 +653,8 @@ with sync_playwright() as p:
     check("상대 프로필 시트: 프사 변경이 잠겨 + 배지·사진 버튼이 없음",
           ps_b["plus"] == 0 and ps_b["avAct"] in (None, "none"), ps_b)
     check("상대 프로필 시트: 프사 옆에 「닉네임」 한 칸", ps_b["lbls"] == ["닉네임"], ps_b["lbls"])
-    check("상대 프로필 시트: 「컬러」 라벨 + 동그란 12색",
-          "컬러" in ps_b["text"] and ps_b["sws"] == 12 and ps_b["round"] >= 49, ps_b)
+    check("상대 프로필 시트: 컬러 판 + 닉네임 아래 안내 (v43)",
+          ps_b["sws"] == 12 and "프로필은 상대방이 직접 설정할 수 있어요" in ps_b["text"], ps_b)
     check("상대 폰에서 콘솔/스크립트 오류 없음", len(errs_b) == 0, errs_b[:3])
     ctx_b.close()
     ctx.close()
@@ -826,7 +826,7 @@ with sync_playwright() as p:
           "사진첩에서 선택" not in ps["text"] and "사진 지우기" not in ps["text"], ps["text"])
     check("프로필 시트: 프사 옆 「닉네임」 한 칸", ps["lbls"] == ["닉네임"] and ps["nameField"], ps["lbls"])
     check("프로필 시트: 「닉네임 바꾸기」 표현이 없음", "닉네임 바꾸기" not in ps["text"], ps["text"])
-    check("프로필 시트: 「컬러」 라벨", ps["colorLbl"] == ["컬러"], ps["colorLbl"])
+    check("프로필 시트: 「컬러」 라벨 (v43 한 줄 팔레트)", ps["colorLbl"] == ["컬러"], ps["colorLbl"])
     check("프로필 시트: 이름+컬러 표기·네모 컬러 미리보기가 없음",
           ps["ownNm"] == 0 and ps["ownChip"] == 0 and "컬러 #" not in ps["text"], (ps["ownNm"], ps["ownChip"]))
     MUTED_RGB = ["rgb(242, 207, 201)", "rgb(222, 162, 166)", "rgb(221, 120, 91)", "rgb(234, 153, 77)",
@@ -911,13 +911,14 @@ with sync_playwright() as p:
     }""")
     check("취소를 누르면 저장하지 않고 닫힘", (not cancelled["overlay"]) and cancelled["len"] == before_len, cancelled)
 
-    # ---- 7-3. 컬러를 고르면 그 색으로 저장
+    # ---- 7-3. 컬러를 고르면 그 색으로 저장 (v43: 프로필 사진이 있으면 색으로 바뀜)
     page.evaluate("""() => { const b = document.querySelectorAll('#sheet .pr-sws .sw')[3]; b.click(); }""")
     page.wait_for_timeout(600)
     col = page.evaluate("""() => ({
       colors: (window.TwoLogUI.state.couple.colors || {}).me,
       sched: (window.TwoLogUI.state.couple.sched || {}).me,
-      sel: document.querySelectorAll('#sheet .pr-sws .sw.sel').length}) """)
+      sel: document.querySelectorAll('#sheet .pr-sws .sw.sel').length,
+      pic: !!((window.TwoLogUI.state.couple.pics || {}).me)}) """)
     check("컬러를 고르면 프로필·일정 색으로 저장되고 하나만 선택 표시",
           col["colors"] == "#EA994D" and col["sched"] == "#EA994D" and col["sel"] == 1, col)
 
@@ -934,8 +935,15 @@ with sync_playwright() as p:
           nick["me"] == "소영이" and nick["stored"] == "소영이" and not nick["sheet"], nick)
 
     # ---- 7-5. 사진 지우기는 프사 위 작은 × 로 (글씨 버튼 없이)
+    #      v43: 컬러를 고르면 사진이 색으로 바뀌므로, 사진을 다시 올린 뒤 × 로 지웁니다
     page.locator('#s-set [data-act="personSheet"][data-who="me"]').click()
     page.wait_for_timeout(450)
+    with page.expect_file_chooser() as fc3:
+        page.locator("#sheet .pr-avbtn").click()
+    fc3.value.set_files(JPG)
+    page.wait_for_timeout(900)
+    page.locator("#avcApply").click()
+    page.wait_for_timeout(800)
     page.locator("#sheet .pr-del").click()
     page.wait_for_timeout(700)
     cleared = page.evaluate("""() => {

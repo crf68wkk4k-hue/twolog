@@ -1,6 +1,6 @@
 """투로그 v41 확인 — 모눈 메모가 «모눈종이 풀스크린 다이어리»로 바뀐 것 + + 시트 문구 정리.
 
-1) 버전: sw.js 캐시 twolog-v42 · APP_VERSION v42 · My 탭 「버전 v42」
+1) 버전: sw.js 캐시 twolog-v43 · APP_VERSION v43 · My 탭 「버전 v43」
 2) + 시트 문구 정리
    - 고른 카테고리 아래 패널 제목은 「속지 · 이름」 (「속지 레이아웃」 아님)
    - 기본 카테고리(메모·버킷리스트·영화·먹방)의 배지와 첫 선택지도 「투두리스트」
@@ -207,9 +207,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v42", 'const VERSION = "twolog-v42"' in sw,
+    check("sw.js 캐시 버전 twolog-v43", 'const VERSION = "twolog-v43"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v42", 'var APP_VERSION = "v42"' in app_js,
+    check("app.js 버전 상수 v43", 'var APP_VERSION = "v43"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -222,7 +222,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v42」", ver.strip() == "버전 v42", ver)
+    check("My 탭 맨 위에 「버전 v43」", ver.strip() == "버전 v43", ver)
 
     # ==================================================================
     # 2. + 시트 문구 — 「속지」 · 기본 카테고리도 「투두리스트」
@@ -436,10 +436,13 @@ with sync_playwright() as p:
     page.locator("#d41Panel [data-act=d41ImgCrop]").first.click()
     page.wait_for_timeout(500)
     crop_open = page.evaluate("!!document.getElementById('d41CropWrap')")
-    cb = page.locator("#d41CropBox").bounding_box()
-    page.mouse.move(cb["x"] + 20, cb["y"] + 16)
+    # v43: 자르기 테두리(손잡이)를 끌어 영역을 정해요 — 그냥 누르면 사진은 그대로
+    hb = page.evaluate("""() => { const f = document.getElementById('d41CropFrame').getBoundingClientRect();
+      const h = document.querySelector('#d41CropWrap .d41-ch-se').getBoundingClientRect();
+      return [h.x + h.width / 2, h.y + h.height / 2, f.x, f.y, f.width, f.height]; }""")
+    page.mouse.move(hb[0], hb[1])
     page.mouse.down()
-    page.mouse.move(cb["x"] + cb["width"] * 0.6, cb["y"] + cb["height"] * 0.6, steps=6)
+    page.mouse.move(hb[2] + hb[4] * 0.6, hb[3] + hb[5] * 0.6, steps=6)
     page.mouse.up()
     page.wait_for_timeout(260)
     before = page.evaluate("""() => { const i = document.querySelector('#sheet .d41-imgb img');
@@ -522,8 +525,11 @@ with sync_playwright() as p:
     page.screenshot(path=os.path.join(SHOT, "_p41-test-reopen.png"))
 
     # 이어 쓰기 · 사진 한 장 삭제
+    # v43: 한 번 누르면 «고르기»만 — 한 번 더 톡 누르면 입력(키보드)
     page.locator("#sheet .d41-tx .d41-txt").first.click()
-    page.wait_for_timeout(200)
+    page.wait_for_timeout(60)
+    page.locator("#sheet .d41-tx .d41-txt").first.click()
+    page.wait_for_timeout(260)
     page.keyboard.press("End")
     page.keyboard.type(" 저녁엔 산책")
     page.wait_for_timeout(260)
@@ -801,8 +807,8 @@ with sync_playwright() as p:
     pageA.set_input_files("#photoInput", many)
     pageA.wait_for_timeout(1100)
     g0 = pageA.evaluate("""() => {
-      const a = document.querySelector('#sheet input[name=album_tag]');
-      const b = document.querySelector('#sheet input[name=date]');
+      const a = document.querySelector('#sheet input[name=date]');
+      const b = document.querySelector('#sheet input[name=album_tag]');
       const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
       const cells = [...document.querySelectorAll('#sheet .up-cell')];
       const grid = document.querySelector('#sheet #upList');
@@ -812,10 +818,10 @@ with sync_playwright() as p:
               cols: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
               rows: new Set(cells.map(c => Math.round(c.getBoundingClientRect().top))).size,
               add: !!document.querySelector('#sheet .up-add')}; }""")
-    check("사진 추가 시트 — 「기록 이름」·「날짜」가 한 줄에 나란히",
-          g0["labels"] == ["기록 이름", "날짜"] and g0["sameRow"], g0)
-    check("고른 사진은 한 줄에 6개씩 들어가는 네모 그리드 (7장 → 두 줄)",
-          g0["cells"] == 7 and g0["cols"] == 6 and g0["rows"] == 2 and g0["xs"] == 7, g0)
+    check("사진 추가 시트 — 「날짜」(왼쪽)·「기록 이름」(오른쪽)이 한 줄에 나란히 (v43)",
+          g0["labels"] == ["날짜", "기록 이름"] and g0["sameRow"], g0)
+    check("고른 사진은 한 줄에 5개씩 들어가는 네모 그리드 (7장 → 두 줄) — v43",
+          g0["cells"] == 7 and g0["cols"] == 5 and g0["rows"] == 2 and g0["xs"] == 7, g0)
     pageA.screenshot(path=os.path.join(SHOT, "photo-v41-editgrid.png"))
 
     pageA.evaluate("() => document.querySelectorAll('#sheet .up-cell').forEach((c, i) => c.dataset.mk = 'abcdefg'[i])")
@@ -841,22 +847,22 @@ with sync_playwright() as p:
     ed0 = pageA.evaluate("""() => ({cells: document.querySelectorAll('#s-photo .dg-cell').length,
       more: document.querySelectorAll('#s-photo .dg-more').length,
       blocks: document.querySelectorAll('#s-photo .dcmt').length}) """)
-    check("날짜 모아보기 — 사진 칸마다 ⋯ 메뉴, 댓글 칸은 하나",
-          ed0["cells"] >= 3 and ed0["more"] == ed0["cells"] and ed0["blocks"] == 1, ed0)
+    check("날짜 모아보기 — 사진 칸마다 ⋯ 메뉴 없이 사진만(v43), 댓글 칸은 하나",
+          ed0["cells"] >= 3 and ed0["more"] == 0 and ed0["blocks"] == 1, ed0)
     pageA.locator('#s-photo [data-act="editPhotoDay"]').click()
     pageA.wait_for_timeout(700)
     ed1 = pageA.evaluate("""() => ({
       labels: [...document.querySelectorAll('#sheet .up-row label')].map(l => l.textContent),
-      sameRow: (() => { const a = document.querySelector('#sheet input[name=album_tag]');
-        const b = document.querySelector('#sheet input[name=date]');
+      sameRow: (() => { const a = document.querySelector('#sheet input[name=date]');
+        const b = document.querySelector('#sheet input[name=album_tag]');
         const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
         return Math.abs(ra.top - rb.top) < 4 && ra.right <= rb.left; })(),
       cells: document.querySelectorAll('#sheet .up-cell').length,
       xs: document.querySelectorAll('#sheet .up-cell .up-x').length,
       cols: getComputedStyle(document.querySelector('#sheet #upList')).gridTemplateColumns.split(' ').length}) """)
-    check("사진 수정 시트도 「기록 이름」·「날짜」 한 줄 · 6열 그리드 · 칸마다 ×",
-          ed1["labels"] == ["기록 이름", "날짜"] and ed1["sameRow"]
-          and ed1["cells"] == ed0["cells"] and ed1["xs"] == ed1["cells"] and ed1["cols"] == 6, ed1)
+    check("사진 수정 시트도 「날짜」·「기록 이름」 한 줄 · 5열 그리드 · 칸마다 × (v43)",
+          ed1["labels"] == ["날짜", "기록 이름"] and ed1["sameRow"]
+          and ed1["cells"] == ed0["cells"] and ed1["xs"] == ed1["cells"] and ed1["cols"] == 5, ed1)
     pageA.keyboard.press("Escape")
     pageA.wait_for_timeout(400)
     check("브라우저 콘솔/페이지 오류 없음 (사진 시트)", len(errsA) == 0, errsA[:4])

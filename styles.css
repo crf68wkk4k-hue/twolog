@@ -442,6 +442,8 @@ html[data-mode="dark"] .segs .seg-btn.active{background:var(--ink); border-color
 .album-hd .c{font-size:11px; color:var(--ink-3)}
 /* 사진첩 날짜 머리글 */
 .pday{margin:0}
+/* v43: 사진첩 목록 — 화면 밖 날짜 블록은 그리기를 미뤄 탭 전환이 빠르게 (최근 날짜는 바로) */
+#s-photo .pdays .pday:not(.pday-last){content-visibility:auto; contain-intrinsic-size:auto 260px}
 .pday-hd{display:flex; align-items:baseline; gap:5px; padding:0 20px; margin-bottom:10px}
 .pday-hd .d{font-size:15px; font-weight:800; letter-spacing:-.03em; color:var(--ink)}
 .pday-hd .d.acc{color:var(--accent)}
@@ -517,8 +519,14 @@ html[data-mode="dark"] .pview .pv-nav{background:rgba(40,40,44,.86); color:#F2F2
 .own-pick input::-webkit-color-swatch{border:0}
 .own-sws{display:flex; flex-wrap:wrap; gap:7px; margin-top:9px}
 .osw{width:24px; height:24px; flex:0 0 24px}
+.pr-note{margin-top:6px; font-size:11.5px; line-height:1.5}
+/* v43: 프로필 컬러 동그라미 — 한 줄로 깔끔하게 */
 .pr-color{margin-top:16px; padding-top:14px; border-top:1px solid var(--line-2)}
 .pr-color .set-lbl{display:block; margin-bottom:2px}
+.pr-color-hint{font-size:11px; color:var(--ink-3); line-height:1.5; margin:6px 0 0}
+#sheet .pr-sws{display:flex; flex-wrap:nowrap; gap:7px; margin-top:8px; max-width:none}
+#sheet .pr-sws .rsw{width:100%; height:auto; min-width:0; flex:1 1 0; aspect-ratio:1/1 !important; border-radius:50% !important}
+#sheet .pr-sws .rsw.sel{box-shadow:inset 0 0 0 2px var(--surface), 0 0 0 1.6px var(--ink)}
 .cp-foot{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:11px}
 .cp-pick{display:inline-flex; align-items:center; gap:8px; height:34px; padding:0 11px 0 6px; border:1px solid var(--line); font-size:11.5px; font-weight:600; color:var(--ink-2); letter-spacing:-.01em}
 .cp-pick input[type=color]{-webkit-appearance:none; appearance:none; width:22px; height:22px; border:0; padding:0; background:none; border-radius:0; cursor:pointer}
@@ -1556,8 +1564,13 @@ html[data-mode="dark"] .fdate{color-scheme:dark}
    ========================================================================== */
 #sheet .up-date{width:100%; box-sizing:border-box; max-width:100%}
 .up-hd{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:4px}
-.up-hd-t{font-size:12px; font-weight:700; color:var(--ink-2); letter-spacing:-.01em}
-.up-hd-t b{font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums}
+/* v43: 「사진」은 위 라벨(날짜·기록 이름)과 같은 글씨, 「N장」은 지금 크기 그대로 */
+.up-hd-t{display:flex; align-items:baseline; gap:6px}
+.up-hd-lb{font-style:normal; font-size:var(--lbl-fs); font-weight:var(--lbl-fw); color:var(--ink); letter-spacing:-.01em}
+.up-hd-c{font-size:12px; font-weight:700; color:var(--ink-2); letter-spacing:-.01em}
+.up-hd-c b{font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums}
+/* v43: 사진을 끌어 순서 바꾸는 안내 — 사진 N장 줄과 그리드 사이 */
+.up-guide{font-size:11.5px; color:var(--ink-3); letter-spacing:-.01em; line-height:1.5; margin:6px 0 0}
 .up-add{display:flex; align-items:center; gap:4px; height:32px; padding:0 12px; border:1px solid var(--line);
   background:var(--surface); color:var(--ink); font-size:12px; font-weight:700; letter-spacing:-.01em; cursor:pointer}
 .up-add svg{width:13px; height:13px}
@@ -2162,7 +2175,7 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 .up-nm-f{flex:1 1 auto !important}
 .up-date-f{flex:0 0 132px !important}
 .up-date-f .up-date{font-variant-numeric:tabular-nums}
-.up-grid{display:grid; grid-template-columns:repeat(6, 1fr); gap:6px; margin-top:6px}
+.up-grid{display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; margin-top:6px}
 .up-cell{
   position:relative; aspect-ratio:1 / 1; overflow:hidden; background:var(--surface-2);
   border-radius:8px !important; touch-action:none; cursor:grab;
@@ -2192,14 +2205,8 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 #s-photo .pbody{padding-top:2px}
 /* v41: 사진 칸 안의 사진은 브라우저 기본 끌기를 끄고 (칸 끌기만 살아 있게) */
 .up-cell img{-webkit-user-drag:none; user-drag:none; pointer-events:none}
-/* v41: 날짜 모아보기 사진 칸 오른쪽 위 «⋯» (정보 수정·삭제) */
+/* v43: 사진 칸 오른쪽 위 «⋯» 메뉴는 없앴어요 (위 연필 아이콘 시트에서 모두) — 칸은 「+N」 배지만 */
 .dgrid > .dg-wrap{position:relative; display:block; width:100%}
-.dg-more{
-  position:absolute; top:3px; right:3px; width:24px; height:24px; display:flex; align-items:center;
-  justify-content:center; border:0 !important; border-radius:50% !important;
-  background:rgba(20,20,22,.5); color:#FFFFFF; cursor:pointer; z-index:2; padding:0
-}
-.dg-more svg{width:14px; height:14px}
 /* v42: 날짜 모아보기는 화면 꼭대기에 바짝 붙지 않게 두 칸(약 30px) 정도 내려서 시작 */
 #s-photo .hdr.hdr-min.dgal-hd{margin-top:30px}
 /* v42: 날짜 모아보기 9장(3×3) 제한 — 9번째 칸 오른쪽 아래 작은 「+N」(누르면 나머지 펼치기) */
@@ -2227,12 +2234,14 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
   white-space:pre-wrap; word-break:break-word; letter-spacing:-.01em; caret-color:var(--ink)}
 #sheet .d41-txt:empty:before{content:attr(data-ph); color:var(--ink-3)}
 #sheet .d41-tx.sel .d41-txt{outline:1.5px dashed var(--ink-3); outline-offset:4px; border-radius:8px}
+/* v43: × 삭제 버튼 — 손가락으로 누르기 좋게 30px, touch-action 으로 끌기·확대와 엉키지 않게 */
 #sheet .d41-txx{
-  position:absolute; top:-11px; right:-11px; width:22px; height:22px; display:none;
+  position:absolute; top:-15px; right:-15px; width:30px; height:30px; display:none;
   align-items:center; justify-content:center; border:0 !important; border-radius:50% !important;
-  background:rgba(20,20,22,.72); color:#FFFFFF; padding:0; cursor:pointer; z-index:3
+  background:rgba(20,20,22,.72); color:#FFFFFF; padding:0; cursor:pointer; z-index:4;
+  touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none
 }
-#sheet .d41-txx svg{width:11px; height:11px}
+#sheet .d41-txx svg{width:13px; height:13px}
 #sheet .d41-tx.sel .d41-txx{display:flex}
 #sheet .d41-imgb{position:absolute; pointer-events:auto; z-index:2; touch-action:none}
 #sheet .d41-imgb.drag{opacity:.9}
@@ -2240,11 +2249,12 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
   background:var(--surface-2); -webkit-user-drag:none; user-drag:none; pointer-events:none}
 #sheet .d41-imgb.sel img{outline:1.5px dashed var(--ink-3); outline-offset:3px}
 #sheet .d41-imgx{
-  position:absolute; top:-10px; right:-10px; width:24px; height:24px; display:none;
+  position:absolute; top:-15px; right:-15px; width:30px; height:30px; display:none;
   align-items:center; justify-content:center; border:0 !important; border-radius:50% !important;
-  background:rgba(20,20,22,.72); color:#FFFFFF; padding:0; cursor:pointer; z-index:3
+  background:rgba(20,20,22,.72); color:#FFFFFF; padding:0; cursor:pointer; z-index:4;
+  touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none
 }
-#sheet .d41-imgx svg{width:12px; height:12px}
+#sheet .d41-imgx svg{width:13px; height:13px}
 #sheet .d41-imgb.sel .d41-imgx{display:flex}
 #sheet .d41-rz{
   position:absolute; right:-9px; bottom:-9px; width:22px; height:22px; display:none;
@@ -2259,32 +2269,58 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 #sheet .d41-pv{flex:0 0 44px; text-align:right; font-size:11.5px; font-weight:700; color:var(--ink-3);
   font-variant-numeric:tabular-nums}
 #sheet .d41-phint{font-size:11px; color:var(--ink-3); line-height:1.6; margin:2px 0 4px}
-/* 사진 자르기 창 */
+/* v43: 사진 자르기 창 — 화면 전체 덮개(스크롤 위치와 상관없이 늘 보이게) + 손잡이 있는 자르기 테두리 */
 .d41-cropwrap{
-  position:absolute; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
-  padding:18px; background:rgba(10,10,12,.6); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px)
+  position:fixed; inset:0; z-index:90; display:flex; align-items:center; justify-content:center;
+  padding:14px; background:rgba(10,10,12,.66); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px)
 }
 .d41-cropcard{
-  width:100%; max-width:360px; background:var(--surface); border-radius:16px !important;
-  padding:14px; box-shadow:0 18px 40px rgba(0,0,0,.28)
+  width:100%; max-width:420px; max-height:calc(100vh - 28px); overflow-y:auto;
+  background:var(--surface); border-radius:16px !important; padding:14px;
+  box-shadow:0 18px 40px rgba(0,0,0,.28)
 }
 .d41-crophd{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px}
 .d41-crophd b{font-size:14px; letter-spacing:-.02em}
-.d41-cropx{width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+.d41-cropx{width:32px; height:32px; display:flex; align-items:center; justify-content:center;
   border:0 !important; border-radius:50% !important; background:var(--surface-2); color:var(--ink); padding:0}
 .d41-cropx svg{width:13px; height:13px}
-.d41-cropbox{
-  position:relative; width:100%; overflow:hidden; border-radius:12px !important;
-  background:var(--surface-2); touch-action:none; line-height:0
+.d41-cropstage{
+  position:relative; overflow:hidden; margin:0 auto; border-radius:10px; background:#0F0F11;
+  touch-action:none; line-height:0; user-select:none; -webkit-user-select:none
 }
-.d41-cropbox img{width:100%; height:auto; display:block; pointer-events:none}
-.d41-cropsel{
-  position:absolute; left:0; top:0; width:100%; height:100%;
-  border:2px solid #FFFFFF; box-shadow:0 0 0 9999px rgba(10,10,12,.45);
-  border-radius:2px; pointer-events:none
+.d41-cropstage img{
+  display:block; width:100%; height:100%; object-fit:cover; pointer-events:none;
+  -webkit-user-drag:none; user-drag:none
 }
+.d41-cropframe{
+  position:absolute; left:0; top:0; width:100%; height:100%; box-sizing:border-box;
+  border:2px solid #FFFFFF; box-shadow:0 0 0 9999px rgba(10,10,12,.52);
+  touch-action:none; cursor:move
+}
+.d41-ch{
+  position:absolute; width:26px; height:26px; touch-action:none; z-index:2
+}
+.d41-ch:after{
+  content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:12px; height:12px; border-radius:3px; background:#FFFFFF; box-shadow:0 1px 3px rgba(0,0,0,.45)
+}
+.d41-ch-nw{left:0; top:0; cursor:nwse-resize}
+.d41-ch-ne{right:0; top:0; cursor:nesw-resize}
+.d41-ch-se{right:0; bottom:0; cursor:nwse-resize}
+.d41-ch-sw{left:0; bottom:0; cursor:nesw-resize}
+.d41-ch-n{left:50%; top:0; margin-left:-13px; cursor:ns-resize}
+.d41-ch-s{left:50%; bottom:0; margin-left:-13px; cursor:ns-resize}
+.d41-ch-w{left:0; top:50%; margin-top:-13px; cursor:ew-resize}
+.d41-ch-e{right:0; top:50%; margin-top:-13px; cursor:ew-resize}
+.d41-ch-n:after,.d41-ch-s:after{width:18px; height:6px; border-radius:3px}
+.d41-ch-w:after,.d41-ch-e:after{width:6px; height:18px; border-radius:3px}
+.d41-crophint{
+  display:flex; align-items:center; gap:8px; margin:8px 0 2px; font-size:11px;
+  color:var(--ink-3); line-height:1.5
+}
+.d41-crophint b{flex:0 0 auto; font-size:11.5px; font-weight:700; color:var(--ink-2); font-variant-numeric:tabular-nums}
 .d41-cropacts{display:flex; gap:8px; margin-top:12px}
-.d41-cb{flex:1 1 0; height:42px; border:1px solid var(--ink) !important; border-radius:10px !important;
+.d41-cb{flex:1 1 0; height:44px; border:1px solid var(--ink) !important; border-radius:10px !important;
   background:var(--ink); color:var(--bg); font-family:inherit; font-size:13px; font-weight:700; cursor:pointer}
 .d41-cb.ghost{background:none; color:var(--ink); border-color:var(--line) !important}
 
@@ -2305,3 +2341,17 @@ html[data-mode="dark"] .d41-new,html[data-mode="dark"] .d41-save{background:var(
 
 /* v42: 노트 카드 미리보기 — 5개까지, 넘치면 「+N개 더」 */
 .ncard .nc-items .nc-more{font-size:11px; font-weight:700; color:var(--ink-3); letter-spacing:-.01em; margin-top:6px}
+
+/* ==========================================================================
+   v43 — 기념일 & 생일 시트: 프로필 편집은 맨 위, 「상단 문구」+「처음 만난 날」은 한 줄
+   ========================================================================== */
+#sheet .dday-profs{margin-top:2px}
+/* 프로필 편집 버튼 앞에 각자 동그라미 프사 */
+#sheet .dday-prof{display:flex; align-items:center; justify-content:center; gap:7px}
+#sheet .dday-av{width:22px; height:22px; flex:0 0 auto; font-size:10px}
+#sheet .dday-row{display:flex; align-items:flex-end; gap:8px}
+#sheet .dday-row .f{margin:0; min-width:0}
+#sheet .dday-ph-f{flex:1 1 auto}
+#sheet .dday-since-f{flex:0 0 128px}
+/* 최대 14자가 한 번에 다 보이도록 문구 칸만 글씨를 살짝 줄여요 */
+#sheet .dday-ph-f .field{font-size:13px; padding:0 10px; letter-spacing:-.02em}

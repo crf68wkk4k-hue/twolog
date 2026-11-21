@@ -142,13 +142,15 @@ with sync_playwright() as p:
     page.wait_for_timeout(420)
     left2 = page.evaluate("Math.round(document.querySelector('#sheet .pv40-strip').scrollLeft)")
     check("되돌아오면 첫 사진", left2 <= 4, left2)
-    # 사진 정보 수정은 모아보기의 ⋯ 메뉴에서 (크게 보기에는 아무 버튼도 없어요)
+    # v43: 사진마다 ⋯ 메뉴는 없앴어요 — 크게 보기에는 아무 버튼도 없고,
+    #      날짜·기록 이름·순서·빼기·추가는 모아보기 오른쪽 위 연필(사진 수정) 시트에서 해요
     page.locator("#sheet .pv40-slide").first.click()
-    page.wait_for_timeout(500)
-    page.locator('#s-photo [data-act="photoMenu"]').first.click()
-    page.wait_for_timeout(500)
-    check("사진 정보 수정·삭제는 ⋯ 메뉴에 그대로",
-          page.locator('#sheet [data-act="photoEdit"]').count() == 1 and page.locator('#sheet [data-act="photoDelete"]').count() == 1)
+    page.wait_for_timeout(600)
+    check("크게 보기에는 수정·삭제 버튼이 없음", page.locator('#sheet [data-act="photoDelete"]').count() == 0)
+    page.locator('#s-photo [data-act="editPhotoDay"]').first.click()
+    page.wait_for_timeout(600)
+    check("날짜 사진 수정 시트에서 사진을 뺄 수 있음 (⋯ 메뉴 대신)",
+          page.locator('#sheet [data-act="upDel"]').count() >= 1)
     page.keyboard.press("Escape")
     page.wait_for_timeout(300)
 

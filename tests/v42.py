@@ -1,6 +1,6 @@
 """투로그 v42 확인 — 「기념일 & 생일」 시트 정리 + 프로필 편집에서 생일 고치기.
 
-1) 버전: sw.js 캐시 twolog-v42 · APP_VERSION v42 · My 탭 「버전 v42」
+1) 버전: sw.js 캐시 twolog-v43 · APP_VERSION v43 · My 탭 「버전 v43」
 2) 기념일 & 생일 시트 (홈 D-day 카드를 눌러 열기)
    - 「홈 D-day 위에 이 문구가 그대로 보여요.」 안내 문구가 사라짐
    - 아래쪽 생일 달력 입력칸(.bd-in.js-bday) 두 개가 사라짐 · 「고른 생일은 바로 위에 …」 안내도 사라짐
@@ -128,9 +128,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v42", 'const VERSION = "twolog-v42"' in sw,
+    check("sw.js 캐시 버전 twolog-v43", 'const VERSION = "twolog-v43"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v42", 'var APP_VERSION = "v42"' in app_js,
+    check("app.js 버전 상수 v43", 'var APP_VERSION = "v43"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -143,7 +143,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v42」", ver.strip() == "버전 v42", ver)
+    check("My 탭 맨 위에 「버전 v43」", ver.strip() == "버전 v43", ver)
 
     tab(page, 0, 520)
 
@@ -154,7 +154,7 @@ with sync_playwright() as p:
     sheet_txt = page.locator("#sheet").inner_text()
     check("「홈 D-day 위에 이 문구가 그대로 보여요.」 문구 없음",
           "홈 D-day 위에 이 문구가 그대로 보여요" not in sheet_txt, sheet_txt[:160])
-    check("「우리는」 입력칸은 그대로", page.locator('#sheetForm input[name="phrase"]').count() == 1)
+    check("「상단 문구」 입력칸은 그대로 (v43 에서 이름만 바뀜)", page.locator('#sheetForm input[name="phrase"]').count() == 1)
     check("처음 만난 날 입력칸은 그대로", page.locator('#sheetForm input[name="since"]').count() == 1)
 
     bd_inputs = page.evaluate("""() => ({
@@ -615,10 +615,13 @@ with sync_playwright() as p:
     page4.locator("#d41Panel [data-act=d41ImgCrop]").first.click()
     page4.wait_for_timeout(500)
     crop4 = page4.evaluate("!!document.getElementById('d41CropWrap')")
-    cb4 = page4.locator("#d41CropBox").bounding_box()
-    page4.mouse.move(cb4["x"] + 18, cb4["y"] + 14)
+    # v43: 자르기 창은 테두리(손잡이)를 끌어 영역을 정해요
+    hb4 = page4.evaluate("""() => { const f = document.getElementById('d41CropFrame').getBoundingClientRect();
+      const h = document.querySelector('#d41CropWrap .d41-ch-se').getBoundingClientRect();
+      return [h.x + h.width / 2, h.y + h.height / 2, f.x, f.y, f.width, f.height]; }""")
+    page4.mouse.move(hb4[0], hb4[1])
     page4.mouse.down()
-    page4.mouse.move(cb4["x"] + cb4["width"] * 0.55, cb4["y"] + cb4["height"] * 0.55, steps=6)
+    page4.mouse.move(hb4[2] + hb4[4] * 0.55, hb4[3] + hb4[5] * 0.55, steps=6)
     page4.mouse.up()
     page4.wait_for_timeout(260)
     nat4a = page4.evaluate("""() => { const i = document.querySelector('#sheet .d41-imgb img'); return [i.naturalWidth, i.naturalHeight]; }""")

@@ -1,6 +1,6 @@
 """투로그 v40 확인 — 투두리스트 속지의 2열 카드 묶음 + 카테고리 줄 아래 속지 아코디언 + 모눈 메모.
 
-1) 버전: sw.js 캐시 twolog-v42 · APP_VERSION v42 · My 탭 「버전 v42」
+1) 버전: sw.js 캐시 twolog-v43 · APP_VERSION v43 · My 탭 「버전 v43」
 2) + 시트 — 속지 레이아웃이 목록 맨 아래가 아니라 «카테고리 줄 바로 아래»로 펼쳐짐
    - 처음엔 접힘 · 줄을 누르면 그 줄 바로 아래에 2×2 · 다른 줄을 누르면 이전 줄은 접힘
    - 같은 줄을 한 번 더 누르면 접힘 · 「추가」로 붙인 줄은 바로 펼쳐짐
@@ -189,9 +189,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v42", 'const VERSION = "twolog-v42"' in sw,
+    check("sw.js 캐시 버전 twolog-v43", 'const VERSION = "twolog-v43"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v42", 'var APP_VERSION = "v42"' in app_js,
+    check("app.js 버전 상수 v43", 'var APP_VERSION = "v43"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -204,7 +204,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v42」", ver.strip() == "버전 v42", ver)
+    check("My 탭 맨 위에 「버전 v43」", ver.strip() == "버전 v43", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄 아래로 펼쳐지는 속지 레이아웃 (아코디언)
@@ -771,8 +771,8 @@ with sync_playwright() as p:
       xs: document.querySelectorAll('#sheet .up-grid .up-cell .up-x').length,
       cols: getComputedStyle(document.querySelector('#sheet #upList')).gridTemplateColumns.split(' ').length,
       btn: (document.querySelector('#sheet #upBtn') || {}).textContent || ''})""")
-    check("고른 사진이 6열 네모 칸으로 (사진 3장 · 칸마다 ×)",
-          up0["rows"] == 3 and up0["xs"] == 3 and up0["cols"] == 6, up0)
+    check("고른 사진이 5열 네모 칸으로 (사진 3장 · 칸마다 ×) — v43",
+          up0["rows"] == 3 and up0["xs"] == 3 and up0["cols"] == 5, up0)
     page6.evaluate("() => document.querySelectorAll('#sheet .up-cell').forEach((c, i) => c.dataset.mk = 'abc'[i])")
     page6.screenshot(path=os.path.join(SHOT, "photo-v40-addsheet.png"))
 
@@ -831,13 +831,13 @@ with sync_playwright() as p:
       tag: (document.querySelector('#sheet input[name=album_tag]') || {}).value,
       date: (document.querySelector('#sheet input[name=date]') || {}).value,
       labels: [...document.querySelectorAll('#sheet .up-row label')].map(l => l.textContent),
-      sameRow: (() => { const a = document.querySelector('#sheet input[name=album_tag]');
-        const b = document.querySelector('#sheet input[name=date]');
+      sameRow: (() => { const a = document.querySelector('#sheet input[name=date]');
+        const b = document.querySelector('#sheet input[name=album_tag]');
         if (!a || !b) return false; const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
         return Math.abs(ra.top - rb.top) < 4 && ra.right <= rb.left; })()})""")
     check("「기록 이름」을 적어 올린 뒤 새 시트를 열면 그 칸이 비어 있음 (라벨도 기록 이름)",
-          tag_new["tag"] == "" and tag_new["labels"] == ["기록 이름", "날짜"], tag_new)
-    check("「기록 이름」과 「날짜」가 한 줄에 나란히", tag_new["sameRow"] is True, tag_new)
+          tag_new["tag"] == "" and tag_new["labels"] == ["날짜", "기록 이름"], tag_new)
+    check("「날짜」와 「기록 이름」이 한 줄에 나란히 (날짜가 왼쪽) — v43", tag_new["sameRow"] is True, tag_new)
     # 한 시트 안에서 「추가」로 더 담을 때는 적어 둔 태그가 그대로
     page6.fill("#sheet input[name=album_tag]", "제주 여행")
     with page6.expect_file_chooser() as fc:
@@ -978,7 +978,7 @@ with sync_playwright() as p:
       grips: document.querySelectorAll('#sheet .up-cell .up-x').length,
       dels: document.querySelectorAll('#sheet .up-cell .up-x').length,
       add: !!document.querySelector('#sheet .up-add')})""")
-    check("수정 아이콘 → 그날 사진 편집 시트 (날짜·기록 이름·사진 6칸 그리드)",
+    check("수정 아이콘 → 그날 사진 편집 시트 (날짜·기록 이름·사진 칸 그리드)",
           de["head"] == "사진 수정" and len(de["date"] or "") == 10 and (de["date"] or "")[4] == "-"
           and de["rows"] == 6 and de["grips"] == 6 and de["dels"] == 6 and de["add"], de)
     check("사진 편집 시트에 캡션 칸 없음", de["caption"] is False, de["caption"])

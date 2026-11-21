@@ -1,6 +1,6 @@
 """투로그 v38 확인 — 노트 + 시트 속지 레이아웃 4종 (투두리스트 · 모눈 메모 · 별점 리뷰 · 지출·정산).
 
-1) 버전: sw.js 캐시 twolog-v42 · APP_VERSION v42 · My 탭 「버전 v42」
+1) 버전: sw.js 캐시 twolog-v43 · APP_VERSION v43 · My 탭 「버전 v43」
 2) + 시트 하단 「속지 레이아웃」
    - 노트 카테고리 목록(#noteOrderList) 아래 · 「저장하기」 버튼 위
    - 카드 4개 · 2×2 (첫 두 장 같은 줄, 셋째 줄에 두 장) · 각진 네모 · 제목 + 한 줄 설명
@@ -186,9 +186,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v42", 'const VERSION = "twolog-v42"' in sw,
+    check("sw.js 캐시 버전 twolog-v43", 'const VERSION = "twolog-v43"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v42", 'var APP_VERSION = "v42"' in app_js,
+    check("app.js 버전 상수 v43", 'var APP_VERSION = "v43"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -201,7 +201,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v42」", ver.strip() == "버전 v42", ver)
+    check("My 탭 맨 위에 「버전 v43」", ver.strip() == "버전 v43", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄 아래로 펼쳐지는 속지 레이아웃 (v40 아코디언)
@@ -1004,7 +1004,7 @@ with sync_playwright() as p:
               btn: (q('#upBtn') || {}).textContent || ''};
     }""")
     check("사진 추가 시트에 앨범 칸이 없음", up["album"] is False and up["datalist"] is False, up)
-    check("맨 윗줄은 「기록 이름」 + 「날짜」 (v41)", up["firstLabel"] == "기록 이름"
+    check("맨 윗줄은 「날짜」(왼쪽) + 「기록 이름」(오른쪽) (v43)", up["firstLabel"] == "날짜"
           and re.match(r"^\d{4}-\d{2}-\d{2}$", up["dateVal"]) is not None, up)
     check("날짜 칸이 시트 폭 안에 들어옴", up["dateIn"] is True, up)
     check("고른 사진 줄에 파일 용량 글씨 없음", up["sizeTxt"] == 0, up["sizeTxt"])
