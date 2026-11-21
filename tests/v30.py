@@ -1,6 +1,6 @@
 """투로그 v30 확인 — 사진첩 폴라로이드를 더 작고 아담하게.
 
-1) 버전: sw.js 캐시 twolog-v40 · APP_VERSION v40
+1) 버전: sw.js 캐시 twolog-v41 · APP_VERSION v41
 2) 사진첩 목록의 폴라로이드 카드가 v29보다 확실히 작아짐
    - 사진 한 칸(정사각) 118.7px → 93.3px, 카드 130.7 → 103.3px, 카드 높이 142.7 → 113.3px
    - 흰 프레임 위·옆 5px, 아래 턱 15px (v29 6px·18px), 캡션 글씨 9px (v29 9.5px)
@@ -139,11 +139,11 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check("sw.js 캐시 버전 twolog-v40", 'const VERSION = "twolog-v40"' in sw,
+    check("sw.js 캐시 버전 twolog-v41", 'const VERSION = "twolog-v41"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v37", 'var APP_VERSION = "v40"' in app_js,
+    check("app.js 버전 상수 v37", 'var APP_VERSION = "v41"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v40", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v41", 'const SHELL = "shell-" + VERSION' in sw)
     check("달력 칸(pcell)은 정사각(aspect-ratio)", "aspect-ratio:1/1" in css.replace(" ", "") and ".pcal-grid" in css)
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장이 되는 일반 모드로 옮겨요
@@ -240,7 +240,7 @@ with sync_playwright() as p:
                            " return !!el && el.classList.contains('active') && el.innerText.trim().length > 0; }", sid)
         check("%s 화면이 정상으로 뜸" % name, bool(ok), sid)
     ver = page.inner_text("#s-set .app-ver")
-    check("My 맨 위 버전 표시가 v36", "v40" in ver, ver)
+    check("My 맨 위 버전 표시가 v36", "v41" in ver, ver)
     check("여기까지 페이지 오류 없음", len(errs) == 0, errs[:4])
 
     ctx.close()

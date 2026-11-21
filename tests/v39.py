@@ -1,6 +1,6 @@
 """투로그 v39 확인 — 카테고리마다 속지 고르기(+ 기본 카테고리도) · 사진 달력 아이폰식.
 
-1) 버전: sw.js 캐시 twolog-v40 · APP_VERSION v40 · My 탭 「버전 v40」
+1) 버전: sw.js 캐시 twolog-v41 · APP_VERSION v41 · My 탭 「버전 v41」
 2) + 시트 — 카테고리 줄마다 지금 속지 배지, 누르면 그 카테고리의 속지를 고치는 모드
    - 메모·버킷리스트·영화·먹방(기본)은 「카드」, 내가 만든 카테고리는 그 속지 이름
    - 줄을 누르면 .active · 제목 「속지 레이아웃 · 버킷리스트」 · 안내에 그 이름
@@ -177,9 +177,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v40", 'const VERSION = "twolog-v40"' in sw,
+    check("sw.js 캐시 버전 twolog-v41", 'const VERSION = "twolog-v41"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v40", 'var APP_VERSION = "v40"' in app_js,
+    check("app.js 버전 상수 v41", 'var APP_VERSION = "v41"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -192,7 +192,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v40」", ver.strip() == "버전 v40", ver)
+    check("My 탭 맨 위에 「버전 v41」", ver.strip() == "버전 v41", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄마다 속지 배지 · 줄을 누르면 그 카테고리 속지 고르기
@@ -216,9 +216,9 @@ with sync_playwright() as p:
     by_name = {r["name"]: r for r in ui["rows"]}
     check("카테고리 줄마다 지금 속지 배지가 있음",
           len(ui["rows"]) >= 4 and all(r["badge"] for r in ui["rows"]), ui["rows"])
-    check("기본 카테고리 배지는 「카드」", by_name.get("메모", {}).get("badge") == "카드"
-          and by_name.get("버킷리스트", {}).get("badge") == "카드"
-          and by_name.get("영화·먹방", {}).get("badge") == "카드",
+    check("기본 카테고리 배지도 「투두리스트」 (v41 통일)", by_name.get("메모", {}).get("badge") == "투두리스트"
+          and by_name.get("버킷리스트", {}).get("badge") == "투두리스트"
+          and by_name.get("영화·먹방", {}).get("badge") == "투두리스트",
           {k: v["badge"] for k, v in by_name.items()})
     custom_badges = [r["badge"] for r in ui["rows"] if "여행 준비물" in r["name"] or "주말 데이트" in r["name"]]
     check("내 카테고리 배지는 그 속지 이름", custom_badges == ["투두리스트", "모눈 메모"], custom_badges)
@@ -245,7 +245,8 @@ with sync_playwright() as p:
     check("기본 카테고리 줄을 누르면 그 줄이 선택됨", sel["row"] == "버킷리스트"
           and sel["border"] not in ("", "rgb(232, 232, 237)"), sel)
     check("속지 패널이 그 줄 바로 아래에 펼쳐짐", sel["hidden"] is False and 0 <= sel["gap"] <= 16, sel)
-    check("속지 제목에 고른 카테고리 이름", "속지 레이아웃" in sel["label"] and "버킷리스트" in sel["label"], sel["label"])
+    check("속지 제목에 고른 카테고리 이름", "속지" in sel["label"] and "레이아웃" not in sel["label"]
+          and "버킷리스트" in sel["label"], sel["label"])
     check("안내 문구도 그 카테고리", "버킷리스트" in sel["hint"], sel["hint"])
     check("기본 카테고리 패널은 「카드」 + 세 속지", sel["kinds"] == ["", "memo", "review", "expense"], sel["kinds"])
     check("지금은 「카드」가 체크됨", sel["activeKinds"] == [""], sel["activeKinds"])
@@ -295,13 +296,13 @@ with sync_playwright() as p:
     page.wait_for_timeout(560)
     bk = page.evaluate("""() => ({
       on: (document.querySelector('#s-diary .seg-btn.active') || {}).textContent || '',
-      tag: (document.querySelector('#s-diary .note-hd .k') || {}).textContent,
+      badge: !!document.querySelector('#s-diary .note-hd .k'),
       sum: (document.querySelector('#s-diary .ex-sum .v') || {}).textContent || '',
       quick: !!document.querySelector('#s-diary #listQuickForm input[name="amount"]'),
       back: !!document.querySelector('#s-diary .nh-back'),
       cards: document.querySelectorAll('#s-diary .ncard').length})""")
-    check("버킷리스트 탭이 지출·정산 속지로 그려짐", bk["tag"] == "지출·정산" and bk["quick"] and bk["sum"], bk)
-    check("속지 화면에는 카드 대신 목록 · 「카드」로 돌아갈 버튼", bk["cards"] == 0 and bk["back"], bk)
+    check("버킷리스트 탭이 지출·정산 속지로 그려짐", bk["badge"] is False and bk["quick"] and bk["sum"], bk)
+    check("속지 화면에는 카드 대신 목록 · 「투두리스트」로 돌아갈 버튼", bk["cards"] == 0 and bk["back"], bk)
 
     page.fill("#s-diary #listQuickForm input[name=text]", "주말 외식")
     page.fill("#s-diary #listQuickForm input[name=amount]", "32000")
@@ -323,7 +324,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(520)
     back = page.evaluate("""() => ({cards: document.querySelectorAll('#s-diary .ncard').length,
       kinds: window.__app.state.noteKinds || {}})""")
-    check("「카드」를 누르면 지금 모양(카드)으로 되돌아감", back["cards"] > 0 and "bucket" not in back["kinds"], back)
+    check("「투두리스트」를 누르면 카드 화면으로 되돌아감", back["cards"] > 0 and "bucket" not in back["kinds"], back)
 
     # 메모 → 모눈 메모
     open_add_sheet(page)
@@ -334,11 +335,12 @@ with sync_playwright() as p:
     page.wait_for_timeout(720)
     page.locator("#s-diary .seg-btn", has_text="메모").first.click()
     page.wait_for_timeout(520)
-    mm = page.evaluate("""() => ({tag: (document.querySelector('#s-diary .note-hd .k') || {}).textContent,
-      cards: document.querySelectorAll('#s-diary .memo-card').length,
-      quick: !!document.querySelector('#s-diary #listQuickForm'),
+    mm = page.evaluate("""() => ({badge: !!document.querySelector('#s-diary .note-hd .k'),
+      cards: document.querySelectorAll('#s-diary .d41-card').length,
+      quick: !!document.querySelector('#s-diary .d41-new'),
       circles: document.querySelectorAll('#s-diary .trow .circ').length})""")
-    check("메모 탭이 모눈 메모 속지로 (체크 동그라미 없음)", mm["tag"] == "모눈 메모" and mm["quick"] and mm["circles"] == 0, mm)
+    check("메모 탭이 모눈 메모 속지로 (위 입력줄 대신 「+ 새 다이어리」·체크 동그라미 없음)",
+          mm["badge"] is False and mm["quick"] and mm["circles"] == 0, mm)
     page.locator("#s-diary .nh-back").click()
     page.wait_for_timeout(460)
 
@@ -351,10 +353,10 @@ with sync_playwright() as p:
     page.wait_for_timeout(720)
     page.locator("#s-diary .seg-btn", has_text="영화·먹방").first.click()
     page.wait_for_timeout(520)
-    rv = page.evaluate("""() => ({tag: (document.querySelector('#s-diary .note-hd .k') || {}).textContent,
+    rv = page.evaluate("""() => ({badge: !!document.querySelector('#s-diary .note-hd .k'),
       cards: document.querySelectorAll('#s-diary .rv-card').length,
       stars: document.querySelectorAll('#s-diary .rv-card .rvs').length})""")
-    check("영화·먹방 탭이 별점 리뷰 속지로", rv["tag"] == "별점 리뷰" and rv["cards"] >= 1 and rv["stars"] >= 5, rv)
+    check("영화·먹방 탭이 별점 리뷰 속지로", rv["badge"] is False and rv["cards"] >= 1 and rv["stars"] >= 5, rv)
     page.locator("#s-diary .rv-card .rvs").nth(4).click()
     page.wait_for_timeout(460)
     first_log = page.evaluate("""() => (window.__app.state.logs || [])[0] || null""")
@@ -493,11 +495,11 @@ with sync_playwright() as p:
     page2.locator("#s-diary .seg-btn", has_text="버킷리스트").first.click()
     page2.wait_for_timeout(560)
     again = page2.evaluate("""() => ({kinds: window.__app.state.noteKinds || {},
-      tag: (document.querySelector('#s-diary .note-hd .k') || {}).textContent,
+      badge: !!document.querySelector('#s-diary .note-hd .k'),
       sum: (document.querySelector('#s-diary .ex-sum .v') || {}).textContent || '',
       rows: document.querySelectorAll('#s-diary .ex-row').length})""")
     check("새로고침해도 기본 카테고리 속지가 유지됨", again["kinds"].get("bucket") == "expense"
-          and again["tag"] == "지출·정산" and again["rows"] >= 2, again)
+          and again["badge"] is False and again["rows"] >= 2, again)
     check("새로고침해도 금액·합계가 그대로 (150,000원 포함)", again["sum"].endswith("원"), again["sum"])
     check("브라우저 콘솔/페이지 오류 없음 (동기화)", len(errs2) == 0, errs2[:4])
     ctx2.close()
@@ -657,7 +659,8 @@ with sync_playwright() as p:
     empty = page4.evaluate("""() => ({empty: document.querySelectorAll('#s-photo .pday-tag.empty').length,
       dots: document.querySelectorAll('#s-photo .pday-dot').length,
       labeled: [...document.querySelectorAll('#s-photo .pday-tag.empty')].map(b => b.textContent.trim())})""")
-    check("태그 없는 날은 「+ 태그」로 바로 달 수 있음", empty["empty"] == 1 and empty["labeled"] == ["+ 태그"], empty)
+    check("기록 이름 없는 날은 「+ 기록 이름」으로 바로 달 수 있음",
+          empty["empty"] == 1 and empty["labeled"] == ["+ 기록 이름"], empty)
 
     page4.locator("#s-photo .pday-tag.empty").first.click()
     page4.wait_for_timeout(520)
@@ -677,7 +680,7 @@ with sync_playwright() as p:
               tagFs: cs ? cs.fontSize : '', dateFs: ds ? ds.fontSize : '',
               borders: cs ? [cs.borderTopWidth, cs.borderBottomWidth] : []};
     }""")
-    check("태그를 달면 「날짜 · 태그」로 이어짐", tagd["dot"] == "·" and tagd["tagFs"] == tagd["dateFs"]
+    check("기록 이름을 달면 「날짜 · 기록 이름」으로 이어짐", tagd["dot"] == "·" and tagd["tagFs"] == tagd["dateFs"]
           and "빼빼로데이" in tagd["text"], tagd)
     check("새로 단 태그도 테두리 없이 글씨로", all(b == "0px" for b in (tagd["borders"] or ["x"])), tagd["borders"])
 

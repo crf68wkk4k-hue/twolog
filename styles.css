@@ -1991,3 +1991,206 @@ html[data-mode="dark"] .dcmt{border-color:rgba(255,255,255,.14); background:#1D1
 
 /* v40: 카드 시트 — 제목 입력칸과 제목 색 사이는 딱 한 칸(19px) */
 #sheet .card-meta + .card-color-gap + .cp.ccp{margin-top:0}
+
+/* ==========================================================================
+   v41 — 모눈 메모: 모눈종이 위 다이어리 카드 + 화면을 꽉 채우는 모눈 다이어리
+   · 목록: 둥근 카드(날짜·제목·본문·사진 미리보기·× 삭제) + 맨 아래 「+ 새 다이어리」
+   · 다이어리: ‹ 뒤로 · 제목(가운데) · 저장 / 11.21 SAT / 모눈 캔버스 / T · 사진 · 펜
+   ========================================================================== */
+.d41-list{padding-bottom:4px}
+.d41-cards{gap:12px; display:flex; flex-direction:column; padding:14px 12px}
+.d41-card{margin:0; border-radius:16px !important}
+.d41-card .nmemo-b{
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+  white-space:pre-wrap
+}
+.d41-thumbs{display:flex; align-items:center; gap:6px; margin-top:10px}
+.d41-th{width:64px; height:64px; object-fit:cover; border-radius:10px !important; background:var(--surface-2); display:block}
+.d41-thn{font-size:11.5px; font-weight:700; color:var(--ink-3); letter-spacing:-.01em}
+.d41-penz{margin-top:9px; font-size:11px; color:var(--ink-3); letter-spacing:-.01em}
+.d41-empty{
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px;
+  width:100%; min-height:170px; padding:22px 16px;
+  border:1px dashed var(--line) !important; border-radius:16px !important;
+  background:rgba(255,255,255,.72); color:var(--ink-2); font-family:inherit; cursor:pointer
+}
+html[data-mode="dark"] .d41-empty{background:rgba(29,29,32,.7)}
+.d41-empty .de-t{font-size:13px; letter-spacing:-.01em}
+.d41-empty .de-s{font-size:13.5px; font-weight:700; color:var(--ink); letter-spacing:-.01em}
+.d41-new{
+  display:flex; align-items:center; justify-content:center; gap:8px; width:100%; height:52px; margin-top:14px;
+  border:0 !important; border-radius:16px !important; background:var(--ink); color:var(--bg);
+  font-family:inherit; font-size:14px; font-weight:700; letter-spacing:-.02em; cursor:pointer
+}
+.d41-new .ap{display:flex; align-items:center; justify-content:center}
+.d41-new .ap svg{width:16px; height:16px}
+
+/* ---- 화면을 꽉 채우는 모눈 다이어리 ---- */
+.sheet-wrap.sheet-full .sheet.d41sheet{padding:0 !important; overflow:hidden; border-radius:0 !important; background:var(--surface)}
+.d41{display:flex; flex-direction:column; flex:1 1 auto; height:100%; min-height:0; background:var(--surface)}
+.d41-top{display:flex; align-items:center; gap:4px; flex:0 0 auto; padding:8px 8px 6px; min-height:52px}
+.d41-back{
+  flex:0 0 40px; width:40px; height:40px; display:flex; align-items:center; justify-content:center;
+  border:0 !important; background:none; color:var(--ink); cursor:pointer
+}
+.d41-back svg{width:22px; height:22px}
+.d41-title{
+  flex:1 1 auto; min-width:0; height:40px; border:0 !important; background:none; outline:none;
+  text-align:center; font-family:inherit; font-size:16px; font-weight:700; letter-spacing:-.025em; color:var(--ink)
+}
+.d41-title::placeholder{color:var(--ink-3); font-weight:600}
+.d41-save{
+  flex:0 0 auto; height:36px; padding:0 14px; border:0 !important; border-radius:10px !important;
+  background:var(--ink); color:var(--bg); font-family:inherit; font-size:13.5px; font-weight:700;
+  letter-spacing:-.02em; cursor:pointer
+}
+.d41-date{position:relative; flex:0 0 auto; padding:2px 20px 14px}
+.d41-dbig{font-size:27px; font-weight:800; letter-spacing:-.035em; color:var(--ink); font-variant-numeric:tabular-nums}
+.d41-datein{
+  position:absolute; left:14px; top:-4px; width:168px; height:48px; opacity:0;
+  border:0 !important; background:none; cursor:pointer
+}
+.d41-canvas{flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain}
+.d41-paper{
+  position:relative; min-height:100%; padding:8px 20px 140px;
+  --d41-line: rgba(0,0,0,.055);
+  background-color:var(--surface);
+  background-image:
+    linear-gradient(to right, var(--d41-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--d41-line) 1px, transparent 1px);
+  background-size:22px 22px; background-position:-1px -1px
+}
+html[data-mode="dark"] .d41-paper{--d41-line: rgba(255,255,255,.07); background-color:#151517}
+.d41-body{
+  display:block; width:100%; min-height:200px; padding:0; border:0 !important; background:none;
+  resize:none; overflow:hidden; outline:none; color:var(--ink);
+  font-family:inherit; line-height:2.1; letter-spacing:-.01em; word-break:break-word
+}
+.d41-body::placeholder{color:var(--ink-3)}
+.d41-paper.pen .d41-body{pointer-events:none}
+.d41-imgs{display:flex; flex-direction:column; gap:26px; margin-top:12px}
+.d41-img{position:relative; margin:0; width:100%}
+.d41-img img{display:block; width:100%; height:auto; border-radius:12px !important; background:var(--surface-2)}
+.d41-img.sz1{width:46%}
+.d41-img.sz2{width:74%}
+.d41-img.sz3{width:100%}
+.d41-img.sel img{outline:1.5px dashed var(--ink-3); outline-offset:3px}
+.d41-imgx{
+  position:absolute; top:-10px; left:-10px; width:28px; height:28px; display:flex; align-items:center;
+  justify-content:center; border:0 !important; border-radius:50% !important; background:#E5484D; color:#FFFFFF;
+  box-shadow:0 2px 8px rgba(0,0,0,.2); cursor:pointer; z-index:4
+}
+.d41-imgx svg{width:14px; height:14px}
+.d41-imgsz{
+  display:none; position:absolute; right:6px; top:6px; gap:6px; padding:5px;
+  border-radius:10px !important; background:rgba(255,255,255,.94); box-shadow:0 4px 16px rgba(0,0,0,.16); z-index:5
+}
+html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
+.d41-img.sel .d41-imgsz{display:flex}
+.d41-szb{
+  height:30px; padding:0 10px; border:1px solid var(--line) !important; border-radius:8px !important;
+  background:var(--surface); color:var(--ink-2); font-family:inherit; font-size:11.5px; cursor:pointer
+}
+.d41-szb.on{background:var(--ink); color:var(--bg); border-color:var(--ink) !important}
+.d41-pen{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:3; overflow:visible}
+.d41-pen.on{pointer-events:auto; touch-action:none; cursor:crosshair}
+.d41-panel{flex:0 0 auto; padding:8px 14px 4px; border-top:1px solid var(--line); background:var(--surface)}
+.d41-prow{display:flex; align-items:center; gap:10px; padding:3px 0; min-height:34px}
+.d41-pl{flex:0 0 56px; font-size:11.5px; color:var(--ink-3); letter-spacing:-.01em}
+.d41-pbtns{display:flex; flex-wrap:wrap; gap:6px}
+.d41-pb{
+  height:30px; padding:0 12px; border:1px solid var(--line) !important; border-radius:8px !important;
+  background:var(--surface); color:var(--ink-2); font-family:inherit; font-size:12px; cursor:pointer
+}
+.d41-pb.on{background:var(--ink); color:var(--bg); border-color:var(--ink) !important}
+.d41-dots{display:flex; align-items:center; gap:8px}
+.d41-dot{
+  width:22px; height:22px; padding:0; border:1px solid rgba(120,120,130,.35) !important;
+  border-radius:50% !important; cursor:pointer
+}
+.d41-dot.on{box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--ink-3)}
+.d41-tools{
+  flex:0 0 auto; display:flex; align-items:center; justify-content:center; gap:28px;
+  padding:8px 16px 16px; border-top:1px solid var(--line); background:var(--surface)
+}
+.d41-tool{
+  width:46px; height:46px; display:flex; align-items:center; justify-content:center;
+  border:0 !important; border-radius:12px !important; background:none; color:var(--ink);
+  font-family:inherit; font-size:20px; font-weight:800; cursor:pointer
+}
+.d41-tool.on{background:var(--surface-2)}
+.d41-tool svg{width:22px; height:22px}
+.d41-tool-t{font-size:19px; font-weight:800; letter-spacing:-.03em; padding-bottom:2px}
+
+/* ==========================================================================
+   v41 — 날짜(챕터) 댓글: 사진마다 카드 대신 그날 사진 전체에 «한 칸»
+   · 머리글(1번째 사진 · 제목)도, 「아직 댓글이 없어요」 문구도 없이
+     댓글 목록(프사·이름·내용·답글·삭제) → 프사 · 「댓글 달기」 · 「등록」
+   ========================================================================== */
+.dcmt.dcmt-day{
+  margin:20px 16px 0; padding:0 0 20px;
+  border:0 !important; border-radius:0 !important; background:none
+}
+.dcmt-day .cmt-list{padding:0; max-height:none; overflow:visible}
+.dcmt-day .cmt{padding:0 0 16px}
+.dcmt-day .cmt.re{margin-left:26px; padding-top:10px}
+.dcmt-day .cmt:last-child{padding-bottom:4px}
+.dcmt-day .cmt-form{
+  margin-top:2px; padding:12px 0 0; border-top:1px solid var(--line);
+  display:flex; align-items:center; gap:9px
+}
+.dcmt-day .cmt-in{height:40px; font-size:13.5px}
+.dcmt-day .cmt-send{
+  height:36px; padding:0 14px; border:0 !important; border-radius:8px !important;
+  background:var(--ink); color:var(--bg); font-family:inherit; font-size:12.5px; font-weight:700;
+  letter-spacing:-.01em; cursor:pointer
+}
+.dcmt-day .cmt-acts{margin-top:5px}
+
+/* ==========================================================================
+   v41 — 사진 추가·수정 시트: 「기록 이름」 + 「날짜」를 한 줄에,
+   사진은 한 줄에 6개씩 들어가는 정사각 네모 그리드 (오른쪽 위 × 로 빼기)
+   ========================================================================== */
+.up-row{display:flex; align-items:flex-end; gap:10px}
+.up-row .f{margin:0; flex:0 0 auto; min-width:0}
+.up-nm-f{flex:1 1 auto !important}
+.up-date-f{flex:0 0 132px !important}
+.up-date-f .up-date{font-variant-numeric:tabular-nums}
+.up-grid{display:grid; grid-template-columns:repeat(6, 1fr); gap:6px; margin-top:6px}
+.up-cell{
+  position:relative; aspect-ratio:1 / 1; overflow:hidden; background:var(--surface-2);
+  border-radius:8px !important; touch-action:none; cursor:grab;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none
+}
+.up-cell.dragging{opacity:.92; box-shadow:0 8px 20px rgba(0,0,0,.22); cursor:grabbing; z-index:6}
+.up-cell:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+.up-cell .up-thumb,.up-cell img{display:block; width:100%; height:100%; object-fit:cover}
+.up-cell .up-thumb svg{width:100%; height:100%; display:block}
+.up-x{
+  position:absolute; top:2px; right:2px; width:18px; height:18px; display:flex; align-items:center;
+  justify-content:center; border:0 !important; border-radius:50% !important;
+  background:rgba(20,20,22,.62); color:#FFFFFF; cursor:pointer; z-index:2; padding:0
+}
+.up-x svg{width:10px; height:10px}
+.up-grid .up-empty{grid-column:1 / -1; padding:18px 2px; font-size:12.5px; color:var(--ink-3); text-align:center}
+
+/* ==========================================================================
+   v41 — 사진첩 목록도 상단 아이콘 줄(🔍 📅 +)을 화면 위에 고정
+   아래 사진들만 스크롤돼요 (달력 보기와 같은 머리줄 높이)
+   ========================================================================== */
+#s-photo .hdr.hdr-min:not(.hdr-cal){
+  position:sticky; top:0; z-index:7;
+  height:58px; padding:14px 20px 6px; align-items:center;
+  background:var(--bg)
+}
+#s-photo .pbody{padding-top:2px}
+/* v41: 사진 칸 안의 사진은 브라우저 기본 끌기를 끄고 (칸 끌기만 살아 있게) */
+.up-cell img{-webkit-user-drag:none; user-drag:none; pointer-events:none}
+/* v41: 날짜 모아보기 사진 칸 오른쪽 위 «⋯» (정보 수정·삭제) */
+.dgrid > .dg-wrap{position:relative; display:block; width:100%}
+.dg-more{
+  position:absolute; top:3px; right:3px; width:24px; height:24px; display:flex; align-items:center;
+  justify-content:center; border:0 !important; border-radius:50% !important;
+  background:rgba(20,20,22,.5); color:#FFFFFF; cursor:pointer; z-index:2; padding:0
+}
+.dg-more svg{width:14px; height:14px}

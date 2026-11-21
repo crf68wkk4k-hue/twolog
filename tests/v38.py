@@ -1,6 +1,6 @@
 """투로그 v38 확인 — 노트 + 시트 속지 레이아웃 4종 (투두리스트 · 모눈 메모 · 별점 리뷰 · 지출·정산).
 
-1) 버전: sw.js 캐시 twolog-v40 · APP_VERSION v40 · My 탭 「버전 v40」
+1) 버전: sw.js 캐시 twolog-v41 · APP_VERSION v41 · My 탭 「버전 v41」
 2) + 시트 하단 「속지 레이아웃」
    - 노트 카테고리 목록(#noteOrderList) 아래 · 「저장하기」 버튼 위
    - 카드 4개 · 2×2 (첫 두 장 같은 줄, 셋째 줄에 두 장) · 각진 네모 · 제목 + 한 줄 설명
@@ -186,9 +186,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v40", 'const VERSION = "twolog-v40"' in sw,
+    check("sw.js 캐시 버전 twolog-v41", 'const VERSION = "twolog-v41"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v40", 'var APP_VERSION = "v40"' in app_js,
+    check("app.js 버전 상수 v41", 'var APP_VERSION = "v41"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -201,7 +201,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v40」", ver.strip() == "버전 v40", ver)
+    check("My 탭 맨 위에 「버전 v41」", ver.strip() == "버전 v41", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄 아래로 펼쳐지는 속지 레이아웃 (v40 아코디언)
@@ -255,10 +255,11 @@ with sync_playwright() as p:
     }""")
     check("누른 줄이 선택됨", row1["active"] and row1["name"] == "버킷리스트", row1)
     check("속지 패널이 그 줄 «바로 아래»에 펼쳐짐", row1["hidden"] is False and 0 <= row1["gap"] <= 16, row1["gap"])
-    check("패널 제목에 고른 카테고리 이름", "속지 레이아웃" in row1["label"] and "버킷리스트" in row1["label"], row1["label"])
+    check("패널 제목은 「속지 · 고른 카테고리 이름」", "속지" in row1["label"] and "레이아웃" not in row1["label"]
+          and "버킷리스트" in row1["label"], row1["label"])
     check("안내 문구도 그 카테고리", "버킷리스트" in row1["hint"], row1["hint"])
-    check("기본 카테고리 패널은 「카드」 + 세 속지", row1["kinds"] == ["", "memo", "review", "expense"], row1["kinds"])
-    check("지금은 「카드」에 체크", row1["activeKinds"] == [""], row1["activeKinds"])
+    check("기본 카테고리 패널은 「투두리스트」 + 세 속지", row1["kinds"] == ["", "memo", "review", "expense"], row1["kinds"])
+    check("지금은 「투두리스트」에 체크", row1["activeKinds"] == [""], row1["activeKinds"])
     check("2×2 로 놓임 (두 줄 · 한 줄에 두 장)",
           row1["pos"][0]["t"] == row1["pos"][1]["t"] and row1["pos"][2]["t"] > row1["pos"][0]["t"]
           and row1["pos"][2]["t"] == row1["pos"][3]["t"] and row1["pos"][0]["w"] == row1["pos"][1]["w"], row1["pos"])
@@ -332,7 +333,7 @@ with sync_playwright() as p:
     create_kind(page, "여행 준비", "check")
     ck = page.evaluate("""() => ({
       seg: document.querySelector('#s-diary .lchip.active').textContent.trim(),
-      kindTag: (document.querySelector('#s-diary .nh-l .k') || {}).textContent,
+      badge: !!document.querySelector('#s-diary .nh-l .k'),
       grid: !!document.querySelector('#s-diary .ngrid'),
       newCard: !!document.querySelector('#s-diary .ngrid .ncard.new'),
       cards: document.querySelectorAll('#s-diary .ngrid .ncard:not(.new)').length,
@@ -341,7 +342,7 @@ with sync_playwright() as p:
       memoCards: document.querySelectorAll('#s-diary .memo-card').length })
     """ )
     check("투두리스트 카테고리 — 탭 이름", ck["seg"] == "여행 준비", ck["seg"])
-    check("투두리스트 — 속지 이름 표시", ck["kindTag"] == "투두리스트", ck["kindTag"])
+    check("투두리스트 — 본문 위에는 속지 배지가 없음", ck["badge"] is False, ck["badge"])
     check("투두리스트 — 2열 카드 묶음 + 「+ 새 리스트」로 열림",
           ck["grid"] and ck["newCard"] and ck["cards"] == 0 and ck["quick"] == 0 and ck["memoCards"] == 0, ck)
     check("투두리스트 — 예전 한 줄 체크 화면(진행률)은 없음", ck["prog"] is False, ck)
@@ -399,32 +400,36 @@ with sync_playwright() as p:
       if (c && document.getElementById('sheetWrap').classList.contains('open')) c.click(); }""")
     page.wait_for_timeout(350)
 
-    # 3-2) 모눈 메모
+    # 3-2) 모눈 메모 (v41: 위 입력줄 대신 「+ 새 다이어리」 → 모눈종이 풀스크린 다이어리)
     create_kind(page, "생각 정리", "memo")
-    page.fill("#s-diary #listQuickForm input[name=text]", "11월에 해보고 싶은 것")
-    page.locator("#s-diary #listQuickForm button").click()
-    page.wait_for_timeout(460)
+    page.wait_for_timeout(420)
+    page.locator("#s-diary .d41-new").click()
+    page.wait_for_timeout(600)
+    page.fill("#sheet .d41-title", "11월에 해보고 싶은 것")
+    page.fill("#sheet textarea[name=memo]", "주말마다 한 번은 산책하기.\n사진도 한 장씩 남기기.")
+    page.locator("#sheet .d41-save").click()
+    page.wait_for_timeout(700)
     mm = page.evaluate("""() => ({
       seg: document.querySelector('#s-diary .lchip.active').textContent.trim(),
-      kindTag: (document.querySelector('#s-diary .nh-l .k') || {}).textContent,
-      cards: document.querySelectorAll('#s-diary .memo-card').length,
-      title: (document.querySelector('#s-diary .memo-card .mc-t') || {}).textContent,
+      badge: !!document.querySelector('#s-diary .nh-l .k'),
+      cards: document.querySelectorAll('#s-diary .d41-card').length,
+      title: (document.querySelector('#s-diary .d41-card .nmemo-t') || {}).textContent,
       circ: document.querySelectorAll('#s-diary .trow .circ').length,
       prog: !!document.querySelector('#s-diary .progress'),
-      date: ((document.querySelector('#s-diary .memo-card .mc-d') || {}).textContent || '').trim() })""")
-    check("모눈 메모 — 속지 이름 표시", mm["kindTag"] == "모눈 메모", mm["kindTag"])
+      date: ((document.querySelector('#s-diary .d41-card .nmemo-date') || {}).textContent || '').trim() })""")
+    check("모눈 메모 — 본문 위에는 속지 배지가 없음", mm["badge"] is False, mm["badge"])
     check("모눈 메모 — 메모 카드로 보임", mm["cards"] == 1 and mm["title"] == "11월에 해보고 싶은 것", mm)
     check("모눈 메모 — 체크 동그라미·진행률 없음", mm["circ"] == 0 and mm["prog"] is False, mm)
     check("모눈 메모 — 카드 맨 위 왼쪽에 날짜 + 요일", re.match(r"^\d{4}\.\d{2}\.\d{2} [일월화수목금토]요일$", mm["date"] or "") is not None, mm["date"])
-    page.locator("#s-diary .memo-card").first.click()
-    page.wait_for_timeout(480)
-    check("모눈 메모 — 눌러서 본문 쓰기 시트",
+    page.locator("#s-diary .d41-card").first.click()
+    page.wait_for_timeout(580)
+    check("모눈 메모 — 눌러서 모눈종이 다이어리로 이어서 쓰기",
           page.evaluate("""() => !!document.querySelector('#sheet textarea[name=memo]') &&
-            document.querySelector('#sheet h2').textContent.indexOf('메모') >= 0""") is True)
-    page.fill("#sheet textarea[name=memo]", "주말마다 한 번은 산책하기.\n사진도 한 장씩 남기기.")
-    page.locator("#sheet button.btn-primary").click()
-    page.wait_for_timeout(560)
-    body = page.evaluate("(document.querySelector('#s-diary .memo-card .mc-b') || {}).textContent || ''")
+            !!document.querySelector('#sheet .d41-save') &&
+            document.getElementById('sheetWrap').classList.contains('sheet-full')""") is True)
+    page.locator("#sheet .d41-back").click()
+    page.wait_for_timeout(480)
+    body = page.evaluate("(document.querySelector('#s-diary .d41-card .nmemo-b') || {}).textContent || ''")
     check("모눈 메모 — 본문이 카드에 그대로", "주말마다 한 번은 산책하기." in body and "사진도 한 장씩" in body, body[:40])
     page.screenshot(path=os.path.join(SHOT, "note-v38-memo.png"))
 
@@ -435,12 +440,12 @@ with sync_playwright() as p:
         page.locator("#s-diary #listQuickForm button").click()
         page.wait_for_timeout(430)
     rv = page.evaluate("""() => ({
-      kindTag: (document.querySelector('#s-diary .nh-l .k') || {}).textContent,
+      badge: !!document.querySelector('#s-diary .nh-l .k'),
       cards: document.querySelectorAll('#s-diary .rv-card').length,
       stars: document.querySelectorAll('#s-diary .rv-card .rvs').length,
       on: document.querySelectorAll('#s-diary .rv-card .rvs.on').length,
       circ: document.querySelectorAll('#s-diary .trow .circ').length })""")
-    check("별점 리뷰 — 속지 이름 표시", rv["kindTag"] == "별점 리뷰", rv["kindTag"])
+    check("별점 리뷰 — 본문 위에는 속지 배지가 없음", rv["badge"] is False, rv["badge"])
     check("별점 리뷰 — 카드마다 별 5개", rv["cards"] == 2 and rv["stars"] == 10, rv)
     check("별점 리뷰 — 처음엔 별점 없음", rv["on"] == 0, rv["on"])
     # 첫 카드 4점, 둘째 카드 5점
@@ -487,13 +492,13 @@ with sync_playwright() as p:
         page.locator("#s-diary #listQuickForm button").click()
         page.wait_for_timeout(430)
     ex = page.evaluate("""() => ({
-      kindTag: (document.querySelector('#s-diary .nh-l .k') || {}).textContent,
+      badge: !!document.querySelector('#s-diary .nh-l .k'),
       sum: (document.querySelector('#s-diary .ex-sum .v') || {}).textContent,
       cnt: (document.querySelector('#s-diary .ex-sum .c') || {}).textContent,
       rows: [...document.querySelectorAll('#s-diary .ex-row')].map(r => [
         r.querySelector('.ex-t').textContent, r.querySelector('.ex-a').textContent]),
       amountFields: document.querySelectorAll('#s-diary #listQuickForm input[name=amount]').length })""")
-    check("지출·정산 — 속지 이름 표시", ex["kindTag"] == "지출·정산", ex["kindTag"])
+    check("지출·정산 — 본문 위에는 속지 배지가 없음", ex["badge"] is False, ex["badge"])
     check("지출·정산 — 맨 위에 합계", ex["sum"] == "61,500원", ex["sum"])
     check("지출·정산 — 건수 표시", ex["cnt"] == "3건", ex["cnt"])
     check("지출·정산 — 항목과 금액", ex["rows"] == [["점심", "24,000원"], ["영화표", "28,000원"], ["커피", "9,500원"]], ex["rows"])
@@ -542,10 +547,10 @@ with sync_playwright() as p:
     page.locator("#s-diary .lchip", has_text="주말 데이트").first.click()
     page.wait_for_timeout(520)
     old_memo = page.evaluate("""() => ({
-      kindTag: (document.querySelector('#s-diary .nh-l .k') || {}).textContent,
+      badge: !!document.querySelector('#s-diary .nh-l .k'),
       cards: document.querySelectorAll('#s-diary .memo-card').length,
       items: (window.__app.state.lists.filter(l => l.title === '주말 데이트')[0] || {items: []}).items.length })""")
-    check("예전 메모 리스트는 모눈 메모로 열림", old_memo["kindTag"] == "모눈 메모", old_memo)
+    check("예전 메모 리스트는 모눈 메모로 열림", old_memo["badge"] is False and old_memo["items"] > 0, old_memo)
     check("예전 메모 항목이 카드로 보임", old_memo["cards"] == old_memo["items"] and old_memo["items"] > 0, old_memo)
 
     # 기본 탭(메모·버킷리스트·영화·먹방) 그대로
@@ -933,7 +938,7 @@ with sync_playwright() as p:
     page4.locator('#s-photo [data-act="editPhotoDay"]').click()
     page4.wait_for_timeout(600)
     add_date = page4.evaluate("(document.querySelector('#sheet input[name=date]') || {}).value || ''")
-    edit_rows = page4.evaluate("document.querySelectorAll('#sheet .up-item').length")
+    edit_rows = page4.evaluate("document.querySelectorAll('#sheet .up-cell').length")
     cells_now = page4.evaluate("document.querySelectorAll('#s-photo .dg-cell').length")
     check("모아보기의 수정 아이콘은 그 날짜 사진 편집 시트",
           add_date == day_date and edit_rows == cells_now and edit_rows >= 1,
@@ -970,26 +975,27 @@ with sync_playwright() as p:
               firstLabel: (q('.form .f label') || {}).textContent || '',
               dateVal: d ? d.value : '',
               dateIn: d ? (d.getBoundingClientRect().right <= q('') ? true : d.getBoundingClientRect().right <= document.querySelector('#sheet').getBoundingClientRect().right + 0.5) : false,
-              rows: document.querySelectorAll('#sheet .up-item').length,
+              rows: document.querySelectorAll('#sheet .up-cell').length,
               sizeTxt: document.querySelectorAll('#sheet .up-size').length,
-              dels: document.querySelectorAll('#sheet .up-del').length,
+              dels: document.querySelectorAll('#sheet .up-x').length,
               addBtn: !!q('.up-add'),
               addTxt: (q('.up-add') || {}).textContent ? q('.up-add').textContent.trim() : '',
               sum: (q('#upSum') || {}).textContent || '',
               btn: (q('#upBtn') || {}).textContent || ''};
     }""")
     check("사진 추가 시트에 앨범 칸이 없음", up["album"] is False and up["datalist"] is False, up)
-    check("맨 위 칸은 날짜", up["firstLabel"] == "날짜" and re.match(r"^\d{4}-\d{2}-\d{2}$", up["dateVal"]) is not None, up)
+    check("맨 윗줄은 「기록 이름」 + 「날짜」 (v41)", up["firstLabel"] == "기록 이름"
+          and re.match(r"^\d{4}-\d{2}-\d{2}$", up["dateVal"]) is not None, up)
     check("날짜 칸이 시트 폭 안에 들어옴", up["dateIn"] is True, up)
     check("고른 사진 줄에 파일 용량 글씨 없음", up["sizeTxt"] == 0, up["sizeTxt"])
-    check("사진 줄마다 「삭제」 버튼", up["rows"] == 2 and up["dels"] == 2, (up["rows"], up["dels"]))
+    check("사진 칸마다 × 삭제 버튼", up["rows"] == 2 and up["dels"] == 2, (up["rows"], up["dels"]))
     check("목록 위에 「추가」 버튼", up["addBtn"] and "추가" in up["addTxt"], up)
     check("요약·담기 버튼이 2장", "2장" in up["sum"] and "2장 담기" in up["btn"], (up["sum"], up["btn"]))
     page6.screenshot(path=os.path.join(SHOT, "photo-v38-addsheet.png"))
 
-    page6.locator("#sheet .up-del").first.click()
+    page6.locator("#sheet .up-x").first.click()
     page6.wait_for_timeout(400)
-    one = page6.evaluate("""() => ({rows: document.querySelectorAll('#sheet .up-item').length,
+    one = page6.evaluate("""() => ({rows: document.querySelectorAll('#sheet .up-cell').length,
       sum: (document.querySelector('#sheet #upSum') || {}).textContent || '',
       cnt: (document.querySelector('#sheet #upCount') || {}).textContent || '',
       btn: (document.querySelector('#sheet #upBtn') || {}).textContent || ''})""")
@@ -1000,16 +1006,16 @@ with sync_playwright() as p:
         page6.locator("#sheet .up-add").click()
     fc.value.set_files([shots[2]])
     page6.wait_for_timeout(600)
-    two = page6.evaluate("""() => ({rows: document.querySelectorAll('#sheet .up-item').length,
+    two = page6.evaluate("""() => ({rows: document.querySelectorAll('#sheet .up-cell').length,
       btn: (document.querySelector('#sheet #upBtn') || {}).textContent || '',
       date: (document.querySelector('#sheet input[name=date]') || {}).value || ''})""")
     check("「추가」로 사진을 더 담으면 목록에 이어 붙음", two["rows"] == 2 and "2장 담기" in two["btn"], two)
     check("더 담아도 고른 날짜는 그대로", two["date"] == up["dateVal"], two)
 
     # 다 지우면 시트가 닫힘
-    page6.locator("#sheet .up-del").first.click()
+    page6.locator("#sheet .up-x").first.click()
     page6.wait_for_timeout(300)
-    page6.locator("#sheet .up-del").first.click()
+    page6.locator("#sheet .up-x").first.click()
     page6.wait_for_timeout(500)
     check("담을 사진을 다 지우면 시트가 닫힘", page6.evaluate("document.getElementById('sheetWrap').classList.contains('open')") is False)
 

@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v40";
+  var APP_VERSION = "v41";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -1689,33 +1689,67 @@
     return h;
   }
 
-  /* 리스트 카드 상세 시트 — v17: 제목만 맨 위, 그 아래 To-do (주제·한 줄 메모·누구는 삭제) */
-  function cardSheetHtml(k, g) {
-    var items = itemsOf(k).filter(function (x) { return x.gid === g.id; }).sort(byDone);
+  /* 리스트 카드 상세 시트 — v17: 제목만 맨 위, 그 아래 To-do (주제·한 줄 메모·누구는 삭제)
+     v41: 「+ 새 리스트」는 이 시트를 그대로 열어 제목·제목 색·To-do 를 한 번에 적고 저장해요.
+     (새 카드일 때는 「카드 삭제」 없이 「저장하기」만 — 그냥 닫으면 빈 카드가 남지 않아요) */
+  function cardSheetHtml(k, g, isNew) {
+    var items = isNew ? (newCard ? newCard.items.slice() : [])
+      : itemsOf(k).filter(function (x) { return x.gid === g.id; }).sort(byDone);
     var h = '<div class="sheet-hd card-hd"><button class="icon-btn" data-close="1" aria-label="닫기">' + IC.x + "</button></div>";
     /* 제목을 시트 맨 위로 — 카드에서 가장 크게 보이는 값이라 먼저 고쳐요.
        v19: 입력칸 아래 부가설명 줄은 지웠어요 (제목 → To-do 로 바로).
        v21: 제목 입력칸 바로 위에 제목 바탕색 컬러판을 두었어요. */
     /* v40: 「제목」을 맨 위로, 「제목 색」은 한 칸 띄워 그 아래로 — 제목 글씨도 크게 */
-    h += '<form class="form card-meta" id="sheetForm">' +
-      '<div class="f"><label>제목</label><input class="field card-title-in" name="title" value="' + esc(groupTitleOf(k, g)) + '" required autocomplete="off"></div>' +
-      "</form>";
+    /* v41: 제목·제목 색·To-do·저장하기를 한 폼 안에 — 「+ 새 리스트」로 열어도
+       바로 이 카드 시트에서 다 적고 저장해요. */
+    h += '<form id="sheetForm">';
+    h += '<div class="form card-meta">' +
+      '<div class="f"><label>제목</label><input class="field card-title-in" name="title" value="' + (isNew ? "" : esc(groupTitleOf(k, g))) + '" placeholder="예) 장보기" autocomplete="off"></div>' +
+      "</div>";
     h += '<div class="card-color-gap"></div>';
     h += cardColorPanel(k, g);
     h += '<div class="todo-label" style="margin-top:20px">To-do</div>';
-    h += '<form class="todo-add" id="listAddForm" data-tab="' + k + '" data-gid="' + g.id + '">' +
+    h += '<div class="todo-add" id="listAddForm" data-tab="' + k + '" data-gid="' + g.id + '">' +
       '<span class="circ" aria-hidden="true">' + CIR_OFF + "</span>" +
       '<input class="todo-in" name="text" placeholder="내용을 추가해보세요" autocomplete="off" enterkeyhint="done" aria-label="내용">' +
-      '<button class="todo-add-btn" type="submit">Add</button></form>';
+      '<button class="todo-add-btn" type="button">Add</button></div>';
     h += '<div class="todo-items card-items" data-tab="' + k + '" data-gid="' + g.id + '">';
     if (!items.length) h += '<div class="empty">위 칸에 적고 Add 를 눌러 보세요.</div>';
     items.forEach(function (it) { h += diaryRow(k, it); });
     h += "</div>";
-    /* 저장·삭제 버튼은 아래에 그대로 — 저장 버튼은 위의 제목·주제 폼(#sheetForm)을 제출해요 */
     h += '<div class="card-acts">' +
-      '<button class="btn-primary" type="submit" form="sheetForm">저장하기</button>' +
-      '<button type="button" class="btn-del" data-act="delCard" data-tab="' + k + '" data-gid="' + g.id + '">카드 삭제</button></div>';
+      '<button class="btn-primary" type="submit">저장하기</button>' +
+      (isNew ? "" : '<button type="button" class="btn-del" data-act="delCard" data-tab="' + k + '" data-gid="' + g.id + '">카드 삭제</button>') +
+      "</div>";
+    h += "</form>";
     return h;
+  }
+
+  /* v41: 「+ 새 리스트」 — 중간 제목 시트 없이 바로 카드 시트를 열고,
+     저장할 때 그제야 카드(리스트)를 만듭니다. 그냥 닫으면 아무것도 남지 않아요. */
+  var newCard = null;
+  function openNewCardSheet(k) {
+    newCard = { k: k, gid: "nc-" + uid(), titleBg: "", items: [] };
+    openSheet(cardSheetHtml(k, { id: newCard.gid, title: "", titleBg: "" }, true),
+      function (fd) { saveNewCard(fd); });
+    openCard = { tab: k, gid: newCard.gid };
+  }
+  function saveNewCard(fd) {
+    if (!newCard) { closeSheet(); return; }
+    var k = newCard.k;
+    var t = String(fd.get("title") || "").trim();
+    if (!t) t = newCard.items.length ? "새 리스트" : "";
+    if (!t) { toast("제목을 적어 주세요"); return; }
+    var g = { id: newCard.gid, title: t, who: "me", date: today };
+    if (newCard.titleBg) g.titleBg = newCard.titleBg;
+    S.groups = S.groups || {};
+    S.groups[k] = S.groups[k] || [];
+    S.groups[k].push(g);
+    var list = newCard.items.slice();
+    newCard = null;
+    list.forEach(function (it) { itemsOf(k).push(it); });
+    openCard = null;
+    save(); closeSheet(); renderDiary(); toast("카드를 만들었어요");
   }
 
   function openGroupSheet(k, gid) {
@@ -1733,6 +1767,23 @@
     });
     /* openSheet 가 열린 카드 표시를 비우므로 시트를 띄운 뒤에 기억해요 */
     openCard = { tab: k, gid: gid };
+  }
+
+  /* v41: 저장 전인 새 카드 안의 항목 빼기 */
+  function dropDraftItem(id) {
+    if (!newCard || !id) return false;
+    var idx = -1;
+    newCard.items.forEach(function (x, i) { if (x.id === id) idx = i; });
+    if (idx < 0) return false;
+    newCard.items.splice(idx, 1);
+    var box = document.querySelector("#sheet .card-items");
+    if (box) {
+      var row = box.querySelector('[data-id="' + id + '"]');
+      var tr = row && row.closest ? row.closest(".trow") : null;
+      if (tr && tr.parentNode) tr.parentNode.removeChild(tr);
+      if (!newCard.items.length) box.innerHTML = '<div class="empty">위 칸에 적고 Add 를 눌러 보세요.</div>';
+    }
+    return true;
   }
 
   /* v31: 지금 열린 시트가 노트 카드 상세(openGroupSheet)이고, 누른 것이 그 안의 항목일 때.
@@ -1904,11 +1955,11 @@
     itemsOf(k).push(it);
     return it;
   }
-  /* 기본 카테고리 속지 화면의 머리 — 탭 이름 · 속지 이름 · 「카드」로 되돌리기 */
+  /* 기본 카테고리 속지 화면의 머리 — 탭 이름 · 「투두리스트」로 되돌리기
+     v41: 카테고리 이름 옆 속지 배지는 없앴어요 (이름만 깔끔하게) */
   function basePageHead(k, kind) {
-    return '<div class="note-hd"><div class="nh-l"><span class="t">' + esc(noteLabel(k)) + "</span>" +
-      '<span class="k">' + LIST_KIND_DEF[kind].n + "</span></div>" +
-      '<button type="button" class="nh-back" data-act="baseKindClear" data-tab="' + k + '" aria-label="카드로 보기">카드</button></div>';
+    return '<div class="note-hd"><div class="nh-l"><span class="t">' + esc(noteLabel(k)) + "</span></div>" +
+      '<button type="button" class="nh-back" data-act="baseKindClear" data-tab="' + k + '" aria-label="투두리스트로 보기">투두리스트</button></div>';
   }
   /* 금액 — 「12,000」·「12000원」·「-3,000」 모두 숫자로 */
   function parseAmount(v) {
@@ -1926,9 +1977,8 @@
 
   function viewList(l) {
     if (!l) return '<div class="list" style="margin:0 20px"><div class="empty">리스트를 찾을 수 없어요.</div></div>';
-    var kind = listKindOf(l);
-    var h = '<div class="note-hd"><div class="nh-l"><span class="t">' + esc(listLabel(l)) + "</span>" +
-      '<span class="k">' + LIST_KIND_DEF[kind].n + "</span></div></div>";
+    /* v41: 카테고리 이름 옆에 붙던 속지 배지(모눈 메모·투두리스트…)는 없앴어요 */
+    var h = '<div class="note-hd"><div class="nh-l"><span class="t">' + esc(listLabel(l)) + "</span></div></div>";
     return h + viewListBody(l);
   }
   /* v39: 속지 본문만 — 기본 카테고리 속지 화면도 같은 본문을 씁니다 */
@@ -1968,26 +2018,366 @@
     return d.getFullYear() + "." + pad(d.getMonth() + 1) + "." + pad(d.getDate()) + " " + DOW_FULL[d.getDay()];
   }
 
-  /* 2) 모눈 메모 — 모눈종이 바탕 위에 흰 일기 카드가 세로로 쌓여요.
-     카드 맨 위 가운데에 날짜+요일, 그 아래 제목(있으면)과 본문. 제목 없이 본문만 써도 돼요. */
+  /* 2) 모눈 메모 (v41) — 모눈종이 바탕 위에 다이어리 카드가 세로로 쌓여요.
+     카드를 누르면 그 다이어리가, 맨 아래 「+ 새 다이어리」를 누르면 새 다이어리가
+     화면을 꽉 채우는 모눈종이 다이어리로 열립니다. */
   function viewListMemo(l) {
-    var h = '<div class="todo-block" data-list="' + l.id + '">';
-    h += quickAddForm(l, "memo", "오늘 있었던 일을 적고 Add");
-    h += '<div class="memo-list nmemo-list" data-list="' + l.id + '">';
-    if (!l.items.length) h += '<div class="empty">아직 메모가 없어요. 위 칸에 적고 Add 를 눌러 보세요.</div>';
+    var h = '<div class="todo-block d41-list" data-list="' + l.id + '">';
+    h += '<div class="memo-list nmemo-list d41-cards" data-list="' + l.id + '">';
+    if (!l.items.length) {
+      h += '<button type="button" class="d41-empty" data-act="openDiary" data-list="' + l.id + '">' +
+        '<span class="de-t">아직 다이어리가 없어요</span><span class="de-s">+ 새 다이어리</span></button>';
+    }
     l.items.forEach(function (it) {
       var body = itBody(it);
-      h += '<article class="memo-card nmemo-card" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '" role="button" tabindex="0">' +
+      var imgs = diaryImgsOf(it);
+      h += '<article class="memo-card nmemo-card d41-card" data-act="openDiary" data-list="' + l.id + '" data-id="' + it.id + '" role="button" tabindex="0">' +
         '<div class="mc-d nmemo-date">' + esc(memoDayLabel(it.date)) + "</div>" +
         (itTitle(it) ? '<div class="mc-t nmemo-t">' + esc(itTitle(it)) + "</div>" : "") +
         (body ? '<div class="mc-b nmemo-b">' + esc(body) + "</div>" : "") +
-        (it.img ? '<img class="nmemo-photo" src="' + esc(it.img) + '" alt="메모 사진" loading="lazy" decoding="async">' : "") +
+        (imgs.length ? '<div class="d41-thumbs">' + imgs.slice(0, 3).map(function (im) {
+          return '<img class="d41-th" src="' + esc(im.src) + '" alt="다이어리 사진" loading="lazy" decoding="async">';
+        }).join("") + (imgs.length > 3 ? '<span class="d41-thn">+' + (imgs.length - 3) + "</span>" : "") + "</div>" : "") +
+        (it.pen && it.pen.length ? '<div class="d41-penz">손그림</div>' : "") +
         '<button type="button" class="x nmemo-x" data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="삭제">' + IC.x + "</button></article>";
     });
-    h += "</div></div>";
-    h += '<div style="height:6px"></div>';
-    h += addRow("addListItem", ' data-list="' + l.id + '"', "본문까지 길게 쓰기");
+    h += "</div>";
+    h += '<button type="button" class="d41-new" data-act="openDiary" data-list="' + l.id + '">' +
+      '<span class="ap">' + IC.plus + '</span><span>새 다이어리</span></button>';
+    h += "</div>";
     return h;
+  }
+
+  /* ==========================================================================
+     v41: 모눈종이 풀스크린 다이어리
+     --------------------------------------------------------------------------
+     카드를 누르면 화면 전체가 모눈종이 다이어리로 열려요.
+       위   ‹ 뒤로 · 제목(가운데) · 저장
+       그 아래 11.21 SAT 큰 날짜 (눌러서 날짜 바꾸기)
+       가운데 모눈 캔버스 (본문 · 사진 · 손그림)
+       맨 아래 T(글씨) · 🖼(사진) · ✏(펜) 도구
+     저장한 값은 예전 메모 항목 그대로에 담겨요:
+       text = 제목, memo = 본문, date = 날짜,
+       imgs = [{id, src, size}]  사진 여러 장(720px 로 줄여 보관), size 1·2·3 = 작게·보통·크게
+       sty  = {size: 1|2|3, color, align}   글씨 크기·색·정렬
+       pen  = [{c, w, p: [x,y,...]}]        손그림 — 폭 기준 0~1 좌표라 폰 폭이 달라도 그대로
+     예전(v40) 메모의 사진 한 장(it.img)은 첫 사진으로 이어받아요.
+     ========================================================================== */
+  var DOW_ENG = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+  var D41_SIZES = [0, 14, 16.5, 19];
+  var D41_COLORS = ["", "#6E6E73", "#B4564E", "#3D6E8A", "#5E7A52"];
+  var diary = null;
+
+  function d41Stamp(ds) {
+    var d = parse(String(ds || today).slice(0, 10));
+    if (!d || isNaN(d.getTime())) return "";
+    return (d.getMonth() + 1) + "." + pad(d.getDate()) + " " + DOW_ENG[d.getDay()];
+  }
+  function diaryImgsOf(it) {
+    var out = [];
+    if (it && Array.isArray(it.imgs)) {
+      it.imgs.forEach(function (im) {
+        if (!im || !im.src) return;
+        var sz = Number(im.size);
+        out.push({ id: String(im.id || uid()), src: String(im.src), size: sz === 1 || sz === 3 ? sz : 2 });
+      });
+    }
+    if (!out.length && it && it.img) out.push({ id: "legacy", src: String(it.img), size: 2 });
+    return out;
+  }
+  function diaryStyOf(it) {
+    var s = (it && it.sty) || {};
+    var sz = Number(s.size);
+    return {
+      size: sz === 1 || sz === 3 ? sz : 2,
+      color: typeof s.color === "string" ? s.color : "",
+      align: s.align === "center" ? "center" : "left"
+    };
+  }
+  function diaryPenOf(it) {
+    if (!it || !Array.isArray(it.pen)) return [];
+    return it.pen.filter(function (s) { return s && Array.isArray(s.p) && s.p.length >= 4; })
+      .map(function (s) {
+        return { c: String(s.c || "#111111"), w: Number(s.w) || 3.5,
+                 p: s.p.map(function (v) { return Number(v) || 0; }) };
+      });
+  }
+  function d41BodyCss(sty) {
+    return "font-size:" + D41_SIZES[sty.size] + "px;" +
+      (sty.color ? "color:" + sty.color + ";" : "") +
+      "text-align:" + (sty.align === "center" ? "center" : "left") + ";";
+  }
+  function d41ImgBlock(im) {
+    var sel = diary && diary.sel === im.id;
+    var h = '<figure class="d41-img sz' + im.size + (sel ? " sel" : "") + '" data-img="' + esc(im.id) + '">' +
+      '<img src="' + esc(im.src) + '" alt="다이어리 사진" data-act="d41ImgSel" data-img="' + esc(im.id) + '">' +
+      '<button type="button" class="d41-imgx" data-act="d41ImgDel" data-img="' + esc(im.id) + '" aria-label="사진 삭제">' + IC.x + "</button>" +
+      '<div class="d41-imgsz">';
+    [[1, "작게"], [2, "보통"], [3, "크게"]].forEach(function (o) {
+      h += '<button type="button" class="d41-szb' + (im.size === o[0] ? " on" : "") + '" data-act="d41ImgSz" data-img="' +
+        esc(im.id) + '" data-sz="' + o[0] + '">' + o[1] + "</button>";
+    });
+    return h + "</div></figure>";
+  }
+  function d41ToolsHtml() {
+    var mode = diary ? diary.mode : "text";
+    return '<div class="d41-tools">' +
+      '<button type="button" class="d41-tool' + (mode === "pen" ? " on" : "") + '" data-act="d41Pen" aria-label="펜 그리기">' + IC.pencil + "</button>" +
+      '<button type="button" class="d41-tool d41-tool-t' + (mode === "text" ? " on" : "") + '" data-act="d41Text" aria-label="글씨">T</button>' +
+      '<button type="button" class="d41-tool" data-act="d41Img" aria-label="사진 넣기">' + IC.photo + "</button>" +
+      "</div>";
+  }
+  function d41TextPanel() {
+    var st = diary.sty;
+    var h = '<div class="d41-prow"><span class="d41-pl">글씨 크기</span><div class="d41-pbtns">';
+    [[1, "작게"], [2, "보통"], [3, "크게"]].forEach(function (o) {
+      h += '<button type="button" class="d41-pb' + (st.size === o[0] ? " on" : "") + '" data-act="d41Size" data-size="' + o[0] + '">' + o[1] + "</button>";
+    });
+    h += '</div></div><div class="d41-prow"><span class="d41-pl">글씨 색</span><div class="d41-dots">';
+    D41_COLORS.forEach(function (c, i) {
+      h += '<button type="button" class="d41-dot' + (st.color === c ? " on" : "") + '" data-act="d41Color" data-color="' + esc(c) +
+        '" aria-label="글씨 색 ' + (i + 1) + '" style="background:' + (c || "#111111") + '"></button>';
+    });
+    h += '</div></div><div class="d41-prow"><span class="d41-pl">정렬</span><div class="d41-pbtns">' +
+      '<button type="button" class="d41-pb' + (st.align === "left" ? " on" : "") + '" data-act="d41Align" data-align="left">왼쪽</button>' +
+      '<button type="button" class="d41-pb' + (st.align === "center" ? " on" : "") + '" data-act="d41Align" data-align="center">가운데</button>' +
+      "</div></div>";
+    return h;
+  }
+  function d41PenPanel() {
+    var h = '<div class="d41-prow"><span class="d41-pl">그리기</span><div class="d41-pbtns">' +
+      '<button type="button" class="d41-pb' + (diary.pmode === "pen" ? " on" : "") + '" data-act="d41PenMode" data-mode="pen">펜</button>' +
+      '<button type="button" class="d41-pb' + (diary.pmode === "erase" ? " on" : "") + '" data-act="d41PenMode" data-mode="erase">지우개</button>' +
+      '<button type="button" class="d41-pb" data-act="d41Undo">되돌리기</button>' +
+      '<button type="button" class="d41-pb" data-act="d41Clear">전체 지우기</button>' +
+      "</div></div>";
+    h += '<div class="d41-prow"><span class="d41-pl">굵기</span><div class="d41-pbtns">';
+    [[2, "얇게"], [3.5, "보통"], [6, "두껍게"]].forEach(function (o) {
+      h += '<button type="button" class="d41-pb' + (Math.abs(diary.pw - o[0]) < 0.01 ? " on" : "") + '" data-act="d41PenW" data-w="' + o[0] + '">' + o[1] + "</button>";
+    });
+    h += '</div></div><div class="d41-prow"><span class="d41-pl">색</span><div class="d41-dots">';
+    ["#111111", "#B4564E", "#3D6E8A", "#5E7A52", "#C9A227"].forEach(function (c, i) {
+      h += '<button type="button" class="d41-dot' + (diary.pcolor === c ? " on" : "") + '" data-act="d41PenColor" data-color="' + esc(c) +
+        '" aria-label="펜 색 ' + (i + 1) + '" style="background:' + c + '"></button>';
+    });
+    return h + "</div></div>";
+  }
+  function d41PanelHtml() {
+    return diary.mode === "pen" ? d41PenPanel() : d41TextPanel();
+  }
+  function formDiary(cid, it) {
+    var l = containerOf(cid);
+    if (!l) return "";
+    diary = {
+      cid: cid, id: it ? it.id : null,
+      date: String((it && it.date) || today).slice(0, 10) || today,
+      imgs: diaryImgsOf(it), sty: diaryStyOf(it), pen: diaryPenOf(it),
+      mode: "text", sel: null, pmode: "pen", pcolor: "#111111", pw: 3.5
+    };
+    var st = diary.sty;
+    var h = '<form class="d41" id="sheetForm" autocomplete="off">';
+    h += '<div class="d41-top">' +
+      '<button type="button" class="d41-back" data-close="1" aria-label="뒤로">' + IC.left + "</button>" +
+      '<input class="d41-title" name="text" value="' + (it ? esc(itTitle(it)) : "") +
+      '" placeholder="새 다이어리" aria-label="다이어리 제목" autocomplete="off">' +
+      '<button type="submit" class="d41-save">저장</button></div>';
+    h += '<div class="d41-date"><span class="d41-dbig" id="d41DateBig">' + esc(d41Stamp(diary.date)) + "</span>" +
+      '<input type="date" class="d41-datein" name="date" value="' + esc(diary.date) + '" aria-label="날짜"></div>';
+    h += '<div class="d41-canvas" id="d41Canvas"><div class="d41-paper" id="d41Paper">' +
+      '<textarea class="d41-body" name="memo" rows="1" placeholder="오늘 있었던 일을 적어 보세요" aria-label="본문" style="' + d41BodyCss(st) + '">' +
+      (it ? esc(itBody(it)) : "") + "</textarea>" +
+      '<div class="d41-imgs" id="d41Imgs">' + diary.imgs.map(d41ImgBlock).join("") + "</div>" +
+      '<svg class="d41-pen" id="d41Pen" aria-hidden="true"></svg>' +
+      "</div></div>";
+    h += '<div class="d41-panel" id="d41Panel" hidden>' + d41PanelHtml() + "</div>";
+    h += d41ToolsHtml();
+    h += '<input type="hidden" name="imgs" id="d41ImgsIn" value="' + esc(JSON.stringify(diary.imgs)) + '">' +
+      '<input type="hidden" name="pen" id="d41PenIn" value="' + esc(JSON.stringify(diary.pen)) + '">' +
+      '<input type="hidden" name="sty" id="d41StyIn" value="' + esc(JSON.stringify(diary.sty)) + '">' +
+      '<input type="file" id="d41ImgIn" accept="image/*" multiple hidden></form>';
+    return h;
+  }
+  function d41Sync() {
+    if (!diary) return;
+    var im = document.getElementById("d41ImgsIn");
+    if (im) im.value = JSON.stringify(diary.imgs.map(function (x) { return { id: x.id, src: x.src, size: x.size }; }));
+    var pe = document.getElementById("d41PenIn");
+    if (pe) pe.value = JSON.stringify(diary.pen);
+    var st = document.getElementById("d41StyIn");
+    if (st) st.value = JSON.stringify(diary.sty);
+  }
+  function d41RenderImgs() {
+    var box = document.getElementById("d41Imgs");
+    if (!box || !diary) return;
+    box.innerHTML = diary.imgs.map(d41ImgBlock).join("");
+    d41Paint();
+  }
+  /* 손그림 — 종이 폭을 1로 본 좌표(0~1)를 그대로 폰 폭에 맞춰 그립니다 */
+  function d41Paint() {
+    var svgEl = document.getElementById("d41Pen");
+    var paper = document.getElementById("d41Paper");
+    if (!svgEl || !paper || !diary) return;
+    var W = Math.max(1, Math.round(paper.clientWidth));
+    var H = Math.max(1, Math.round(paper.scrollHeight || paper.offsetHeight || 1));
+    svgEl.setAttribute("viewBox", "0 0 " + W + " " + H);
+    var out = "";
+    diary.pen.forEach(function (s) {
+      if (!s.p || s.p.length < 4) return;
+      var d = "";
+      for (var i = 0; i < s.p.length; i += 2) {
+        d += (i ? "L" : "M") + (s.p[i] * W).toFixed(1) + " " + (s.p[i + 1] * W).toFixed(1);
+      }
+      out += '<path d="' + d + '" fill="none" stroke="' + esc(s.c) + '" stroke-width="' + s.w +
+        '" stroke-linecap="round" stroke-linejoin="round"/>';
+    });
+    svgEl.innerHTML = out;
+  }
+  function d41Grow() {
+    var t = document.querySelector("#d41Canvas .d41-body");
+    if (!t) return;
+    t.style.height = "auto";
+    t.style.height = Math.max(200, t.scrollHeight) + "px";
+    d41Paint();
+  }
+  function d41ApplyStyle() {
+    if (!diary) return;
+    var t = document.querySelector("#d41Canvas .d41-body");
+    if (t) t.setAttribute("style", d41BodyCss(diary.sty));
+    d41Sync();
+    var p = document.getElementById("d41Panel");
+    if (p && diary.mode === "text") p.innerHTML = d41TextPanel();
+  }
+  function d41PanelOpen(mode) {
+    if (!diary) return;
+    diary.mode = mode;
+    var p = document.getElementById("d41Panel");
+    if (!p) return;
+    p.hidden = false;
+    p.innerHTML = d41PanelHtml();
+    var paper = document.getElementById("d41Paper");
+    if (paper) paper.classList.toggle("pen", mode === "pen");
+    var penEl = document.getElementById("d41Pen");
+    if (penEl) penEl.classList.toggle("on", mode === "pen");
+    var tools = document.querySelector(".d41-tools");
+    if (tools) tools.outerHTML = d41ToolsHtml();
+    if (mode === "pen") d41Paint();
+  }
+  function d41PanelRefresh() {
+    var p = document.getElementById("d41Panel");
+    if (p && diary) p.innerHTML = d41PanelHtml();
+  }
+  function d41BindPen() {
+    var svgEl = document.getElementById("d41Pen");
+    var paper = document.getElementById("d41Paper");
+    if (!svgEl || !paper) return;
+    var cur = null, liveEl = null, lastX = 0, lastY = 0;
+    function pt(ev) {
+      var r = paper.getBoundingClientRect();
+      return { x: ev.clientX - r.left, y: ev.clientY - r.top, W: Math.max(1, r.width) };
+    }
+    function addPoint(p) {
+      if (Math.abs(p.x - lastX) < 1.6 && Math.abs(p.y - lastY) < 1.6) return false;
+      lastX = p.x; lastY = p.y;
+      cur.p.push(Math.round(p.x / p.W * 1000) / 1000, Math.round(p.y / p.W * 1000) / 1000);
+      return true;
+    }
+    function live() {
+      if (!liveEl) return;
+      var d = "";
+      for (var i = 0; i < cur.p.length; i += 2) {
+        d += (i ? "L" : "M") + (cur.p[i] * paper.clientWidth).toFixed(1) + " " + (cur.p[i + 1] * paper.clientWidth).toFixed(1);
+      }
+      liveEl.setAttribute("d", d);
+    }
+    svgEl.addEventListener("pointerdown", function (ev) {
+      if (!diary || diary.mode !== "pen") return;
+      var p = pt(ev);
+      ev.preventDefault();
+      if (diary.pmode === "erase") {
+        var hit = -1, W = p.W;
+        diary.pen.forEach(function (s, idx) {
+          if (hit >= 0) return;
+          for (var i = 0; i < s.p.length; i += 2) {
+            var dx = s.p[i] * W - p.x, dy = s.p[i + 1] * W - p.y;
+            if (dx * dx + dy * dy < 196) { hit = idx; break; }
+          }
+        });
+        if (hit >= 0) { diary.pen.splice(hit, 1); d41Paint(); d41Sync(); }
+        return;
+      }
+      cur = { c: diary.pcolor || "#111111", w: Number(diary.pw) || 3.5, p: [] };
+      lastX = p.x; lastY = p.y;
+      cur.p.push(Math.round(p.x / p.W * 1000) / 1000, Math.round(p.y / p.W * 1000) / 1000);
+      diary.pen.push(cur);
+      liveEl = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      liveEl.setAttribute("fill", "none");
+      liveEl.setAttribute("stroke", cur.c);
+      liveEl.setAttribute("stroke-width", String(cur.w));
+      liveEl.setAttribute("stroke-linecap", "round");
+      liveEl.setAttribute("stroke-linejoin", "round");
+      svgEl.appendChild(liveEl);
+      live();
+      try { svgEl.setPointerCapture(ev.pointerId); } catch (e) {}
+    });
+    svgEl.addEventListener("pointermove", function (ev) {
+      if (!cur || !diary || diary.mode !== "pen") return;
+      ev.preventDefault();
+      if (addPoint(pt(ev))) live();
+    });
+    function end() {
+      if (!cur) return;
+      cur = null; liveEl = null;
+      d41Paint(); d41Sync();
+    }
+    svgEl.addEventListener("pointerup", end);
+    svgEl.addEventListener("pointercancel", end);
+    svgEl.addEventListener("pointerleave", end);
+  }
+  function openDiary(cid, id) {
+    var l = containerOf(cid);
+    if (!l) return;
+    var it = id ? (l.items || []).filter(function (x) { return x.id === id; })[0] : null;
+    sheetCenter = false;
+    openSheet(formDiary(cid, it), function (fd) { saveDiary(fd); }, { full: true, cls: "d41sheet" });
+    d41BindPen();
+    d41Grow();
+    d41Paint();
+  }
+  function saveDiary(fd) {
+    if (!diary) return;
+    var l = containerOf(diary.cid);
+    if (!l) { closeSheet(); return; }
+    var title = String(fd.get("text") || "").trim();
+    var body = String(fd.get("memo") || "").trim();
+    var date = String(fd.get("date") || "").slice(0, 10) || today;
+    var imgs = [], pen = [], sty = null;
+    try { imgs = JSON.parse(String(fd.get("imgs") || "[]")); } catch (e) { imgs = []; }
+    try { pen = JSON.parse(String(fd.get("pen") || "[]")); } catch (e) { pen = []; }
+    try { sty = JSON.parse(String(fd.get("sty") || "null")); } catch (e) { sty = null; }
+    if (!title && !body && !imgs.length && !pen.length) { toast("오늘 있었던 일을 적어 주세요"); return; }
+    var it = diary.id ? (l.items || []).filter(function (x) { return x.id === diary.id; })[0] : null;
+    if (!it) { it = { id: uid(), done: false }; l.items.push(it); }
+    it.text = title;
+    it.memo = body;
+    it.date = date;
+    if (imgs.length) it.imgs = imgs.map(function (x) {
+      var sz = Number(x.size);
+      return { id: String(x.id || uid()), src: String(x.src || ""), size: sz === 1 || sz === 3 ? sz : 2 };
+    }).filter(function (x) { return !!x.src; });
+    else delete it.imgs;
+    delete it.img;                      /* v41: 사진은 imgs 로만 (옛 한 장짜리는 imgs 로 옮겨 담았어요) */
+    if (pen.length) it.pen = pen; else delete it.pen;
+    if (sty && (Number(sty.size) === 1 || Number(sty.size) === 3 || sty.color || sty.align === "center")) {
+      it.sty = diaryStyOf({ sty: sty });
+    } else delete it.sty;
+    var savedId = it.id;
+    save();
+    closeSheet();
+    renderDiary();
+    /* 목록에서 방금 저장한 다이어리가 보이게 */
+    var card = document.querySelector('#s-diary .d41-card[data-id="' + savedId + '"]');
+    if (card && card.scrollIntoView) { try { card.scrollIntoView({ block: "center" }); } catch (e) {} }
+    toast("저장했어요");
   }
 
   /* 3) 별점 리뷰 — 별을 눌러 바로 점수를 매기고, 눌러서 장소·날짜·한줄평 */
@@ -2075,15 +2465,15 @@
     if (day === addDays(today, -1)) return '<span class="d acc">어제</span>';
     return '<span class="d">' + (d.getMonth() + 1) + "월 " + d.getDate() + "일</span>";
   }
-  /* v39: 날짜 옆 태그 — 테두리·바탕 없이 날짜와 같은 크기의 글씨로만 (누르면 그대로 태그 고치기) */
+  /* v41: 날짜 옆 «기록 이름» — 테두리·바탕 없이 날짜와 같은 크기의 글씨로만 (누르면 바로 고치기) */
   function photoDayTagHtml(day) {
     var tag = dateTagOf(day);
     if (tag) {
       return '<span class="pday-dot" aria-hidden="true">·</span>' +
-        '<button type="button" class="pday-tag on" data-act="dateTag" data-date="' + day + '" aria-label="날짜 태그 고치기">' +
+        '<button type="button" class="pday-tag on" data-act="dateTag" data-date="' + day + '" aria-label="날짜 기록 이름 고치기">' +
         esc(tag) + "</button>";
     }
-    return '<button type="button" class="pday-tag empty" data-act="dateTag" data-date="' + day + '" aria-label="날짜 태그 추가">+ 태그</button>';
+    return '<button type="button" class="pday-tag empty" data-act="dateTag" data-date="' + day + '" aria-label="날짜 기록 이름 추가">+ 기록 이름</button>';
   }
 
   /* v23: 사진첩 달력 보기 — 한 달만 보이고 화살표·밀어서 달을 넘깁니다.
@@ -2180,7 +2570,7 @@
      폭에 맞춰 칸이 스스로 정사각형이 되므로 따로 계산할 것이 없어요. */
 
   function isDefaultAlbum(s) { return !String(s || "").trim() || /^\d{1,2}월의 순간$/.test(String(s || "").trim()); }
-  /* v38: 날짜 태그 — 그날 사진들의 album 을 «경주여행» 같은 짧은 이름으로 써요(기본 앨범 이름은 태그로 보지 않음) */
+  /* v38: 날짜의 기록 이름 — 그날 사진들의 album 을 «경주여행» 같은 짧은 이름으로 써요(기본 앨범 이름은 기록 이름으로 보지 않음) */
   function dateTagOf(day) {
     var hit = (S.photos || []).filter(function (p) {
       return String(p.date || "").slice(0, 10) === day && !isDefaultAlbum(p.album);
@@ -2197,10 +2587,10 @@
   }
   function formDateTag(day) {
     var d = parse(day);
-    return sheetHead("날짜 태그") +
-      '<p class="sheet-sub">' + (d.getMonth() + 1) + "월 " + d.getDate() + "일 사진에 붙는 짧은 이름이에요. 예) 경주여행 · 성수 데이트</p>" +
+    return sheetHead("날짜 기록 이름") +
+      '<p class="sheet-sub">' + (d.getMonth() + 1) + "월 " + d.getDate() + "일 사진에 붙는 기록 이름이에요. 예) 경주여행 · 성수 데이트</p>" +
       '<form class="form" id="sheetForm">' +
-      '<div class="f"><label>태그</label><input class="field" name="tag" value="' + esc(dateTagOf(day)) +
+      '<div class="f"><label>기록 이름</label><input class="field" name="tag" value="' + esc(dateTagOf(day)) +
       '" placeholder="예) 경주여행" autocomplete="off"></div>' +
       '<button class="btn-primary" type="submit">저장하기</button></form>' +
       '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
@@ -2238,7 +2628,7 @@
     var key = String(q || "").trim();
     return sheetHead("사진 검색") +
       '<div class="f" style="margin-top:14px">' +
-      '<input class="field" id="photoSearchIn" value="' + esc(key) + '" placeholder="태그·캡션·장소로 검색 (예: 경주)" autocomplete="off" enterkeyhint="search" aria-label="사진 검색어">' +
+      '<input class="field" id="photoSearchIn" value="' + esc(key) + '" placeholder="기록 이름·장소로 검색 (예: 경주)" autocomplete="off" enterkeyhint="search" aria-label="사진 검색어">' +
       "</div>" +
       '<div class="sres-wrap" id="photoSearchOut">' + photoSearchResults(key) + "</div>" +
       '<div style="height:12px"></div><button class="btn-line" data-close="1">닫기</button>';
@@ -2270,22 +2660,42 @@
      사진을 누르면 사진만 보이는 크게 보기(풀스크린)로 넘어가고,
      댓글·대댓글은 이 화면에서 사진 아래에 바로 달아요.
      ========================================================================== */
-  function cmtBlockBody(p) {
-    var h = cmtListHtml(p);
-    h += cmtFormHtml(p);
+  /* v41: 날짜(챕터) 댓글 — 그날 사진 전체에 «하나의 댓글 칸».
+     · 사진마다 「1번째 사진 · 제목」 카드와 입력줄을 반복하지 않아요
+     · 예전(v40)에 사진마다 달아 둔 댓글도 이 날짜 칸에 모아 보여 줘요
+     · 새로 다는 댓글은 그날의 대표(첫 번째) 사진에 담아 photos.memo 동기화를 그대로 써요
+     · 대댓글은 그 댓글이 있던 사진에 그대로 붙어요 (상대 폰에서도 같은 날짜 칸에 보임) */
+  function dayRepPhoto(day) { return photoDayItems(day)[0] || null; }
+  function dayChapterComments(day) {
+    var out = [];
+    photoDayItems(day).forEach(function (p) {
+      ((p && p.comments) || []).forEach(function (c) { out.push({ p: p, c: c }); });
+    });
+    return out;
+  }
+  function dayChapterCount(day) {
+    return dayChapterComments(day).reduce(function (n, e) { return n + 1 + ((e.c.replies || []).length); }, 0);
+  }
+  function dayCmtBody(day) {
+    var h = '<div class="cmt-list">';
+    dayChapterComments(day).forEach(function (e) {
+      h += cmtRowHtml(e.c, false, e.c.id, e.p.id);
+      (e.c.replies || []).forEach(function (r) { h += cmtRowHtml(r, true, e.c.id, e.p.id); });
+    });
+    h += "</div>";
+    h += cmtFormHtml(dayRepPhoto(day), day);
     return h;
   }
-  function dayCmtBlock(p, idx) {
-    var cn = photoCommentCount(p);
-    var nm = p.title || p.album || "사진";
-    return '<section class="dcmt" data-pid="' + esc(p.id) + '">' +
-      '<div class="dcmt-hd">' +
-      '<button class="dcmt-th" type="button" data-act="openPhoto" data-id="' + esc(p.id) + '" aria-label="사진 크게 보기">' + photoImg(p) + "</button>" +
-      '<div class="dcmt-ti"><b>' + (idx + 1) + "번째 사진</b><span>" + esc(nm) + "</span></div>" +
-      '<span class="dcmt-c' + (cn ? " on" : "") + '">' + (cn ? "댓글 " + cn : "댓글") + "</span>" +
-      '<button class="dcmt-more" type="button" data-act="photoMenu" data-id="' + esc(p.id) + '" aria-label="사진 메뉴" title="정보 수정·삭제">' + IC.more + "</button>" +
-      "</div>" +
-      '<div class="dcmt-b" data-pid="' + esc(p.id) + '">' + cmtBlockBody(p) + "</div></section>";
+  function dayCmtHtml(day) {
+    return '<section class="dcmt dcmt-day" id="dcmtWrap" data-day="' + esc(day) + '">' + dayCmtBody(day) + "</section>";
+  }
+  /* 댓글·답글·삭제 뒤 그 날짜 칸만 다시 그림 (사진 또는 날짜 문자열을 받아요) */
+  function refreshDayCmt(target) {
+    var day = typeof target === "string" ? target : String((target && target.date) || "").slice(0, 10);
+    var sec = document.querySelector("#s-photo .dcmt.dcmt-day");
+    if (!sec || !day) return;
+    sec.setAttribute("data-day", day);
+    sec.innerHTML = dayCmtBody(day);
   }
 
   function renderPhotoDay() {
@@ -2306,43 +2716,21 @@
     if (items.length) {
       h += '<div class="dgrid" data-day="' + day + '">';
       items.forEach(function (p) {
-        var cn = photoCommentCount(p);
-        h += '<button class="dg-cell" type="button" data-act="openPhoto" data-id="' + p.id +
-          '" aria-label="' + esc(p.title || p.album || "사진") + ' 크게 보기">' + photoImg(p) +
-          (cn ? '<span class="dg-cmt">' + IC.chat + "<b>" + cn + "</b></span>" : "") + "</button>";
+        h += '<div class="dg-wrap">' +
+          '<button class="dg-cell" type="button" data-act="openPhoto" data-id="' + p.id +
+          '" aria-label="' + esc(p.title || p.album || "사진") + ' 크게 보기">' + photoImg(p) + "</button>" +
+          /* v41: 사진마다 «⋯» — 정보 수정·삭제 메뉴 (댓글은 날짜 한 칸으로 모았어요) */
+          '<button class="dg-more" type="button" data-act="photoMenu" data-id="' + esc(p.id) +
+          '" aria-label="사진 메뉴" title="정보 수정·삭제">' + IC.more + "</button></div>";
       });
       h += "</div>";
-      /* 사진마다 댓글 — 사진 아래에서 바로 달고 봐요 */
-      h += '<div class="dcmt-wrap" id="dcmtWrap">';
-      items.forEach(function (p, i) { h += dayCmtBlock(p, i); });
-      h += "</div>";
+      /* v41: 그 날짜(챕터) 사진 전체에 댓글 한 칸만 — 프사 · 「댓글 달기」 · 「등록」 */
+      h += dayCmtHtml(day);
     } else {
       h += '<div class="empty">이 날 담은 사진이 아직 없어요.<br>오른쪽 위 <b>+</b> 로 담아 보세요.</div>';
     }
     h += "</div>";
     $("#s-photo").innerHTML = h;
-  }
-
-  /* 한 사진의 댓글 칸만 다시 그림 (댓글·답글·삭제 뒤) */
-  function refreshDayCmt(p) {
-    if (!p) return;
-    var box = document.querySelector('#s-photo .dcmt-b[data-pid="' + p.id + '"]');
-    if (box) box.innerHTML = cmtBlockBody(p);
-    var sec = document.querySelector('#s-photo .dcmt[data-pid="' + p.id + '"]');
-    if (sec) {
-      var cb = sec.querySelector(".dcmt-c");
-      var cn = photoCommentCount(p);
-      if (cb) { cb.textContent = cn ? "댓글 " + cn : "댓글"; cb.classList.toggle("on", !!cn); }
-    }
-    var cell = document.querySelector('#s-photo .dg-cell[data-id="' + p.id + '"]');
-    if (cell) {
-      var bdg = cell.querySelector(".dg-cmt");
-      var n2 = photoCommentCount(p);
-      if (n2) {
-        if (!bdg) { cell.insertAdjacentHTML("beforeend", '<span class="dg-cmt">' + IC.chat + "<b>" + n2 + "</b></span>"); }
-        else { var bb = bdg.querySelector("b"); if (bb) bb.textContent = String(n2); }
-      } else if (bdg) bdg.parentNode.removeChild(bdg);
-    }
   }
 
   function renderPhoto() {
@@ -2416,14 +2804,21 @@
     if (photoToBottom || atBottom) photoListToBottom();
     photoToBottom = false;
   }
-  /* v39: 사진 목록의 맨 아래(가장 최근 날짜)로 — 목록이 짧으면 스크롤이 없어 그대로예요 */
+  /* v39: 사진 목록의 맨 아래(가장 최근 날짜)로 — 목록이 짧으면 스크롤이 없어 그대로예요
+     v41: 사진은 화면에 그려진 뒤 높이가 한 번 더 잡혀요. 그래서 바로 · 다음 프레임 ·
+     조금 뒤에 한 번 더 맞춰, 달력에서 목록으로 돌아오면 늘 «마지막 업로드 날짜»가 보이게 해요. */
   function photoListToBottom() {
     var scr = document.getElementById("screens");
     if (!scr) return;
-    scr.scrollTop = scr.scrollHeight;
-    requestAnimationFrame(function () {
-      if (!photoDayView && !(S.ui && S.ui.photoCal)) scr.scrollTop = scr.scrollHeight;
-    });
+    var jump = function () {
+      if (photoDayView || (S.ui && S.ui.photoCal)) return;
+      if (!document.querySelector("#s-photo .pbody")) return;
+      scr.scrollTop = scr.scrollHeight;
+    };
+    jump();
+    requestAnimationFrame(jump);
+    setTimeout(jump, 60);
+    setTimeout(jump, 240);
   }
 
   /* ------------------------------------------------------------------ sheet */
@@ -2451,6 +2846,8 @@
     personSheetWho = null;
     openCard = null;
     /* v38: 사진 크게 보기는 화면을 꽉 채우는 풀스크린 시트로 (다른 시트는 예전 그대로) */
+    /* v41: 모눈 다이어리는 풀스크린 + 자기 배치(d41sheet) */
+    sheet.className = "sheet" + ((opts && opts.cls) ? " " + opts.cls : "");
     sheetWrap.classList.toggle("sheet-full", !!(opts && opts.full));
     sheetWrap.classList.toggle("sheet-center", !!sheetCenter);
     sheetCenter = false;
@@ -2471,6 +2868,9 @@
     dayEdit = null;
     dayAddMore = false;
     photoView = null;   /* v37: 사진 크게 보기를 닫으면 보던 목록도 끝 — 달럭 밑기·사진 넘기기가 남아 있지 않게 */
+    diary = null;       /* v41: 다이어리를 닫으면 편집 상태도 끝 */
+    newCard = null;     /* v41: 저장하지 않고 닫은 새 카드는 남기지 않아요 */
+    sheet.className = "sheet";
     sheetWrap.classList.remove("sheet-center");
     sheetWrap.classList.remove("sheet-full");
     sheet.style.maxHeight = "";
@@ -2526,18 +2926,19 @@
     return h;
   }
 
-  /* v40: 카테고리 줄 아래에 펼쳐지는 속지 레이아웃 2×2 —
-     기본 카테고리는 「카드」까지, 내 카테고리·새로 더한 줄은 네 속지만 보여요. */
+  /* v40: 카테고리 줄 아래에 펼쳐지는 속지 2×2 —
+     기본 카테고리도 «투두리스트»부터, 내 카테고리·새로 더한 줄은 네 속지만 보여요.
+     v41: 기본 카테고리에 있던 「카드」 라벨은 «투두리스트»로 통일 (보이는 모양·항목은 그대로) */
   function nkPanelHtml(kind, isBase, name, key) {
     var list = isBase
-      ? [{ k: "", n: "카드", d: "지금처럼 카드로 모아 보기" }].concat(
+      ? [{ k: "", n: "투두리스트", d: "카드로 모아 보기" }].concat(
           LIST_KINDS.filter(function (k) { return k !== "check"; }).map(function (k) {
             return { k: k, n: LIST_KIND_DEF[k].n, d: LIST_KIND_DEF[k].d };
           }))
       : LIST_KINDS.map(function (k) { return { k: k, n: LIST_KIND_DEF[k].n, d: LIST_KIND_DEF[k].d }; });
     var cur = isBase ? (kind || "") : (LIST_KINDS.indexOf(kind) >= 0 ? kind : "check");
     var nm = String(name || "").trim();
-    var h = '<div class="set-lbl" id="nkindLbl">' + esc(nm ? "속지 레이아웃 · " + nm : "속지 레이아웃") + "</div>";
+    var h = '<div class="set-lbl" id="nkindLbl">' + esc(nm ? "속지 · " + nm : "속지") + "</div>";
     h += '<div class="nkind-hint" id="nkindHint">' + esc((nm ? "\u300c" + nm + "\u300d" : "이 카테고리") + "에 쓸 속지를 골라요.") + "</div>";
     h += '<div class="nkind" data-group="nkind" data-key="' + esc(key || "") + '">';
     list.forEach(function (o) {
@@ -2614,9 +3015,10 @@
       "</div>";
   }
 
-  /* v39: 속지 이름 — "" 는 기본 카테고리의 지금 모양(카드) */
+  /* v39: 속지 이름 — "" 는 기본 카테고리의 지금 모양(투두리스트 = 카드로 모아 보기)
+     v41: 예전 「카드」 라벨을 «투두리스트»로 통일 */
   function nkKindName(kind) {
-    return LIST_KIND_DEF[kind] ? LIST_KIND_DEF[kind].n : "카드";
+    return LIST_KIND_DEF[kind] ? LIST_KIND_DEF[kind].n : "투두리스트";
   }
   function nkSelectedRow() {
     return document.querySelector("#sheet #noteOrderList .nord-row.active");
@@ -2802,26 +3204,45 @@
      (키보드 ↑ ↓ 로도 옮길 수 있어요)
      ========================================================================== */
   var upDrag = null;
-  function upRowsOf(box) { return Array.prototype.slice.call(box.querySelectorAll(".up-item")); }
-  /* v40: 같은 ≡ 손잡이로 «사진 추가 시트»와 «날짜 사진 편집 시트» 둘 다 순서를 바꿔요 */
+  function upCellsOf(box) { return Array.prototype.slice.call(box.querySelectorAll(".up-cell")); }
+  /* v41: 같은 그리드로 «사진 추가 시트»와 «날짜 사진 편집 시트» 둘 다 순서를 바꿔요 */
   var upMode = "pending";      // pending: 새로 담는 사진들 · day: 그날 이미 올라간 사진 편집
   function upArray() { return (upMode === "day" && dayEdit) ? dayEdit.items : pendingFiles; }
+  /* 칸이 가로·세로로 미끄러지는 FLIP (그리드라 위아래뿐 아니라 좌우도 함께) */
+  function upFlip(box, keep, mutate) {
+    var cells = upCellsOf(box).filter(function (r) { return r !== keep; });
+    var before = cells.map(function (r) { var b = r.getBoundingClientRect(); return { x: b.left, y: b.top }; });
+    mutate();
+    cells.forEach(function (r, i) {
+      if (!r.isConnected) return;
+      var b = r.getBoundingClientRect();
+      var dx = before[i].x - b.left, dy = before[i].y - b.top;
+      r.style.transition = "none";
+      r.style.transform = (dx || dy) ? "translate(" + dx + "px," + dy + "px)" : "";
+      if (!dx && !dy) { r.style.transition = ""; return; }
+      void r.offsetHeight;
+      r.style.transition = "transform 180ms " + NORD_EASE;
+      r.style.transform = "";
+      clearTimeout(r._flipTid);
+      r._flipTid = setTimeout(function () { r.style.transition = ""; r.style.transform = ""; }, 240);
+    });
+  }
   /* 화면에 보이는 순서를 지금 목록(pendingFiles · dayEdit.items)에 반영해요 */
   function upCommitOrder() {
     var box = document.querySelector("#sheet #upList");
     if (!box) return;
     var arr = upArray();
-    var order = upRowsOf(box).map(function (r) { return Number(r.getAttribute("data-i")); });
+    var order = upCellsOf(box).map(function (r) { return Number(r.getAttribute("data-i")); });
     var next = [];
     order.forEach(function (i) { if (arr[i]) next.push(arr[i]); });
     arr.forEach(function (f) { if (next.indexOf(f) < 0) next.push(f); });
     if (upMode === "day" && dayEdit) dayEdit.items = next;
     else pendingFiles = next;
-    /* 줄은 그대로 두고 data-i 만 지금 순서로 다시 매겨요 (손잡이 포커스도 유지) */
-    upRowsOf(box).forEach(function (r, i) {
+    /* 칸은 그대로 두고 data-i 만 지금 순서로 다시 매겨요 (포커스도 유지) */
+    upCellsOf(box).forEach(function (r, i) {
       r.setAttribute("data-i", String(i));
-      var del = r.querySelector(".up-del");
-      if (del) del.setAttribute("data-i", String(i));
+      var x = r.querySelector(".up-x");
+      if (x) x.setAttribute("data-i", String(i));
     });
     var cnt = document.querySelector("#sheet #upCount");
     if (cnt) cnt.textContent = String(arr.length);
@@ -2835,87 +3256,84 @@
     var d = upDrag;
     if (!d) return;
     upDrag = null;
-    var row = d.row;
-    row.style.transition = "transform 200ms " + NORD_EASE;
-    row.style.transform = "translateY(0)";
-    var settle = function () {
-      row.removeEventListener("transitionend", settle);
-      row.style.transition = "";
-      row.style.transform = "";
-      row.style.zIndex = "";
-      row.classList.remove("dragging");
-    };
-    row.addEventListener("transitionend", settle);
-    setTimeout(settle, 260);
+    if (d.moved) {
+      d.cell.classList.remove("dragging");
+      d.cell.style.zIndex = "";
+    }
     upCommitOrder();
   }
-  function upMove(row, dir) {
-    if (!row) return false;
-    var box = row.parentNode;
+  /* 한 칸 옮기기 — 그리드 안에서 ←→ 는 한 칸, ↑↓ 는 한 줄(6칸) */
+  function upMoveCell(cell, delta) {
+    if (!cell) return false;
+    var box = cell.parentNode;
     if (!box) return false;
-    if (dir < 0 && row.previousElementSibling) {
-      nordFlip(box, row, function () { box.insertBefore(row, row.previousElementSibling); }, ".up-item");
-      upCommitOrder();
-      return true;
-    }
-    if (dir > 0 && row.nextElementSibling) {
-      var nx = row.nextElementSibling;
-      nordFlip(box, nx, function () { box.insertBefore(nx, row); }, ".up-item");
-      upCommitOrder();
-      return true;
-    }
-    return false;
+    var cells = upCellsOf(box);
+    var i = cells.indexOf(cell), j = i + delta;
+    if (j < 0 || j >= cells.length) return false;
+    var ref = cells[j];
+    upFlip(box, cell, function () {
+      if (delta > 0) box.insertBefore(cell, ref.nextElementSibling);
+      else box.insertBefore(cell, ref);
+    });
+    upCommitOrder();
+    return true;
   }
+  /* 사진 네모를 끌어다 놓으면 그 자리로 옮겨져요 (누르고 끌기 · 가로세로 모두) */
   document.addEventListener("pointerdown", function (ev) {
-    var g = ev.target && ev.target.closest ? ev.target.closest("#sheet .up-grip") : null;
-    if (!g) return;
-    var row = g.closest(".up-item"), box = g.closest(".up-list");
-    if (!row || !box) return;
-    ev.preventDefault();
-    var rb = row.getBoundingClientRect();
-    upDrag = {
-      grip: g, row: row, box: box, id: ev.pointerId,
-      startY: ev.clientY, translate: 0,
-      h: rb.height, center: rb.top + rb.height / 2,
-      step: rb.height + nordGapOf(box), order: upRowsOf(box)
-    };
-    row.style.transition = "none";
-    row.style.zIndex = "5";
-    row.classList.add("dragging");
-    try { g.setPointerCapture(ev.pointerId); } catch (e) {}
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    if (t.closest("#sheet .up-x")) return;
+    var c = t.closest("#sheet #upList .up-cell");
+    if (!c) return;
+    var box = document.getElementById("upList");
+    if (!box) return;
+    /* 사진을 끄는 동안 브라우저의 «이미지 끌기»가 시작되지 않게 (pointercancel 방지) */
+    if (ev.cancelable) ev.preventDefault();
+    upDrag = { cell: c, box: box, id: ev.pointerId, sx: ev.clientX, sy: ev.clientY, moved: false };
+    try { if (c.setPointerCapture) c.setPointerCapture(ev.pointerId); } catch (e) {}
   }, true);
   document.addEventListener("pointermove", function (ev) {
     var d = upDrag;
     if (!d || ev.pointerId !== d.id) return;
-    if (ev.cancelable) ev.preventDefault();
-    var row = d.row, box = d.box;
-    var boxTop = box.getBoundingClientRect().top;
-    var desiredTop = (d.center + (ev.clientY - d.startY)) - d.h / 2;
-    var want = Math.round((desiredTop - boxTop) / d.step);
-    want = Math.max(0, Math.min(d.order.length - 1, want));
-    var cur = d.order.indexOf(row);
-    if (want !== cur) {
-      nordFlip(box, row, function () {
-        d.order.splice(cur, 1);
-        d.order.splice(want, 0, row);
-        box.insertBefore(row, d.order[want + 1] || null);
-      }, ".up-item");
+    var dx = ev.clientX - d.sx, dy = ev.clientY - d.sy;
+    if (!d.moved) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      d.moved = true;
+      d.cell.classList.add("dragging");
+      d.cell.style.zIndex = "5";
     }
-    var natural = row.getBoundingClientRect().top - d.translate;
-    d.translate = desiredTop - natural;
-    row.style.transform = "translateY(" + d.translate + "px)";
+    if (ev.cancelable) ev.preventDefault();
+    var box = d.box;
+    var cells = upCellsOf(box);
+    var first = cells[0];
+    if (!first) return;
+    var r0 = first.getBoundingClientRect();
+    var gr = box.getBoundingClientRect();
+    var cw = Math.max(1, r0.width + 6), ch = Math.max(1, r0.height + 6);
+    var col = Math.max(0, Math.min(5, Math.floor((ev.clientX - gr.left) / cw)));
+    var row = Math.max(0, Math.floor((ev.clientY - gr.top) / ch));
+    var want = Math.min(cells.length - 1, row * 6 + col);
+    var cur = cells.indexOf(d.cell);
+    if (want !== cur) {
+      upFlip(box, d.cell, function () {
+        var list = upCellsOf(box);
+        var ref = list[want];
+        if (want > cur) box.insertBefore(d.cell, ref ? ref.nextElementSibling : null);
+        else box.insertBefore(d.cell, ref || null);
+      });
+    }
   }, true);
   document.addEventListener("pointerup", upEnd, true);
   document.addEventListener("pointercancel", upEnd, true);
-  /* 손잡이를 고르고 ↑ ↓ 키로도 옮길 수 있게 */
+  /* 칸을 고르고 ← → ↑ ↓ 키로도 옮길 수 있게 */
   document.addEventListener("keydown", function (ev) {
-    var g = ev.target && ev.target.closest ? ev.target.closest("#sheet .up-grip") : null;
-    if (!g) return;
-    var d = ev.key === "ArrowUp" ? -1 : (ev.key === "ArrowDown" ? 1 : 0);
+    var c = ev.target && ev.target.closest ? ev.target.closest("#sheet #upList .up-cell") : null;
+    if (!c) return;
+    var d = ev.key === "ArrowLeft" ? -1 : (ev.key === "ArrowRight" ? 1 :
+            (ev.key === "ArrowUp" ? -6 : (ev.key === "ArrowDown" ? 6 : 0)));
     if (!d) return;
     ev.preventDefault();
-    /* 줄을 옮기면 포커스가 풀리므로 손잡이를 다시 잡아 줘요 (계속 ↑ ↓ 로 옮길 수 있게) */
-    if (upMove(g.closest(".up-item"), d)) g.focus();
+    if (upMoveCell(c, d)) { try { c.focus(); } catch (e) {} }
   }, true);
 
   /* v36: 「추가」/엔터 — 입력칸의 이름을 목록 맨 아래 줄로 붙입니다.
@@ -3087,26 +3505,8 @@
       '" data-id="' + it.id + '">삭제</button>' : "";
     var submit = '<button class="btn-primary" type="submit">' + (isEdit ? "저장하기" : "추가하기") + "</button></form>";
 
-    if (kind === "memo") {
-      /* v40: 모눈 메모 — 제목은 있어도 없어도 되고, 본문만 써도 저장돼요. 사진 한 장은 골라서 붙일 수 있어요. */
-      var mimg = it && it.img ? String(it.img) : "";
-      return sheetHead(isEdit ? "메모 수정" : "새 메모") +
-        '<form class="form" id="sheetForm">' +
-        '<div class="f"><label>제목 (선택)</label><input class="field" name="text" value="' + (it ? esc(itTitle(it)) : "") +
-        '" placeholder="예) 11월 21일의 기록" autocomplete="off"></div>' +
-        '<div class="f"><label>본문</label><textarea class="field nmemo-paper" name="memo" rows="7" placeholder="오늘 있었던 일을 자유롭게 적어 두세요">' +
-        (it ? esc(itBody(it)) : "") + "</textarea></div>" +
-        '<div class="f"><label>사진 (선택)</label>' +
-        '<div class="nmemo-pick">' +
-        '<button type="button" class="btn-line" data-act="memoImgPick">사진 고르기</button>' +
-        '<span class="nmemo-pick-n" id="memoImgName">' + (mimg ? "사진 한 장 붙임" : "없음") + "</span>" +
-        (mimg ? '<button type="button" class="btn-line" data-act="memoImgClear">빼기</button>' : "") +
-        "</div>" +
-        '<input type="file" id="memoImgIn" accept="image/*" hidden>' +
-        '<input type="hidden" name="img" value="' + esc(mimg) + '">' +
-        '<img class="nmemo-prev" id="memoImgPrev" alt=""' + (mimg ? ' src="' + esc(mimg) + '"' : " hidden") + ">" +
-        "</div>" + delBtn + submit;
-    }
+    /* v41: 모눈 메모는 이 시트를 쓰지 않아요 — 모눈종이 풀스크린 다이어리(openDiary)로 열립니다 */
+    if (kind === "memo") return sheetHead("메모") + '<p class="sheet-sub">모눈 메모는 모눈종이 다이어리에서 써요.</p>';
 
     if (kind === "review") {
       var r = it ? Math.max(0, Math.min(5, Math.round(Number(it.rating) || 0))) : 0;
@@ -3485,10 +3885,11 @@
     return ap + " " + hh + ":" + pad(m);
   }
   function cmtName(who) { return who === "you" ? String(S.couple.you || "준영") : String(S.couple.me || "나"); }
-  function cmtRowHtml(c, isReply, parentId) {
+  function cmtRowHtml(c, isReply, parentId, pid) {
     var who = c.who === "you" ? "you" : "me";
     var mine = who === "me";
-    return '<div class="cmt' + (isReply ? " re" : "") + '" data-cid="' + esc(c.id) + '" data-parent="' + esc(parentId) + '">' +
+    return '<div class="cmt' + (isReply ? " re" : "") + '" data-cid="' + esc(c.id) + '" data-parent="' + esc(parentId) +
+      '" data-pid="' + esc(pid || "") + '">' +
       avSpan(who) +
       '<div class="cmt-b">' +
       '<div class="cmt-h"><b>' + esc(cmtName(who)) + "</b><span>" + esc(cmtTime(c.at)) + "</span></div>" +
@@ -3510,9 +3911,10 @@
     h += "</div>";
     return h;
   }
-  function cmtFormHtml(p) {
-    return '<form class="cmt-form" data-id="' + esc(p ? p.id : "") + '">' +
+  function cmtFormHtml(p, day) {
+    return '<form class="cmt-form" data-id="' + esc(p ? p.id : "") + '" data-day="' + esc(day || "") + '">' +
       '<input type="hidden" name="re" value="">' +
+      '<input type="hidden" name="repid" value="">' +
       avSpan("me") +
       '<input class="cmt-in" name="text" placeholder="댓글 달기" autocomplete="off" enterkeyhint="send" aria-label="댓글">' +
       '<button class="cmt-send" type="submit">등록</button></form>';
@@ -3670,16 +4072,16 @@
     pendingFiles.forEach(function (f) { t += f.size || 0; });
     return t;
   }
+  /* v41: 사진은 한 줄에 6개씩 들어가는 정사각 네모 칸으로 — 칸 오른쪽 위 × 로 빼고,
+     칸을 끌어다 놓으면(또는 ←→↑↓) 순서가 바뀌어요 */
   function photoUpRowsHtml() {
+    if (!pendingFiles.length) return '<div class="up-empty">고른 사진이 없어요. 「추가」로 담아 보세요.</div>';
     return pendingFiles.map(function (f, i) {
       var url = "";
       try { url = URL.createObjectURL(f); pendingUrls.push(url); } catch (e) {}
-      return '<div class="up-item" data-i="' + i + '">' +
-        /* v40: 노트 카테고리 목록처럼 맨 앞 ≡ 손잡이 — 끌어서 사진 순서를 바꿔요 */
-        '<button type="button" class="up-grip" data-act="upGrip" aria-label="사진 순서 바꾸기 — 끌거나 위·아래 화살표" title="끌어서 위아래로 옮겨요">' + IC.grip + "</button>" +
-        (url ? '<img class="up-thumb" src="' + url + '" alt="">' : '<div class="up-thumb"></div>') +
-        '<div class="up-name">' + esc(f.name || "사진") + "</div>" +
-        '<button type="button" class="up-del" data-act="upDel" data-i="' + i + '" aria-label="이 사진 빼기">삭제</button></div>';
+      return '<div class="up-cell" data-i="' + i + '" tabindex="0" role="button" aria-label="' + esc(f.name || "사진") + '">' +
+        (url ? '<img class="up-thumb" src="' + url + '" alt="" draggable="false">' : '<span class="up-thumb"></span>') +
+        '<button type="button" class="up-x" data-act="upDel" data-i="' + i + '" aria-label="이 사진 빼기">' + IC.x + "</button></div>";
     }).join("");
   }
   /* 목록·요약·담기 버튼의 장 수를 지금 상태에 맞춰 다시 칩니다 */
@@ -3702,16 +4104,18 @@
     return sheetHead("사진 추가") +
       '<p class="sheet-sub" id="upSum">' + pendingFiles.length + "장 · " + fmtBytes(upTotal()) + " · 긴 변 1800px 로 줄여서 보관해요.</p>" +
       '<form class="form" id="sheetForm" data-form="photo">' +
-      '<div class="f"><label>날짜</label><input class="field up-date" type="date" name="date" value="' +
-      dv + '" required></div>' +
-      /* v40: 태그는 늘 빈 칸에서 시작 — 예전에 올린 태그가 따라 올라오지 않게.
-         (한 번 연 시트에서 「+ 추가」로 더 담을 때는 입력해 둔 값이 그대로 남아요) */
-      '<div class="f"><label>태그</label><input class="field" name="album_tag" value=""' +
-      ' placeholder="어디서 · 무슨 날 (예: 경주여행)" autocomplete="off"></div>' +
+      /* v41: 「기록 이름」과 「날짜」를 한 줄에 나란히 — 세로 여백을 줄였어요.
+         기록 이름은 늘 빈 칸에서 시작(예전에 올린 이름이 따라 올라오지 않게),
+         한 시트에서 「+ 추가」로 더 담을 때는 적어 둔 값이 그대로 남아요. */
+      '<div class="up-row">' +
+      '<div class="f up-nm-f"><label>기록 이름</label><input class="field" name="album_tag" value=""' +
+      ' placeholder="예) 경주여행" autocomplete="off"></div>' +
+      '<div class="f up-date-f"><label>날짜</label><input class="field up-date" type="date" name="date" value="' +
+      dv + '" required></div></div>' +
       /* v40: 「캡션」 칸은 없앴어요 — 날짜·태그·고른 사진만 남깁니다 */
       '<div class="up-hd"><span class="up-hd-t">선택한 사진 <b id="upCount">' + pendingFiles.length + '</b>장</span>' +
       '<button type="button" class="up-add" data-act="upAdd">' + IC.plus + " 추가</button></div>" +
-      '<div class="up-list" id="upList">' + photoUpRowsHtml() + "</div>" +
+      '<div class="up-grid" id="upList">' + photoUpRowsHtml() + "</div>" +
       '<div class="up-bar" id="upBar"><i></i></div>' +
       '<button class="btn-primary" id="upBtn" type="submit">' + pendingFiles.length + "장 담기</button></form>" +
       '<div style="height:10px"></div><button class="btn-line" data-close="1">취소</button>';
@@ -3727,19 +4131,16 @@
   var dayAddMore = false;
 
   function dayEditRows() {
-    var h = "";
-    (dayEdit ? dayEdit.items : []).forEach(function (it, i) {
+    if (!dayEdit || !dayEdit.items.length) return '<div class="up-empty">이 날짜에 사진이 없어요. 「추가」로 담아 보세요.</div>';
+    return dayEdit.items.map(function (it, i) {
       var p = it.pid ? S.photos.filter(function (x) { return x.id === it.pid; })[0] : null;
-      var inner = p ? photoImg(p) : (it.url ? '<img src="' + esc(it.url) + '" alt="">' : "");
+      var inner = p ? photoImg(p) : (it.url ? '<img src="' + esc(it.url) + '" alt="" draggable="false">' : "");
       var name = p ? (p.album || "사진") : (it && it.file ? (it.file.name || "사진") : "사진");
-      h += '<div class="up-item" data-i="' + i + '"' + (p ? ' data-pid="' + esc(p.id) + '"' : "") + ">" +
-        '<button type="button" class="up-grip" data-act="upGrip" aria-label="사진 순서 바꾸기" title="끌어서 위아래로 옮겨요">' + IC.grip + "</button>" +
+      return '<div class="up-cell" data-i="' + i + '"' + (p ? ' data-pid="' + esc(p.id) + '"' : "") +
+        ' tabindex="0" role="button" aria-label="' + esc(name) + '">' +
         '<span class="up-thumb">' + inner + "</span>" +
-        '<div class="up-name">' + esc(name) + "</div>" +
-        '<button type="button" class="up-del" data-act="upDel" data-i="' + i + '" aria-label="이 사진 빼기">삭제</button></div>';
-    });
-    if (!h) h = '<div class="up-empty">이 날짜에 사진이 없어요. 「추가」로 담아 보세요.</div>';
-    return h;
+        '<button type="button" class="up-x" data-act="upDel" data-i="' + i + '" aria-label="이 사진 빼기">' + IC.x + "</button></div>";
+    }).join("");
   }
   function refreshDayEdit() {
     var list = document.querySelector("#sheet #upList");
@@ -3754,12 +4155,13 @@
     return sheetHead("사진 수정") +
       '<p class="sheet-sub">이 날짜의 사진을 고치고, ≡ 로 순서를 바꿔요.</p>' +
       '<form class="form" id="sheetForm" data-form="photoDay">' +
-      '<div class="f"><label>날짜</label><input class="field up-date" type="date" name="date" value="' + day + '" required></div>' +
-      '<div class="f"><label>태그</label><input class="field" name="album_tag" value="' + esc(dateTagOf(day)) +
-      '" placeholder="어디서 · 무슨 날 (예: 경주여행)" autocomplete="off"></div>' +
+      '<div class="up-row">' +
+      '<div class="f up-nm-f"><label>기록 이름</label><input class="field" name="album_tag" value="' + esc(dateTagOf(day)) +
+      '" placeholder="예) 경주여행" autocomplete="off"></div>' +
+      '<div class="f up-date-f"><label>날짜</label><input class="field up-date" type="date" name="date" value="' + day + '" required></div></div>' +
       '<div class="up-hd"><span class="up-hd-t">사진 <b id="upCount">' + dayEdit.items.length + '</b>장</span>' +
       '<button type="button" class="up-add" data-act="upAdd">' + IC.plus + " 추가</button></div>" +
-      '<div class="up-list" id="upList">' + dayEditRows() + "</div>" +
+      '<div class="up-grid" id="upList">' + dayEditRows() + "</div>" +
       '<button class="btn-primary" type="submit">저장하기</button></form>' +
       '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
   }
@@ -4983,20 +5385,91 @@
     }
 
     /* v40: 모눈 메모 시트의 사진 한 장 — 고르기/빼기 */
-    if (act === "memoImgPick") {
-      var mIn = document.getElementById("memoImgIn");
-      if (mIn) mIn.click();
+    /* v41: 모눈 메모 — 모눈종이 풀스크린 다이어리 */
+    if (act === "openDiary") {
+      openDiary(el.getAttribute("data-list"), el.getAttribute("data-id"));
       return;
     }
-    if (act === "memoImgClear") {
-      var mHide = document.querySelector('#sheet input[name="img"]');
-      if (mHide) mHide.value = "";
-      var mPrev = document.getElementById("memoImgPrev");
-      if (mPrev) { mPrev.hidden = true; mPrev.removeAttribute("src"); }
-      var mNm = document.getElementById("memoImgName");
-      if (mNm) mNm.textContent = "없음";
-      var mClear = el.parentNode ? el.parentNode.querySelector('[data-act="memoImgClear"]') : null;
-      if (mClear && mClear.parentNode) mClear.parentNode.removeChild(mClear);
+    if (act === "d41Text") { d41PanelOpen("text"); return; }
+    if (act === "d41Pen") { d41PanelOpen("pen"); return; }
+    if (act === "d41Img") {
+      var d41In = document.getElementById("d41ImgIn");
+      if (d41In) d41In.click();
+      return;
+    }
+    if (act === "d41Size") {
+      if (!diary) return;
+      diary.sty.size = Number(el.getAttribute("data-size")) || 2;
+      d41ApplyStyle();
+      return;
+    }
+    if (act === "d41Color") {
+      if (!diary) return;
+      diary.sty.color = el.getAttribute("data-color") || "";
+      d41ApplyStyle();
+      return;
+    }
+    if (act === "d41Align") {
+      if (!diary) return;
+      diary.sty.align = el.getAttribute("data-align") === "center" ? "center" : "left";
+      d41ApplyStyle();
+      return;
+    }
+    if (act === "d41ImgSel") {
+      if (!diary) return;
+      var d41Sid = el.getAttribute("data-img");
+      diary.sel = diary.sel === d41Sid ? null : d41Sid;
+      d41RenderImgs();
+      return;
+    }
+    if (act === "d41ImgDel") {
+      if (!diary) return;
+      var d41Did = el.getAttribute("data-img");
+      diary.imgs = diary.imgs.filter(function (x) { return x.id !== d41Did; });
+      if (diary.sel === d41Did) diary.sel = null;
+      d41RenderImgs();
+      d41Sync();
+      return;
+    }
+    if (act === "d41ImgSz") {
+      if (!diary) return;
+      var d41Zid = el.getAttribute("data-img");
+      var d41Zsz = Number(el.getAttribute("data-sz")) || 2;
+      diary.imgs.forEach(function (x) { if (x.id === d41Zid) x.size = d41Zsz; });
+      d41RenderImgs();
+      d41Sync();
+      return;
+    }
+    if (act === "d41PenMode") {
+      if (!diary) return;
+      diary.pmode = el.getAttribute("data-mode") === "erase" ? "erase" : "pen";
+      d41PanelRefresh();
+      return;
+    }
+    if (act === "d41PenColor") {
+      if (!diary) return;
+      diary.pcolor = el.getAttribute("data-color") || "#111111";
+      d41PanelRefresh();
+      return;
+    }
+    if (act === "d41PenW") {
+      if (!diary) return;
+      diary.pw = Number(el.getAttribute("data-w")) || 3.5;
+      d41PanelRefresh();
+      return;
+    }
+    if (act === "d41Undo") {
+      if (!diary) return;
+      diary.pen.pop();
+      d41Paint();
+      d41Sync();
+      return;
+    }
+    if (act === "d41Clear") {
+      if (!diary) return;
+      diary.pen = [];
+      d41Paint();
+      d41Sync();
       return;
     }
 
@@ -5045,6 +5518,7 @@
     }
 
     if (act === "delListItem") {
+      if (dropDraftItem(el.getAttribute("data-id"))) return;
       var dl = containerOf(el.getAttribute("data-list"));
       var di = el.getAttribute("data-id");
       if (dl) {
@@ -5063,6 +5537,8 @@
       var elIt = elL ? elL.items.filter(function (x) { return x.id === elId; })[0] : null;
       if (!elL || !elIt) return;
       var edKind = listKindOf(elL);
+      /* v41: 모눈 메모는 시트 대신 모눈종이 풀스크린 다이어리로 열어요 */
+      if (edKind === "memo") { openDiary(elCid, elId); return; }
       openSheet(formListItem(elL, elIt), function (fd) {
         var L2 = containerOf(elCid);
         var I2 = L2 ? L2.items.filter(function (x) { return x.id === elId; })[0] : null;
@@ -5122,15 +5598,8 @@
     }
 
     if (act === "addGroup") {
-      var agK = el.getAttribute("data-tab") || "todo";
-      openSheet(formGroup(agK, null), function (fd) {
-        var gTitle = String(fd.get("title") || "").trim();
-        if (!gTitle) { toast("리스트 이름을 적어 주세요"); return; }
-        S.groups = S.groups || {};
-        S.groups[agK] = S.groups[agK] || [];
-        S.groups[agK].push({ id: uid(), title: gTitle, who: "me", date: today });
-        save(); closeSheet(); renderAll(); toast("리스트를 만들었어요");
-      });
+      /* v41: 중간 단계 없이 바로 카드 시트(제목·제목 색·To-do) */
+      openNewCardSheet(el.getAttribute("data-tab") || "todo");
       return;
     }
 
@@ -5165,6 +5634,8 @@
       var alL = containerOf(alId);
       if (!alL) return;
       var alKind = listKindOf(alL);
+      /* v41: 모눈 메모는 새 다이어리로 */
+      if (alKind === "memo") { openDiary(alId, null); return; }
       openSheet(formListItem(alL, null), function (fd) {
         var L0 = containerOf(alId);
         if (!L0) return;
@@ -5230,6 +5701,7 @@
     }
 
     if (act === "delTodo") {
+      if (dropDraftItem(el.getAttribute("data-id"))) return;
       var dtId = el.getAttribute("data-id");
       S.todos = S.todos.filter(function (x) { return x.id !== dtId; });
       save();
@@ -5258,6 +5730,7 @@
     }
 
     if (act === "delBucket") {
+      if (dropDraftItem(el.getAttribute("data-id"))) return;
       var dbId = el.getAttribute("data-id");
       S.bucket = S.bucket.filter(function (x) { return x.id !== dbId; });
       save();
@@ -5343,6 +5816,7 @@
     }
 
     if (act === "delLog") {
+      if (dropDraftItem(el.getAttribute("data-id"))) return;
       var lid = el.getAttribute("data-id");
       S.logs = S.logs.filter(function (l) { return l.id !== lid; });
       save();
@@ -5380,7 +5854,22 @@
 
     /* v21: 노트 카드 시트에서 제목 바탕색을 고를 때 — 그 카드에만 바로 저장 */
     if (act === "pickCardColor") {
-      var ccg = groupOf(el.getAttribute("data-tab") || "", el.getAttribute("data-gid") || "");
+      var ccTab = el.getAttribute("data-tab") || "", ccGid = el.getAttribute("data-gid") || "";
+      if (newCard && ccGid === newCard.gid) {
+        /* 아직 저장 전인 새 카드 — 색만 기억해 두고 시트의 컬러판 표시를 바꿔요 */
+        var ccv0 = String(el.getAttribute("data-color") || "");
+        newCard.titleBg = /^#[0-9a-fA-F]{6}$/.test(ccv0) ? ccv0.toUpperCase() : "";
+        var cp0 = el.closest(".cp");
+        if (cp0) {
+          cp0.querySelectorAll(".sw").forEach(function (b) {
+            b.classList.toggle("sel", String(b.getAttribute("data-color") || "").toUpperCase() === newCard.titleBg);
+          });
+          var rs0 = cp0.querySelector(".cp-reset");
+          if (rs0) rs0.classList.toggle("on", !newCard.titleBg);
+        }
+        return;
+      }
+      var ccg = groupOf(ccTab, ccGid);
       if (!ccg) return;
       var ccv = String(el.getAttribute("data-color") || "");
       ccg.titleBg = /^#[0-9a-fA-F]{6}$/.test(ccv) ? ccv.toUpperCase() : "";
@@ -5601,7 +6090,7 @@
         setDateTag(tgd, fd.get("tag"));
         closeSheet();
         if (current === "photo") renderPhoto();
-        toast("날짜 태그를 저장했어요");
+        toast("기록 이름을 저장했어요");
       });
       return;
     }
@@ -5654,12 +6143,14 @@
       return;
     }
 
-    /* v40: 모아보기의 사진마다 댓글 — 답글 모드 · 삭제 · ⋯ 메뉴 */
+    /* v41: 날짜(챕터) 댓글 — 답글 모드 · 삭제 · ⋯ 메뉴 */
     if (act === "cmtReply") {
-      var secR = el.closest ? el.closest("[data-pid]") : null;
-      if (!secR) return;
-      var fR = secR.querySelector(".cmt-form");
+      var rowR = el.closest ? el.closest(".cmt") : null;
+      var secR = el.closest ? el.closest(".dcmt") : null;
+      var fR = secR ? secR.querySelector(".cmt-form") : null;
       if (!fR) return;
+      var rePidIn = fR.querySelector('input[name="repid"]');
+      if (rePidIn) rePidIn.value = rowR ? (rowR.getAttribute("data-pid") || "") : "";
       var reIn = fR.querySelector('input[name="re"]');
       if (reIn) reIn.value = el.getAttribute("data-id") || "";
       var whoName = el.getAttribute("data-name") || "";
@@ -5677,11 +6168,13 @@
       return;
     }
     if (act === "cmtReplyCancel") {
-      var secC = el.closest ? el.closest("[data-pid]") : null;
+      var secC = el.closest ? el.closest(".dcmt") : null;
       var fC = secC ? secC.querySelector(".cmt-form") : null;
       if (fC) {
         var reC = fC.querySelector('input[name="re"]');
         if (reC) reC.value = "";
+        var rePidC = fC.querySelector('input[name="repid"]');
+        if (rePidC) rePidC.value = "";
         var tC = fC.querySelector(".cmt-in");
         if (tC) tC.setAttribute("placeholder", "댓글 달기");
       }
@@ -5690,11 +6183,19 @@
       return;
     }
     if (act === "cmtDel") {
-      var secD = el.closest ? el.closest("[data-pid]") : null;
-      var pidD = secD ? secD.getAttribute("data-pid") : "";
-      var pD = S.photos.filter(function (x) { return x.id === pidD; })[0];
-      if (!pD) return;
+      var rowD = el.closest ? el.closest(".cmt") : null;
+      var pidD = rowD ? (rowD.getAttribute("data-pid") || "") : "";
       var cidDel = el.getAttribute("data-id");
+      var pD = S.photos.filter(function (x) { return x.id === pidD; })[0];
+      if (!pD) {
+        /* 어느 사진에 달린 댓글인지 모를 때 — 그날 사진에서 찾아요 */
+        pD = S.photos.filter(function (x) {
+          return ((x.comments) || []).some(function (c) {
+            return c.id === cidDel || (c.replies || []).some(function (r) { return r.id === cidDel; });
+          });
+        })[0];
+      }
+      if (!pD) return;
       pD.comments = (pD.comments || []).filter(function (c) {
         if (c.id === cidDel) return false;
         c.replies = (c.replies || []).filter(function (r) { return r.id !== cidDel; });
@@ -6057,6 +6558,85 @@
     calMove(dx < 0 ? 1 : -1);
   }, { passive: true });
 
+  /* v41: 카드 시트의 To-do 입력줄 — 폼(form) 안에 넣기 위해 div 로 바꿔도 같은 동작 */
+  function cardAddFrom(lf) {
+      var lid = lf.getAttribute("data-list");
+      if (lid) {
+        /* 사용자 리스트(리스트 탭) 안에서 바로 더하기 */
+        var lobj = containerOf(lid);
+        if (!lobj) return;
+        var cin = lf.querySelector('input[name="text"]');
+        var ctx = String((cin && cin.value) || "").trim();
+        if (!ctx) { if (cin) cin.focus(); return; }
+        var cit;
+        if (isBaseContainer(lobj)) {
+          cit = basePush(lobj.base, { text: ctx, memo: "" });
+        } else {
+          cit = { id: uid(), text: ctx, memo: "", done: false };
+          lobj.items.push(cit);
+        }
+        save();
+        var cbox = document.querySelector('#s-diary .todo-items[data-list="' + lid + '"]');
+        if (cbox) {
+          var cem = cbox.querySelector(".empty");
+          if (cem) cem.remove();
+          cbox.insertAdjacentHTML("beforeend", listItemRow(cit, '<div class="t tw">' + esc(itTitle(cit)) + "</div>",
+            'data-act="toggleListItem" data-list="' + lid + '" data-id="' + cit.id + '"',
+            'data-act="editListItem" data-list="' + lid + '" data-id="' + cit.id + '"',
+            'data-act="delListItem" data-list="' + lid + '" data-id="' + cit.id + '"'));
+        }
+        if (cin) { cin.value = ""; cin.focus(); }
+        var cpr = document.querySelector('#s-diary .progress[data-list="' + lid + '"]');
+        if (cpr) updateProgressBar(cpr, lobj.items, "완료");
+        return;
+      }
+      var lk = lf.getAttribute("data-tab") || "todo";
+      var lgid = lf.getAttribute("data-gid") || firstGroupId(lk);
+      var lin = lf.querySelector('input[name="text"]');
+      var ltxt = String((lin && lin.value) || "").trim();
+      if (!ltxt) { if (lin) lin.focus(); return; }
+      var lit = { id: uid(), done: false, gid: lgid };
+      if (lk === "todo") { lit.text = ltxt; lit.memo = ""; lit.who = "함께"; }
+      else if (lk === "bucket") { lit.title = ltxt; lit.cat = "기타"; lit.memo = ""; }
+      else if (isListSeg(lk)) { lit.text = ltxt; lit.memo = ""; }
+      else { lit.kind = "movie"; lit.title = ltxt; lit.rating = 4; lit.date = today; lit.review = ""; lit.place = ""; lit.done = true; }
+      /* v41: 저장 전인 새 카드 — 항목은 카드와 함께 저장될 때까지 잠깐 들고 있어요 */
+      if (newCard && newCard.gid === lgid) {
+        newCard.items.push(lit);
+        var nbox0 = document.querySelector("#sheet .card-items");
+        if (nbox0) {
+          var nem0 = nbox0.querySelector(".empty");
+          if (nem0) nem0.remove();
+          nbox0.insertAdjacentHTML("beforeend", diaryRow(lk, lit));
+        }
+        if (lin) { lin.value = ""; lin.focus(); }
+        return;
+      }
+      itemsOf(lk).push(lit);
+      save();
+      /* 카드 상세 시트에서 바로 더한 경우 — 시트 안 목록에 붙이고 입력칸을 비워요 */
+      if (openCard && openCard.tab === lk && openCard.gid === lgid) {
+        var sbox = document.querySelector('#sheet .card-items');
+        if (sbox) {
+          var sel2 = sbox.querySelector(".empty");
+          if (sel2) sel2.remove();
+          sbox.insertAdjacentHTML("beforeend", diaryRow(lk, lit));
+        }
+        if (lin) { lin.value = ""; lin.focus(); }
+        return;
+      }
+      var lbox = document.querySelector('#s-diary .todo-items[data-tab="' + lk + '"][data-gid="' + lgid + '"]');
+      if (lbox) {
+        var lel = lbox.querySelector(".empty");
+        if (lel) lel.remove();
+        lbox.insertAdjacentHTML("beforeend", diaryRow(lk, lit));
+      }
+      if (lin) { lin.value = ""; lin.focus(); }
+      var lpr = document.querySelector('#s-diary .progress[data-tab="' + lk + '"]');
+      if (lpr) updateProgressBar(lpr, itemsOf(lk), lk === "bucket" ? "달성" : "완료");
+
+  }
+
   document.addEventListener("submit", function (ev) {
     if (ev.target.id === "personForm") {
       ev.preventDefault();
@@ -6087,23 +6667,33 @@
       return;
     }
 
-    /* v40: 사진 댓글·대댓글 달기 — 작성자 프사·이름과 함께 사진에 담겨요 */
+    /* v41: 날짜(챕터) 댓글·대댓글 달기 — 작성자 프사·이름과 함께 그날 사진에 담겨요.
+       새 댓글은 그날의 대표(첫 번째) 사진에, 대댓글은 원래 댓글이 있던 사진에 붙어요. */
     if (ev.target.classList && ev.target.classList.contains("cmt-form")) {
       ev.preventDefault();
       var cf = ev.target;
-      var cp = S.photos.filter(function (x) { return x.id === cf.getAttribute("data-id"); })[0];
-      if (!cp) return;
+      var dayC = String(cf.getAttribute("data-day") || "").slice(0, 10) || String(photoDayView || "");
       var cin = cf.querySelector(".cmt-in");
       var txt = String((cin && cin.value) || "").trim();
       if (!txt) { if (cin) cin.focus(); return; }
       var reId = String((cf.querySelector('input[name="re"]') || {}).value || "");
-      cp.comments = Array.isArray(cp.comments) ? cp.comments : [];
+      var rePid = String((cf.querySelector('input[name="repid"]') || {}).value || "");
+      var rep = (dayC ? dayRepPhoto(dayC) : null) ||
+        S.photos.filter(function (x) { return x.id === cf.getAttribute("data-id"); })[0];
+      if (!rep) return;
       var at = new Date().toISOString();
       if (reId) {
-        var par = cp.comments.filter(function (c) { return c.id === reId; })[0];
+        var owner = S.photos.filter(function (x) { return x.id === rePid; })[0] ||
+          S.photos.filter(function (x) {
+            return ((x.comments) || []).some(function (c) {
+              return c.id === reId || ((c.replies || [])).some(function (r) { return r.id === reId; });
+            });
+          })[0] || rep;
+        owner.comments = Array.isArray(owner.comments) ? owner.comments : [];
+        var par = owner.comments.filter(function (c) { return c.id === reId; })[0];
         var toName = par ? cmtName(par.who) : "";
         if (!par) {
-          cp.comments.forEach(function (c) {
+          owner.comments.forEach(function (c) {
             (c.replies || []).forEach(function (r) {
               if (r.id === reId) { par = c; toName = cmtName(r.who); }
             });
@@ -6114,11 +6704,12 @@
           par.replies.push({ id: uid(), who: "me", text: txt, at: at, to: toName });
         }
       } else {
-        cp.comments.push({ id: uid(), who: "me", text: txt, at: at, replies: [] });
+        rep.comments = Array.isArray(rep.comments) ? rep.comments : [];
+        rep.comments.push({ id: uid(), who: "me", text: txt, at: at, replies: [] });
       }
       save();
-      refreshDayCmt(cp);
-      var nf2 = document.querySelector('#s-photo .dcmt-b[data-pid="' + cp.id + '"] .cmt-in');
+      refreshDayCmt(dayC || rep);
+      var nf2 = document.querySelector("#s-photo .dcmt.dcmt-day .cmt-in");
       if (nf2) { try { nf2.focus(); } catch (e) {} }
       return;
     }
@@ -6295,71 +6886,8 @@
       return;
     }
     if (ev.target.id === "listAddForm") {
-      /* 노트 리스트: ○ + 입력 + Add 로 바로 더하기 */
       ev.preventDefault();
-      var lf = ev.target;
-      var lid = lf.getAttribute("data-list");
-      if (lid) {
-        /* 사용자 리스트(리스트 탭) 안에서 바로 더하기 */
-        var lobj = containerOf(lid);
-        if (!lobj) return;
-        var cin = lf.querySelector('input[name="text"]');
-        var ctx = String((cin && cin.value) || "").trim();
-        if (!ctx) { if (cin) cin.focus(); return; }
-        var cit;
-        if (isBaseContainer(lobj)) {
-          cit = basePush(lobj.base, { text: ctx, memo: "" });
-        } else {
-          cit = { id: uid(), text: ctx, memo: "", done: false };
-          lobj.items.push(cit);
-        }
-        save();
-        var cbox = document.querySelector('#s-diary .todo-items[data-list="' + lid + '"]');
-        if (cbox) {
-          var cem = cbox.querySelector(".empty");
-          if (cem) cem.remove();
-          cbox.insertAdjacentHTML("beforeend", listItemRow(cit, '<div class="t tw">' + esc(itTitle(cit)) + "</div>",
-            'data-act="toggleListItem" data-list="' + lid + '" data-id="' + cit.id + '"',
-            'data-act="editListItem" data-list="' + lid + '" data-id="' + cit.id + '"',
-            'data-act="delListItem" data-list="' + lid + '" data-id="' + cit.id + '"'));
-        }
-        if (cin) { cin.value = ""; cin.focus(); }
-        var cpr = document.querySelector('#s-diary .progress[data-list="' + lid + '"]');
-        if (cpr) updateProgressBar(cpr, lobj.items, "완료");
-        return;
-      }
-      var lk = lf.getAttribute("data-tab") || "todo";
-      var lgid = lf.getAttribute("data-gid") || firstGroupId(lk);
-      var lin = lf.querySelector('input[name="text"]');
-      var ltxt = String((lin && lin.value) || "").trim();
-      if (!ltxt) { if (lin) lin.focus(); return; }
-      var lit = { id: uid(), done: false, gid: lgid };
-      if (lk === "todo") { lit.text = ltxt; lit.memo = ""; lit.who = "함께"; }
-      else if (lk === "bucket") { lit.title = ltxt; lit.cat = "기타"; lit.memo = ""; }
-      else if (isListSeg(lk)) { lit.text = ltxt; lit.memo = ""; }
-      else { lit.kind = "movie"; lit.title = ltxt; lit.rating = 4; lit.date = today; lit.review = ""; lit.place = ""; lit.done = true; }
-      itemsOf(lk).push(lit);
-      save();
-      /* 카드 상세 시트에서 바로 더한 경우 — 시트 안 목록에 붙이고 입력칸을 비워요 */
-      if (openCard && openCard.tab === lk && openCard.gid === lgid) {
-        var sbox = document.querySelector('#sheet .card-items');
-        if (sbox) {
-          var sel2 = sbox.querySelector(".empty");
-          if (sel2) sel2.remove();
-          sbox.insertAdjacentHTML("beforeend", diaryRow(lk, lit));
-        }
-        if (lin) { lin.value = ""; lin.focus(); }
-        return;
-      }
-      var lbox = document.querySelector('#s-diary .todo-items[data-tab="' + lk + '"][data-gid="' + lgid + '"]');
-      if (lbox) {
-        var lel = lbox.querySelector(".empty");
-        if (lel) lel.remove();
-        lbox.insertAdjacentHTML("beforeend", diaryRow(lk, lit));
-      }
-      if (lin) { lin.value = ""; lin.focus(); }
-      var lpr = document.querySelector('#s-diary .progress[data-tab="' + lk + '"]');
-      if (lpr) updateProgressBar(lpr, itemsOf(lk), lk === "bucket" ? "달성" : "완료");
+      cardAddFrom(ev.target);
       return;
     }
     if (ev.target.id !== "sheetForm" || !sheetSubmit) return;
@@ -6368,8 +6896,31 @@
     try { sheetSubmit(fd); } catch (e) { toast("저장하지 못했어요"); }
   });
 
+  /* v41: 카드 시트의 To-do 「Add」 — 폼 안에 넣으면서 div 로 바뀌어 클릭·엔터로 더해요 */
+  document.addEventListener("click", function (ev) {
+    var b = ev.target && ev.target.closest ? ev.target.closest("#sheet #listAddForm .todo-add-btn") : null;
+    if (!b) return;
+    ev.preventDefault();
+    var lf = b.closest("#listAddForm");
+    if (lf) cardAddFrom(lf);
+  }, true);
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Enter") return;
+    var t = ev.target;
+    if (!t || !t.closest || !t.closest("#sheet #listAddForm input[name=\"text\"]")) return;
+    ev.preventDefault();
+    cardAddFrom(t.closest("#listAddForm"));
+  }, true);
+
   document.addEventListener("input", function (ev) {
     var t = ev.target;
+    /* v41: 모눈 다이어리 본문 — 적는 만큼 종이가 길어지고, 그림 좌표도 함께 맞춰요 */
+    if (t && t.classList && t.classList.contains("d41-body")) {
+      t.style.height = "auto";
+      t.style.height = Math.max(200, t.scrollHeight) + "px";
+      d41Paint();
+      return;
+    }
     /* v19: 일정 검색 — 글자를 칠 때마다 결과를 바로 */
     if (t && t.id === "calSearchIn") {
       var sOut = document.getElementById("calSearchOut");
@@ -6417,39 +6968,35 @@
     if (ev.target && ev.target.classList && ev.target.classList.contains("js-evtime") && ev.target.value) {
       ev.target.hidden = true;
     }
-    /* v40: 모눈 메모에 붙일 사진 한 장 — 작게 줄여서 메모 항목에 담아요 */
-    if (ev.target && ev.target.id === "memoImgIn") {
-      var mFile = (ev.target.files || [])[0];
+    /* v41: 모눈 다이어리 사진 — 720px 로 줄여 여러 장 붙이고, 붙인 자리에서 크기·삭제 */
+    if (ev.target && ev.target.classList && ev.target.classList.contains("d41-datein")) {
+      var dBig = document.getElementById("d41DateBig");
+      if (dBig) dBig.textContent = d41Stamp(ev.target.value);
+      return;
+    }
+    if (ev.target && ev.target.id === "d41ImgIn") {
+      var dFiles = Array.prototype.slice.call(ev.target.files || []);
       ev.target.value = "";
-      if (!mFile) return;
-      var mComp = (window.TwoLog && window.TwoLog.compressImage)
-        ? window.TwoLog.compressImage(mFile, 720, 0.6)
-        : Promise.reject(new Error("no_compress"));
-      mComp.then(function (res) {
-        return new Promise(function (resolve, reject) {
-          var fr = new FileReader();
-          fr.onload = function () { resolve(String(fr.result || "")); };
-          fr.onerror = function () { reject(fr.error || new Error("read_failed")); };
-          fr.readAsDataURL(res.blob);
+      if (!dFiles.length || !diary) return;
+      var dSeq = Promise.resolve();
+      dFiles.forEach(function (f) {
+        dSeq = dSeq.then(function () {
+          var comp = (window.TwoLog && window.TwoLog.compressImage)
+            ? window.TwoLog.compressImage(f, 720, 0.6)
+            : Promise.reject(new Error("no_compress"));
+          return comp.then(function (res) {
+            return new Promise(function (ok, no) {
+              var fr = new FileReader();
+              fr.onload = function () { ok(String(fr.result || "")); };
+              fr.onerror = function () { no(fr.error || new Error("read_failed")); };
+              fr.readAsDataURL(res.blob);
+            });
+          }).then(function (dataUrl) {
+            if (dataUrl && diary) diary.imgs.push({ id: uid(), src: dataUrl, size: 2 });
+          }).catch(function () { toast("사진을 붙이지 못했어요"); });
         });
-      }).then(function (dataUrl) {
-        if (!dataUrl) return;
-        var hide = document.querySelector('#sheet input[name="img"]');
-        if (hide) hide.value = dataUrl;
-        var prev = document.getElementById("memoImgPrev");
-        if (prev) { prev.src = dataUrl; prev.hidden = false; }
-        var nm = document.getElementById("memoImgName");
-        if (nm) nm.textContent = "사진 한 장 붙임";
-        var pick = document.querySelector('#sheet [data-act="memoImgPick"]');
-        if (pick && pick.parentNode && !pick.parentNode.querySelector('[data-act="memoImgClear"]')) {
-          var clr = document.createElement("button");
-          clr.type = "button";
-          clr.className = "btn-line";
-          clr.setAttribute("data-act", "memoImgClear");
-          clr.textContent = "빼기";
-          pick.parentNode.appendChild(clr);
-        }
-      }).catch(function () { toast("사진을 붙이지 못했어요"); });
+      });
+      dSeq.then(function () { d41RenderImgs(); d41Sync(); });
       return;
     }
     if (!ev.target || ev.target.id !== "avatarInput") return;

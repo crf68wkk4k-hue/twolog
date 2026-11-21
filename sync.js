@@ -487,6 +487,18 @@
           if (it.gid) x.gid = String(it.gid);
           /* v40: 모눈 메모에 붙인 사진 한 장 */
           if (it.img) x.img = String(it.img);
+          /* v41: 모눈 다이어리 — 사진 여러 장 · 글씨 모양 · 손그림도 함께 실어요 */
+          if (Array.isArray(it.imgs) && it.imgs.length) {
+            x.imgs = it.imgs.filter(function (m) { return m && m.src; }).map(function (m) {
+              var sz = Number(m.size);
+              return { id: String(m.id || ""), src: String(m.src), size: sz === 1 || sz === 3 ? sz : 2 };
+            });
+          }
+          if (it.sty && typeof it.sty === "object") {
+            x.sty = { size: Number(it.sty.size) || 2, color: String(it.sty.color || ""),
+                     align: it.sty.align === "center" ? "center" : "left" };
+          }
+          if (Array.isArray(it.pen) && it.pen.length) x.pen = it.pen;
           if (it.rating != null) x.rating = Number(it.rating) || 0;
           if (it.place != null) x.place = String(it.place);
           if (it.date != null) x.date = String(it.date);
@@ -655,6 +667,18 @@
               /* v40: 어느 카드(리스트) 안의 항목인지 — 없으면 앱이 첫 카드로 이어 줘요 */
               if (it.gid) x.gid = String(it.gid);
               if (it.img) x.img = String(it.img);
+              /* v41: 모눈 다이어리 — 사진 여러 장 · 글씨 모양 · 손그림도 그대로 되살려요 */
+              if (Array.isArray(it.imgs) && it.imgs.length) {
+                x.imgs = it.imgs.filter(function (m) { return m && m.src; }).map(function (m) {
+                  var sz = Number(m.size);
+                  return { id: String(m.id || ""), src: String(m.src), size: sz === 1 || sz === 3 ? sz : 2 };
+                });
+              }
+              if (it.sty && typeof it.sty === "object") {
+                x.sty = { size: Number(it.sty.size) || 2, color: String(it.sty.color || ""),
+                         align: it.sty.align === "center" ? "center" : "left" };
+              }
+              if (Array.isArray(it.pen) && it.pen.length) x.pen = it.pen;
               if (it.rating != null) x.rating = Number(it.rating) || 0;
               if (it.place != null) x.place = String(it.place);
               if (it.date != null) x.date = String(it.date);

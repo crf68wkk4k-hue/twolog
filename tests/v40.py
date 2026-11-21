@@ -1,6 +1,6 @@
 """투로그 v40 확인 — 투두리스트 속지의 2열 카드 묶음 + 카테고리 줄 아래 속지 아코디언 + 모눈 메모.
 
-1) 버전: sw.js 캐시 twolog-v40 · APP_VERSION v40 · My 탭 「버전 v40」
+1) 버전: sw.js 캐시 twolog-v41 · APP_VERSION v41 · My 탭 「버전 v41」
 2) + 시트 — 속지 레이아웃이 목록 맨 아래가 아니라 «카테고리 줄 바로 아래»로 펼쳐짐
    - 처음엔 접힘 · 줄을 누르면 그 줄 바로 아래에 2×2 · 다른 줄을 누르면 이전 줄은 접힘
    - 같은 줄을 한 번 더 누르면 접힘 · 「추가」로 붙인 줄은 바로 펼쳐짐
@@ -189,9 +189,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v40", 'const VERSION = "twolog-v40"' in sw,
+    check("sw.js 캐시 버전 twolog-v41", 'const VERSION = "twolog-v41"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v40", 'var APP_VERSION = "v40"' in app_js,
+    check("app.js 버전 상수 v41", 'var APP_VERSION = "v41"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -204,7 +204,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v40」", ver.strip() == "버전 v40", ver)
+    check("My 탭 맨 위에 「버전 v41」", ver.strip() == "버전 v41", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄 아래로 펼쳐지는 속지 레이아웃 (아코디언)
@@ -215,7 +215,7 @@ with sync_playwright() as p:
     check("+ 시트를 열면 속지 패널은 접혀 있음", p0["exists"] and p0["hidden"] is True and p0["h"] == 0, p0)
     check("목록 맨 아래에 고정된 속지 칸은 없음 (패널 안에만 있어요)",
           page.evaluate("""() => [...document.querySelectorAll('#sheet .set-lbl')]
-            .filter(e => !e.closest('#nkPanel') && e.textContent.trim() === '속지 레이아웃').length""") == 0)
+            .filter(e => !e.closest('#nkPanel') && e.textContent.trim() === '속지').length""") == 0)
 
     row1 = page.locator("#sheet #noteOrderList .nord-row").nth(1)
     r1name = page.evaluate("(i) => document.querySelectorAll('#sheet #noteOrderList .nord-row')[i].querySelector('.nord-nm').value", 1)
@@ -224,9 +224,12 @@ with sync_playwright() as p:
     pa = panel_state(page)
     check("카테고리 줄을 누르면 그 줄 «바로 아래»로 패널이 펼쳐짐",
           pa["hidden"] is False and pa["row"] == r1name and 0 <= pa["gap"] <= 16, pa)
-    check("패널 제목에 그 카테고리 이름", "속지 레이아웃" in pa["label"] and r1name in pa["label"], pa["label"])
-    check("기본 카테고리 패널은 「카드」 + 세 속지 (2×2)",
+    check("패널 제목은 「속지 · 그 카테고리 이름」", "속지" in pa["label"] and "레이아웃" not in pa["label"]
+          and r1name in pa["label"], pa["label"])
+    check("기본 카테고리 패널은 「투두리스트」 + 세 속지 (2×2)",
           pa["kinds"] == ["", "memo", "review", "expense"] and pa["active"] == [""], pa)
+    check("기본 카테고리 패널 첫 칸 이름은 「투두리스트」",
+          page.evaluate("""() => (document.querySelector("#sheet #nkPanel .nk-card[data-kind=''] .nk-n") || {}).textContent""") == "투두리스트")
     box = page.evaluate("""() => {
       const cs = [...document.querySelectorAll('#sheet #nkPanel .nk-card')].map(c => {
         const b = c.getBoundingClientRect(); return {t: Math.round(b.top), l: Math.round(b.left), w: Math.round(b.width)}; });
@@ -292,14 +295,14 @@ with sync_playwright() as p:
     page.locator("#s-diary .lchip", has_text="장보기 리스트").first.click()
     page.wait_for_timeout(520)
     v = page.evaluate("""() => ({
-      kindTag: (document.querySelector('#s-diary .nh-l .k') || {}).textContent,
+      badge: !!document.querySelector('#s-diary .nh-l .k'),
       grid: !!document.querySelector('#s-diary .ngrid'),
       newCard: !!document.querySelector('#s-diary .ngrid .ncard.new'),
       newLabel: (document.querySelector('#s-diary .ncard.new') || {}).textContent || '',
       cards: document.querySelectorAll('#s-diary .ngrid .ncard:not(.new)').length,
       prog: !!document.querySelector('#s-diary .progress'),
       addForm: document.querySelectorAll('#s-diary #listAddForm').length })""")
-    check("속지 이름은 그대로 「투두리스트」", v["kindTag"] == "투두리스트", v["kindTag"])
+    check("본문 위에는 속지 배지가 없음 (카테고리 이름만)", v["badge"] is False, v["badge"])
     check("카드가 없으면 「+ 새 리스트」 카드 하나만", v["grid"] and v["newCard"] and v["cards"] == 0, v)
     check("「+ 새 리스트」 라고 적혀 있음", "새 리스트" in v["newLabel"], v["newLabel"])
     check("예전 한 줄 체크 화면(진행률·Add 줄)은 없음", v["prog"] is False and v["addForm"] == 0, v)
@@ -458,7 +461,7 @@ with sync_playwright() as p:
     open_add_sheet(page3)
     row_loc(page3, "버킷리스트").locator(".nord-kb").click()
     page3.wait_for_timeout(300)
-    check("기본 카테고리 줄의 배지는 「카드」", (row_loc(page3, "버킷리스트").locator(".nord-kb").text_content() or "").strip() == "카드")
+    check("기본 카테고리 줄의 배지도 「투두리스트」 (v41 통일)", (row_loc(page3, "버킷리스트").locator(".nord-kb").text_content() or "").strip() == "투두리스트")
     pick_kind(page3, "memo")
     page3.locator("#sheet button.btn-primary").click()
     page3.wait_for_timeout(760)
@@ -491,23 +494,23 @@ with sync_playwright() as p:
     page3.locator("#s-diary .lchip", has_text="오늘의 기록").first.click()
     page3.wait_for_timeout(520)
 
-    # 제목 없이 본문만 새 메모
-    page3.evaluate("""() => { const b = document.querySelector('#s-diary [data-act="addListItem"]');
-      if (b) b.click(); }""")
-    page3.wait_for_timeout(580)
+    # v41: 「+ 새 다이어리」 → 모눈종이 풀스크린 다이어리 (제목 없이 본문만)
+    page3.locator("#s-diary .d41-new").click()
+    page3.wait_for_timeout(640)
     memo_sheet = page3.evaluate("""() => ({open: document.getElementById('sheetWrap').classList.contains('open'),
-      label: (document.querySelector('#sheet label') || {}).textContent,
-      paper: (() => { const t = document.querySelector('#sheet textarea.nmemo-paper');
-        return t ? getComputedStyle(t).backgroundImage : null; })(),
-      pick: !!document.querySelector('#sheet [data-act="memoImgPick"]')})""")
-    check("메모 쓰기 시트 — 제목은 (선택), 본문 칸은 모눈 바탕", "선택" in (memo_sheet["label"] or "")
-          and "linear-gradient" in (memo_sheet["paper"] or ""), memo_sheet)
-    check("모눈 메모에 사진 한 장 고르는 자리가 있음 (선택)", memo_sheet["pick"] is True, memo_sheet)
+      full: document.getElementById('sheetWrap').classList.contains('sheet-full'),
+      paper: (() => { const p = document.querySelector('#sheet .d41-paper');
+        return p ? getComputedStyle(p).backgroundImage : null; })(),
+      tools: [...document.querySelectorAll('#sheet .d41-tool')].map(b => b.getAttribute('aria-label'))})""")
+    check("다이어리는 화면을 꽉 채우고 본문 칸이 모눈 바탕",
+          memo_sheet["open"] and memo_sheet["full"] and "linear-gradient" in (memo_sheet["paper"] or ""), memo_sheet)
+    check("다이어리 아래에 펜 · 글씨 · 사진 도구가 있음",
+          memo_sheet["tools"] == ["펜 그리기", "글씨", "사진 넣기"], memo_sheet["tools"])
     page3.fill("#sheet textarea[name=memo]",
                "아침에 창문을 열었더니 바람이 차가웠다.\n커피를 천천히 마시며 오늘 할 일을 적었다.\n저녁엔 준영이랑 산책하기로.")
     page3.wait_for_timeout(160)
-    page3.locator("#sheet button.btn-primary").click()
-    page3.wait_for_timeout(700)
+    page3.locator("#sheet .d41-save").click()
+    page3.wait_for_timeout(760)
     memo = page3.evaluate("""() => {
       const cards = [...document.querySelectorAll('#s-diary .nmemo-card')];
       const d = cards[0] ? cards[0].querySelector('.nmemo-date') : null;
@@ -540,16 +543,16 @@ with sync_playwright() as p:
             "090a161718191a25262728292a3435363738393a434445464748494a535455565758595a636465666768696a73747576"
             "7778797a838485868788898a92939495969798999aa2a3a4a5a6a7a8a9aab2b3b4b5b6b7b8b9bac2c3c4c5c6c7c8c9"
             "cad2d3d4d5d6d7d8d9dae1e2e3e4e5e6e7e8e9eaf1f2f3f4f5f6f7f8f9faffda0008010100003f00fbfcffd9"))
-    page3.locator("#s-diary .nmemo-card").first.click()
-    page3.wait_for_timeout(560)
-    page3.set_input_files("#memoImgIn", [memo_jpg])
-    page3.wait_for_timeout(900)
-    page3.locator("#sheet button.btn-primary").click()
-    page3.wait_for_timeout(750)
+    page3.locator("#s-diary .d41-card").first.click()
+    page3.wait_for_timeout(620)
+    page3.set_input_files("#d41ImgIn", [memo_jpg])
+    page3.wait_for_timeout(1300)
+    page3.locator("#sheet .d41-save").click()
+    page3.wait_for_timeout(820)
     pimg = page3.evaluate("""() => { const l = window.__app.state.lists.filter(x => x.title === '오늘의 기록')[0] || {items: []};
-      return {img: String((l.items[0] || {}).img || '').slice(0, 20),
-              shown: document.querySelectorAll('#s-diary .nmemo-photo').length}; }""")
-    check("모눈 메모에 사진 한 장을 붙이면 카드 아래에 보임",
+      return {img: String((((l.items[0] || {}).imgs) || [{}])[0].src || '').slice(0, 20),
+              shown: document.querySelectorAll('#s-diary .d41-th').length}; }""")
+    check("모눈 메모에 사진 한 장을 붙이면 카드에 미리보기로 보임",
           pimg["img"].startswith("data:image") and pimg["shown"] == 1, pimg)
 
     # 다크 모드에서도 모눈 결이 보임
@@ -573,10 +576,10 @@ with sync_playwright() as p:
     page3.fill("#s-diary #listQuickForm input[name=text]", "성수 카페")
     page3.locator("#s-diary #listQuickForm button").click()
     page3.wait_for_timeout(480)
-    rv = page3.evaluate("""() => ({tag: (document.querySelector('#s-diary .note-hd .k') || {}).textContent,
+    rv = page3.evaluate("""() => ({badge: !!document.querySelector('#s-diary .note-hd .k'),
       cards: document.querySelectorAll('#s-diary .rv-card').length,
       stars: document.querySelectorAll('#s-diary .rv-card .rvs').length})""")
-    check("별점 리뷰 속지는 그대로", rv["tag"] == "별점 리뷰" and rv["cards"] == 1 and rv["stars"] == 5, rv)
+    check("별점 리뷰 속지는 그대로", rv["badge"] is False and rv["cards"] == 1 and rv["stars"] == 5, rv)
 
     open_add_sheet(page3)
     page3.fill("#sheet .nord-new", "데이트 통장")
@@ -589,10 +592,10 @@ with sync_playwright() as p:
     page3.fill("#s-diary #listQuickForm input[name=amount]", "24000")
     page3.locator("#s-diary #listQuickForm button").click()
     page3.wait_for_timeout(520)
-    ex = page3.evaluate("""() => ({tag: (document.querySelector('#s-diary .note-hd .k') || {}).textContent,
+    ex = page3.evaluate("""() => ({badge: !!document.querySelector('#s-diary .note-hd .k'),
       sum: (document.querySelector('#s-diary .ex-sum .v') || {}).textContent,
       rows: document.querySelectorAll('#s-diary .ex-row').length})""")
-    check("지출·정산 속지는 그대로 (합계 계산)", ex["tag"] == "지출·정산" and ex["sum"] == "24,000원" and ex["rows"] == 1, ex)
+    check("지출·정산 속지는 그대로 (합계 계산)", ex["badge"] is False and ex["sum"] == "24,000원" and ex["rows"] == 1, ex)
     check("브라우저 콘솔/페이지 오류 없음 (속지)", len(errs3) == 0, errs3[:4])
     ctx3.close()
 
@@ -767,49 +770,46 @@ with sync_playwright() as p:
     page6.set_input_files("#photoInput", shots)
     page6.wait_for_timeout(800)
     up0 = page6.evaluate("""() => ({
-      rows: document.querySelectorAll('#sheet .up-item').length,
-      grips: document.querySelectorAll('#sheet .up-item .up-grip').length,
-      firstChild: [...document.querySelectorAll('#sheet .up-item')].every(r => r.firstElementChild &&
-        r.firstElementChild.classList.contains('up-grip')),
-      names: [...document.querySelectorAll('#sheet .up-item .up-name')].map(n => n.textContent),
+      rows: document.querySelectorAll('#sheet .up-grid .up-cell').length,
+      xs: document.querySelectorAll('#sheet .up-grid .up-cell .up-x').length,
+      cols: getComputedStyle(document.querySelector('#sheet #upList')).gridTemplateColumns.split(' ').length,
       btn: (document.querySelector('#sheet #upBtn') || {}).textContent || ''})""")
-    check("고른 사진 줄이 3개 · 줄마다 맨 앞에 ≡ 손잡이",
-          up0["rows"] == 3 and up0["grips"] == 3 and up0["firstChild"] is True, up0)
-    check("처음 순서는 고른 순서 그대로", up0["names"] == ["v40-up1.jpg", "v40-up2.jpg", "v40-up3.jpg"], up0["names"])
+    check("고른 사진이 6열 네모 칸으로 (사진 3장 · 칸마다 ×)",
+          up0["rows"] == 3 and up0["xs"] == 3 and up0["cols"] == 6, up0)
+    page6.evaluate("() => document.querySelectorAll('#sheet .up-cell').forEach((c, i) => c.dataset.mk = 'abc'[i])")
     page6.screenshot(path=os.path.join(SHOT, "photo-v40-addsheet.png"))
 
-    # ≡ 를 끌어서 3번째 사진을 맨 위로
-    grip3 = page6.locator("#sheet .up-item").nth(2).locator(".up-grip")
-    gb = grip3.bounding_box()
-    row0 = page6.locator("#sheet .up-item").nth(0).bounding_box()
-    page6.mouse.move(gb["x"] + gb["width"] / 2, gb["y"] + gb["height"] / 2)
+    # 세 번째 칸을 끌어 맨 앞으로
+    c3 = page6.locator("#sheet .up-cell").nth(2).bounding_box()
+    c0 = page6.locator("#sheet .up-cell").nth(0).bounding_box()
+    page6.mouse.move(c3["x"] + c3["width"] / 2, c3["y"] + c3["height"] / 2)
     page6.mouse.down()
-    page6.wait_for_timeout(160)
-    check("끌기 시작하면 그 줄이 떠 있음 (dragging)",
-          page6.evaluate("document.querySelectorAll('#sheet .up-item.dragging').length") == 1)
-    steps = 12
-    for i in range(1, steps + 1):
-        page6.mouse.move(gb["x"] + gb["width"] / 2, gb["y"] + gb["height"] / 2 - (gb["y"] - row0["y"] + 4) * i / steps)
+    page6.wait_for_timeout(120)
+    for i in range(1, 9):
+        page6.mouse.move(c3["x"] + c3["width"] / 2 + (c0["x"] - c3["x"]) * i / 8,
+                         c3["y"] + c3["height"] / 2)
         page6.wait_for_timeout(30)
+    check("칸을 끌기 시작하면 떠 있음 (dragging)",
+          page6.evaluate("document.querySelectorAll('#sheet .up-cell.dragging').length") == 1)
     page6.mouse.up()
     page6.wait_for_timeout(600)
-    up1 = page6.evaluate("""() => ({
-      names: [...document.querySelectorAll('#sheet .up-item .up-name')].map(n => n.textContent),
-      idx: [...document.querySelectorAll('#sheet .up-item')].map(r => r.getAttribute('data-i')),
-      dragging: document.querySelectorAll('#sheet .up-item.dragging').length})""")
-    check("≡ 를 끌어 3번째 사진을 맨 위로 옮김", up1["names"] == ["v40-up3.jpg", "v40-up1.jpg", "v40-up2.jpg"], up1["names"])
-    check("끌고 나면 data-i 도 지금 순서로 다시 매겨짐", up1["idx"] == ["0", "1", "2"] and up1["dragging"] == 0, up1)
+    order1 = page6.evaluate("() => [...document.querySelectorAll('#sheet .up-cell')].map(c => c.dataset.mk)")
+    idx1 = page6.evaluate("() => [...document.querySelectorAll('#sheet .up-cell')].map(c => c.getAttribute('data-i'))")
+    check("세 번째 사진을 끌어 맨 앞으로 옮김", order1 == ["c", "a", "b"], order1)
+    check("끌고 나면 data-i 도 지금 순서로 다시 매겨짐",
+          idx1 == ["0", "1", "2"] and page6.evaluate("document.querySelectorAll('#sheet .up-cell.dragging').length") == 0, idx1)
 
-    # 키보드 ↑ ↓ 로도
-    page6.locator("#sheet .up-item").nth(1).locator(".up-grip").focus()
-    page6.keyboard.press("ArrowUp")
-    page6.wait_for_timeout(320)
-    up2 = page6.evaluate("() => [...document.querySelectorAll('#sheet .up-item .up-name')].map(n => n.textContent)")
-    check("손잡이에서 ↑ 키로 한 칸 위로", up2 == ["v40-up1.jpg", "v40-up3.jpg", "v40-up2.jpg"], up2)
-    page6.keyboard.press("ArrowDown")
-    page6.wait_for_timeout(320)
-    up3 = page6.evaluate("() => [...document.querySelectorAll('#sheet .up-item .up-name')].map(n => n.textContent)")
-    check("↓ 키로 다시 아래로", up3 == ["v40-up3.jpg", "v40-up1.jpg", "v40-up2.jpg"], up3)
+    # 키보드 → ← 로도
+    page6.locator("#sheet .up-cell").nth(0).focus()
+    page6.keyboard.press("ArrowRight")
+    page6.wait_for_timeout(300)
+    order2 = page6.evaluate("() => [...document.querySelectorAll('#sheet .up-cell')].map(c => c.dataset.mk)")
+    check("칸에서 → 키로 한 칸 오른쪽", order2 == ["a", "c", "b"], order2)
+    page6.locator("#sheet .up-cell").nth(1).focus()
+    page6.keyboard.press("ArrowLeft")
+    page6.wait_for_timeout(300)
+    order3 = page6.evaluate("() => [...document.querySelectorAll('#sheet .up-cell')].map(c => c.dataset.mk)")
+    check("← 키로 다시 왼쪽", order3 == ["c", "a", "b"], order3)
 
     # 담기 → 고른 순서 그대로 저장 (1번째가 사진첩 맨 앞 = 대표)
     page6.locator("#sheet #upBtn").click()
@@ -830,11 +830,17 @@ with sync_playwright() as p:
     page6.wait_for_timeout(2400)
     page6.set_input_files("#photoInput", [tag_shots[1]])
     page6.wait_for_timeout(800)
-    tag_new = page6.evaluate("""() => ({tag: (document.querySelector('#sheet input[name=album_tag]') || {}).value,
+    tag_new = page6.evaluate("""() => ({
+      tag: (document.querySelector('#sheet input[name=album_tag]') || {}).value,
       date: (document.querySelector('#sheet input[name=date]') || {}).value,
-      labeled: (document.querySelector('#sheet .form .f:nth-child(2) label') || {}).textContent})""")
-    check("태그를 적어 올린 뒤 새 사진 추가 시트를 열면 태그 칸이 비어 있음",
-          tag_new["tag"] == "" and tag_new["labeled"] == "태그", tag_new)
+      labels: [...document.querySelectorAll('#sheet .up-row label')].map(l => l.textContent),
+      sameRow: (() => { const a = document.querySelector('#sheet input[name=album_tag]');
+        const b = document.querySelector('#sheet input[name=date]');
+        if (!a || !b) return false; const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+        return Math.abs(ra.top - rb.top) < 4 && ra.right <= rb.left; })()})""")
+    check("「기록 이름」을 적어 올린 뒤 새 시트를 열면 그 칸이 비어 있음 (라벨도 기록 이름)",
+          tag_new["tag"] == "" and tag_new["labels"] == ["기록 이름", "날짜"], tag_new)
+    check("「기록 이름」과 「날짜」가 한 줄에 나란히", tag_new["sameRow"] is True, tag_new)
     # 한 시트 안에서 「추가」로 더 담을 때는 적어 둔 태그가 그대로
     page6.fill("#sheet input[name=album_tag]", "제주 여행")
     with page6.expect_file_chooser() as fc:
@@ -842,7 +848,7 @@ with sync_playwright() as p:
     fc.value.set_files([tag_shots[0]])
     page6.wait_for_timeout(700)
     kept = page6.evaluate("() => (document.querySelector('#sheet input[name=album_tag]') || {}).value")
-    check("한 시트에서 「+ 추가」로 더 담을 때는 태그가 그대로", kept == "제주 여행", kept)
+    check("한 시트에서 「+ 추가」로 더 담을 때는 기록 이름이 그대로", kept == "제주 여행", kept)
     page6.keyboard.press("Escape")
     page6.wait_for_timeout(400)
     check("브라우저 콘솔/페이지 오류 없음 (사진 순서)", len(errs6) == 0, errs6[:4])
@@ -971,23 +977,23 @@ with sync_playwright() as p:
       date: (document.querySelector('#sheet input[name=date]') || {}).value,
       tag: (document.querySelector('#sheet input[name=album_tag]') || {}).value,
       caption: !!document.querySelector('#sheet input[name=title]'),
-      rows: document.querySelectorAll('#sheet .up-item').length,
-      grips: document.querySelectorAll('#sheet .up-item .up-grip').length,
-      dels: document.querySelectorAll('#sheet .up-item .up-del').length,
+      rows: document.querySelectorAll('#sheet .up-cell').length,
+      grips: document.querySelectorAll('#sheet .up-cell .up-x').length,
+      dels: document.querySelectorAll('#sheet .up-cell .up-x').length,
       add: !!document.querySelector('#sheet .up-add')})""")
-    check("수정 아이콘 → 그날 사진 편집 시트 (날짜·태그·사진 목록)",
+    check("수정 아이콘 → 그날 사진 편집 시트 (날짜·기록 이름·사진 6칸 그리드)",
           de["head"] == "사진 수정" and len(de["date"] or "") == 10 and (de["date"] or "")[4] == "-"
           and de["rows"] == 6 and de["grips"] == 6 and de["dels"] == 6 and de["add"], de)
     check("사진 편집 시트에 캡션 칸 없음", de["caption"] is False, de["caption"])
     page8.screenshot(path=os.path.join(SHOT, "_probe-dayedit2.png"))
     before_ids = page8.evaluate("() => window.__app.state.photos.map(p => p.id)")
-    page8.locator("#sheet .up-item .up-grip").first.focus()
-    page8.keyboard.press("ArrowDown")
+    page8.locator("#sheet .up-cell").first.focus()
+    page8.keyboard.press("ArrowRight")
     page8.wait_for_timeout(400)
     page8.locator("#sheet button.btn-primary").click()
     page8.wait_for_timeout(1500)
     after_ids = page8.evaluate("() => window.__app.state.photos.map(p => p.id)")
-    check("≡ 로 바꾼 사진 순서가 저장됨 (그날 첫 사진부터)",
+    check("칸을 옮긴 사진 순서가 저장됨 (그날 첫 사진부터)",
           before_ids[:2] == after_ids[1::-1] and sorted(before_ids) == sorted(after_ids),
           (before_ids[:3], after_ids[:3]))
 
@@ -1026,13 +1032,13 @@ with sync_playwright() as p:
     check("사진을 한 번 탭하면 모아보기로 닫힘", closed["sheet"] is False and closed["cells"] == 6, closed)
 
     # ==================================================================
-    # 12. 모아보기의 사진마다 댓글 · 대댓글
+    # 12. 모아보기의 댓글 · 대댓글 (v41: 사진마다가 아니라 날짜 한 칸)
     # ==================================================================
     page8.wait_for_timeout(200)
     dv = page8.evaluate("""() => ({blocks: document.querySelectorAll('#s-photo .dcmt').length,
       forms: document.querySelectorAll('#s-photo .dcmt .cmt-form').length,
       thumbs: document.querySelectorAll('#s-photo .dcmt .dcmt-th').length})""")
-    check("사진마다 댓글 칸이 따로 있음 (사진 6장 = 칸 6개)", dv["blocks"] == 6 and dv["forms"] == 6, dv)
+    check("날짜 사진 전체에 댓글 칸 하나 (사진 6장이어도 칸 1개)", dv["blocks"] == 1 and dv["forms"] == 1, dv)
 
     first_cmt = page8.locator("#s-photo .dcmt").first
     first_cmt.locator(".cmt-form .cmt-in").fill("여기 진짜 좋았다 🤍")
@@ -1044,12 +1050,12 @@ with sync_playwright() as p:
               text: (sec.querySelector('.cmt-t') || {}).textContent,
               av: !!sec.querySelector('.cmt .av'),
               time: (sec.querySelector('.cmt-h span') || {}).textContent,
-              cnt: (sec.querySelector('.dcmt-c') || {}).textContent,
-              cellBadge: (document.querySelector('#s-photo .dg-cell .dg-cmt b') || {}).textContent}; }""")
+              replyBtns: sec.querySelectorAll('button[data-act="cmtReply"]').length,
+              delBtns: sec.querySelectorAll('button[data-act="cmtDel"]').length}; }""")
     check("댓글에 작성자 프사·이름·내용·시각이 보임",
           c1["rows"] == 1 and c1["name"] == "소영" and "여기 진짜 좋았다" in (c1["text"] or "")
           and c1["av"] and (c1["time"] or "").startswith("오"), c1)
-    check("댓글이 붙으면 사진 칸·머리에 댓글 수 표시", c1["cnt"] == "댓글 1" and c1["cellBadge"] == "1", c1)
+    check("단 댓글에는 답글·삭제 버튼이 함께 보임", c1["replyBtns"] == 1 and c1["delBtns"] == 1, c1)
 
     page8.locator("#s-photo .dcmt").first.locator(".cmt-acts button[data-act='cmtReply']").first.click()
     page8.wait_for_timeout(350)
