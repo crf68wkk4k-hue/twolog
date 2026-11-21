@@ -1,6 +1,6 @@
 """투로그 v29 확인 — 노트 맨 윗줄의 네모 설정 버튼을 지우고 그 자리에 동그란 +, 알약 탭은 조금 작게.
 
-1) 버전: sw.js 캐시 twolog-v39 · APP_VERSION v39
+1) 버전: sw.js 캐시 twolog-v40 · APP_VERSION v40
 2) 노트 맨 윗줄(📖 노트) 오른쪽에 동그란 점선 + 가 있고, 누르면 「새 카테고리」 시트가 열림
 3) 예전 네모 설정 버튼(톱니 아이콘)은 사라짐 — 알약 탭 아래 칩 줄에도 + 는 없음
 4) 알약 탭(메모·버킷리스트·영화·먹방)이 조금 작아짐: 높이 40px · 글씨 14px · 글씨 잘림 없음
@@ -184,11 +184,11 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check("sw.js 캐시 버전 twolog-v39", 'const VERSION = "twolog-v39"' in sw,
+    check("sw.js 캐시 버전 twolog-v40", 'const VERSION = "twolog-v40"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v39", 'var APP_VERSION = "v39"' in app_js,
+    check("app.js 버전 상수 v40", 'var APP_VERSION = "v40"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v39", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v40", 'const SHELL = "shell-" + VERSION' in sw)
     check("예전 칩 줄 + 스타일(.lst-new)은 남아 있지 않음", ".lst-new" not in css)
 
     # ==================================================================
@@ -251,9 +251,20 @@ with sync_playwright() as p:
           (ns["chips"], ns["cur"]))
     check("칩 줄에도 + 는 여전히 없음", note_header(page).get("plusInChipBar") is False)
 
-    page.fill('#s-diary #listAddForm input[name="text"]', "우유 사기")
-    page.locator("#s-diary #listAddForm .todo-add-btn").click()
-    page.wait_for_timeout(700)
+    # v40: 새 카테고리는 2열 카드 묶음 — 「+ 새 리스트」로 카드를 만들고 그 안에 항목을 넣어요
+    check("새 탭 화면은 2열 카드 묶음 (v40)", "새 리스트" in ns["body"], ns["body"][:80])
+    page.locator("#s-diary .ngrid .ncard.new").click()
+    page.wait_for_timeout(480)
+    page.fill("#sheet input[name=title]", "장보기 목록")
+    page.locator("#sheet button.btn-primary").click()
+    page.wait_for_timeout(600)
+    page.locator("#s-diary .ngrid .ncard:not(.new)").first.click()
+    page.wait_for_timeout(520)
+    page.fill('#sheet #listAddForm input[name="text"]', "우유 사기")
+    page.locator('#sheet #listAddForm button').click()
+    page.wait_for_timeout(520)
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(420)
     ns2 = note_state(page)
     check("새 탭 안에 항목을 넣을 수 있음",
           ns2["lists"][0]["items"] == ["우유 사기"] and "우유 사기" in ns2["body"], ns2["lists"])

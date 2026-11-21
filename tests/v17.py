@@ -457,8 +457,10 @@ with sync_playwright() as p:
     except Exception:  # noqa: BLE001
         chooser_ok = False
     check("+ 사진 추가가 파일 선택창을 엽니다", chooser_ok)
-    # 앨범·날짜 수정은 사진 상세의 「정보 수정」에서 그대로
+    # 앨범·날짜 수정은 모아보기의 ⋯ 메뉴 → 「정보 수정」에서 그대로 (v40)
     page3.locator("#s-photo .pola").first.click()
+    page3.wait_for_timeout(500)
+    page3.locator('#s-photo [data-act="photoMenu"]').first.click()
     page3.wait_for_timeout(500)
     page3.locator('#sheet [data-act="photoEdit"]').click()
     page3.wait_for_timeout(500)

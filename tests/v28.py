@@ -1,6 +1,6 @@
 """투로그 v28 확인 — 캘린더는 열 때 이번 달 · 일정 시트 날짜+요일 · 하단 일정 수정 · 노트 + 탭 추가.
 
-1) 버전: sw.js 캐시 twolog-v39 · APP_VERSION v39
+1) 버전: sw.js 캐시 twolog-v40 · APP_VERSION v40
 2) 앱을 새로 켜면(새로고침) 저장해 둔 지난달 대신 이번 달로
 3) 탭에서 캘린더로 들어오면 이번 달 + 오늘 날짜 (다른 달 → 다른 탭 → 돌아오면 이번 달)
 4) 달 안에서 화살표·손가락 밀기로 넘기는 이동은 그대로 (그 달에 머무는 동안 유지)
@@ -170,11 +170,11 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v39", 'const VERSION = "twolog-v39"' in sw,
+    check("sw.js 캐시 버전 twolog-v40", 'const VERSION = "twolog-v40"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v39", 'var APP_VERSION = "v39"' in app_js,
+    check("app.js 버전 상수 v40", 'var APP_VERSION = "v40"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v39", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v40", 'const SHELL = "shell-" + VERSION' in sw)
 
     # ==================================================================
     # 2. 앱을 새로 켜면 이번 달 (저장된 지난달은 무시)
@@ -550,11 +550,20 @@ with sync_playwright() as p:
     ns = note_state(page)
     check("새 카테고리 탭이 만들어짐", [l["title"] for l in ns["lists"]] == ["장보기"], ns["lists"])
     check("새 탭 칩이 바로 열림", ns["chips"] == ["장보기"] and ns["cur"] == "장보기", (ns["chips"], ns["cur"]))
-    check("새 탭 화면에 To-do 입력칸", "To-do" in ns["body"], ns["body"][:80])
-
-    page.fill('#s-diary #listAddForm input[name="text"]', "우유 사기")
-    page.locator('#s-diary #listAddForm .todo-add-btn').click()
-    page.wait_for_timeout(700)
+    # v40: 새 카테고리의 「투두리스트」는 2열 카드 묶음 — 카드를 만들고 그 안에 항목을 넣어요
+    check("새 탭 화면은 2열 카드 묶음 (v40)", "새 리스트" in ns["body"], ns["body"][:80])
+    page.locator("#s-diary .ngrid .ncard.new").click()
+    page.wait_for_timeout(480)
+    page.fill("#sheet input[name=title]", "장보기 목록")
+    page.locator("#sheet button.btn-primary").click()
+    page.wait_for_timeout(620)
+    page.locator("#s-diary .ngrid .ncard:not(.new)").first.click()
+    page.wait_for_timeout(520)
+    page.fill('#sheet #listAddForm input[name="text"]', "우유 사기")
+    page.locator('#sheet #listAddForm button').click()
+    page.wait_for_timeout(520)
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(420)
     ns2 = note_state(page)
     check("새 탭 안에 항목을 넣을 수 있음",
           ns2["lists"][0]["items"] == ["우유 사기"] and "우유 사기" in ns2["body"], ns2["lists"])
@@ -583,9 +592,20 @@ with sync_playwright() as p:
     page.fill('#sheet input[name="title"]', "여행 준비")
     page.locator('#sheet .btn-primary').click()
     page.wait_for_timeout(800)
-    page.fill('#s-diary #listAddForm input[name="text"]', "여권 챙기기")
-    page.locator('#s-diary #listAddForm .todo-add-btn').click()
-    page.wait_for_timeout(1200)
+    # v40: 카드를 하나 만들고 그 안에 항목을 넣어요
+    page.locator("#s-diary .ngrid .ncard.new").click()
+    page.wait_for_timeout(460)
+    page.fill("#sheet input[name=title]", "준비물")
+    page.locator("#sheet button.btn-primary").click()
+    page.wait_for_timeout(600)
+    page.locator("#s-diary .ngrid .ncard:not(.new)").first.click()
+    page.wait_for_timeout(500)
+    page.fill('#sheet #listAddForm input[name="text"]', "여권 챙기기")
+    page.locator('#sheet #listAddForm button').click()
+    page.wait_for_timeout(600)
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(500)
+    page.wait_for_timeout(600)
     page.evaluate("() => window.TwoLogStore.flush()")
     page.wait_for_timeout(1200)
 
@@ -630,9 +650,13 @@ with sync_playwright() as p:
     check("상대 폰에서 탭을 열면 항목이 보임",
           nb_b2["cur"] == "여행 준비" and "여권 챙기기" in nb_b2["body"], (nb_b2["cur"], nb_b2["body"][:60]))
 
-    page_b.fill('#s-diary #listAddForm input[name="text"]', "충전기 챙기기")
-    page_b.locator('#s-diary #listAddForm .todo-add-btn').click()
+    page_b.locator("#s-diary .ngrid .ncard:not(.new)").first.click()
+    page_b.wait_for_timeout(500)
+    page_b.fill('#sheet #listAddForm input[name="text"]', "충전기 챙기기")
+    page_b.locator('#sheet #listAddForm button').click()
     page_b.wait_for_timeout(1000)
+    page_b.keyboard.press("Escape")
+    page_b.wait_for_timeout(400)
     page_b.evaluate("() => window.TwoLogStore.flush()")
     page_b.wait_for_timeout(1200)
     b_items = note_state(page_b)["lists"][0]["items"]

@@ -1,6 +1,6 @@
 """투로그 v30 확인 — 사진첩 폴라로이드를 더 작고 아담하게.
 
-1) 버전: sw.js 캐시 twolog-v39 · APP_VERSION v39
+1) 버전: sw.js 캐시 twolog-v40 · APP_VERSION v40
 2) 사진첩 목록의 폴라로이드 카드가 v29보다 확실히 작아짐
    - 사진 한 칸(정사각) 118.7px → 93.3px, 카드 130.7 → 103.3px, 카드 높이 142.7 → 113.3px
    - 흰 프레임 위·옆 5px, 아래 턱 15px (v29 6px·18px), 캡션 글씨 9px (v29 9.5px)
@@ -139,11 +139,11 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check("sw.js 캐시 버전 twolog-v39", 'const VERSION = "twolog-v39"' in sw,
+    check("sw.js 캐시 버전 twolog-v40", 'const VERSION = "twolog-v40"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v37", 'var APP_VERSION = "v39"' in app_js,
+    check("app.js 버전 상수 v37", 'var APP_VERSION = "v40"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v39", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v40", 'const SHELL = "shell-" + VERSION' in sw)
     check("달력 칸(pcell)은 정사각(aspect-ratio)", "aspect-ratio:1/1" in css.replace(" ", "") and ".pcal-grid" in css)
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장이 되는 일반 모드로 옮겨요
@@ -168,7 +168,8 @@ with sync_playwright() as p:
     check("흰 프레임·아래 턱 없음 (padding 0)",
           ph["padTop"] == "0px" and ph["padSide"] == "0px" and ph["padBottom"] == "0px",
           (ph["padTop"], ph["padSide"], ph["padBottom"]))
-    check("캡션은 사진 아래 한 줄", bool(ph["chinText"]) and 12 <= ph["chinH"] <= 26,
+    # v40: 사진 아래 캡션 줄은 없앴어요 — 사진만 보입니다
+    check("사진 아래 캡션 줄 없음 (v40)", not ph["chinText"] and not ph["chinH"],
           (ph["chinH"], ph["chinText"]))
     check("그림자·기울임·바탕 없음", ph["shadow"] in (None, "none", "")
           and all(t in ("none", "matrix(1, 0, 0, 1, 0, 0)") for t in ph["tilts"]),
@@ -198,13 +199,15 @@ with sync_playwright() as p:
       return {open: !!v, h: v ? Math.round(v.getBoundingClientRect().height) : 0,
               img: !!im, count: c ? c.textContent.trim() : null,
               head: (document.querySelector('#sheet .sheet-hd h2') || {}).textContent}; }""")
+    slides = page.evaluate("document.querySelectorAll('#sheet .pv40-slide').length")
     check("작은 폴라로이드를 눌러도 크게 보기가 열림", pv["open"] and pv["img"] and pv["h"] > 200, pv)
-    check("같은 날 사진 넘기기 표시(/ 6) 그대로", "/ 6" in str(pv["count"]), pv["count"])
+    # v40: 크게 보기는 사진만 — 옆으로 밀어서 같은 날 사진을 넘겨요
+    check("같은 날 사진 6장이 옆으로 이어짐", slides == 6, slides)
     page.screenshot(path=os.path.join(SHOT, "photo-v30-viewer.png"))
-    page.locator("#sheet .pview .pv-nav.next").click()
-    page.wait_for_timeout(300)
-    cnt2 = page.evaluate("(document.querySelector('#sheet .pv-count') || {}).textContent || ''")
-    check("다음 사진으로 넘어감", cnt2.strip().startswith("2 / 6"), cnt2)
+    page.evaluate("(() => { const s = document.querySelector('#sheet .pv40-strip'); s.scrollBy({ left: s.clientWidth }); })()")
+    page.wait_for_timeout(420)
+    left2 = page.evaluate("Math.round(document.querySelector('#sheet .pv40-strip').scrollLeft)")
+    check("옆으로 밀면 다음 사진으로 넘어감", left2 > 100, left2)
     page.keyboard.press("Escape")
     page.wait_for_timeout(350)
     page.locator('#s-photo [data-act="photoDayBack"]').click()   # v38: 모아보기에서 목록으로
@@ -237,7 +240,7 @@ with sync_playwright() as p:
                            " return !!el && el.classList.contains('active') && el.innerText.trim().length > 0; }", sid)
         check("%s 화면이 정상으로 뜸" % name, bool(ok), sid)
     ver = page.inner_text("#s-set .app-ver")
-    check("My 맨 위 버전 표시가 v36", "v39" in ver, ver)
+    check("My 맨 위 버전 표시가 v36", "v40" in ver, ver)
     check("여기까지 페이지 오류 없음", len(errs) == 0, errs[:4])
 
     ctx.close()

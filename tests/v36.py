@@ -1,6 +1,6 @@
 """투로그 v36 확인 — 노트 중복 정리 · 동기화 덮어쓰기 방지 · 카테고리 시트 UI.
 
-1) 버전: sw.js 캐시 twolog-v39 · APP_VERSION v39 · My 탭 「버전 v39」
+1) 버전: sw.js 캐시 twolog-v40 · APP_VERSION v40 · My 탭 「버전 v40」
 2) 노트 중복 정리 (이 폰)
    - 같은 카드 안에 같은 내용이 두 번 들어 있으면 하나로: 체크(done)한 쪽이 살아남고
      상세 메모가 있는 쪽이 살아남음 · 같은 내용이라도 다른 카드/다른 kind 면 그대로
@@ -267,11 +267,11 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v39", 'const VERSION = "twolog-v39"' in sw,
+    check("sw.js 캐시 버전 twolog-v40", 'const VERSION = "twolog-v40"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v39", 'var APP_VERSION = "v39"' in app_js,
+    check("app.js 버전 상수 v40", 'var APP_VERSION = "v40"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v39", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v40", 'const SHELL = "shell-" + VERSION' in sw)
 
     note_tab(page)
     hdr = page.evaluate("""() => {
@@ -284,7 +284,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 500)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v39」", ver.strip() == "버전 v39", ver)
+    check("My 탭 맨 위에 「버전 v40」", ver.strip() == "버전 v40", ver)
     tab(page, 2, 500)
 
     # ==================================================================

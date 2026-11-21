@@ -1,13 +1,13 @@
 """투로그 v39 확인 — 카테고리마다 속지 고르기(+ 기본 카테고리도) · 사진 달력 아이폰식.
 
-1) 버전: sw.js 캐시 twolog-v39 · APP_VERSION v39 · My 탭 「버전 v39」
+1) 버전: sw.js 캐시 twolog-v40 · APP_VERSION v40 · My 탭 「버전 v40」
 2) + 시트 — 카테고리 줄마다 지금 속지 배지, 누르면 그 카테고리의 속지를 고치는 모드
    - 메모·버킷리스트·영화·먹방(기본)은 「카드」, 내가 만든 카테고리는 그 속지 이름
    - 줄을 누르면 .active · 제목 「속지 레이아웃 · 버킷리스트」 · 안내에 그 이름
    - 2×2 카드가 그 카테고리의 속지를 체크 · 다른 속지를 누르면 줄 배지가 바로 바뀜
    - 기본 카테고리에만 「카드」(지금 모양으로 되돌리기) 가 보임
    - 「저장하기」로 S.noteKinds(기본) · list.kind(내 카테고리) 에 반영
-3) 기본 카테고리 화면이 고른 속지로 그려짐 — 지출·정산(합계·금액) · 줄글 메모 · 별점 리뷰
+3) 기본 카테고리 화면이 고른 속지로 그려짐 — 지출·정산(합계·금액) · 모눈 메모 · 별점 리뷰
    - 속지 화면 머리의 「카드」로 지금 모양(카드)으로 되돌아감
 4) 내 카테고리 · 방금 추가한 줄
    - 줄을 골라 속지 바꾸기 · 「추가」로 붙인 줄이 자동 선택
@@ -122,8 +122,9 @@ def open_add_sheet(page):
 
 
 def pick_kind(page, kind):
-    page.locator("#sheet .nk-card[data-kind='%s']" % kind).click()
-    page.wait_for_timeout(140)
+    """v40: 속지 레이아웃은 고른 카테고리 줄 바로 아래 패널에서 골라요."""
+    page.locator("#sheet #nkPanel .nk-card[data-kind='%s']" % kind).click()
+    page.wait_for_timeout(160)
 
 
 def row_loc(page, text):
@@ -176,9 +177,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v39", 'const VERSION = "twolog-v39"' in sw,
+    check("sw.js 캐시 버전 twolog-v40", 'const VERSION = "twolog-v40"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v39", 'var APP_VERSION = "v39"' in app_js,
+    check("app.js 버전 상수 v40", 'var APP_VERSION = "v40"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -191,7 +192,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v39」", ver.strip() == "버전 v39", ver)
+    check("My 탭 맨 위에 「버전 v40」", ver.strip() == "버전 v40", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄마다 속지 배지 · 줄을 누르면 그 카테고리 속지 고르기
@@ -202,15 +203,15 @@ with sync_playwright() as p:
       const rows = [...document.querySelectorAll('#sheet #noteOrderList .nord-row')];
       const name = r => { const i = r.querySelector('.nord-nm'); return i ? i.value : ''; };
       const badge = r => ((r.querySelector('.nord-kb') || {}).textContent || '').trim();
-      const cardsBtn = document.querySelector('#sheet .nk-cards');
+      const panel = document.getElementById('nkPanel');
       return {
         rows: rows.map(r => ({name: name(r), badge: badge(r), kind: r.getAttribute('data-kind'),
                               active: r.classList.contains('active')})),
-        cardsBtn: !!cardsBtn,
-        cardsShown: cardsBtn ? getComputedStyle(cardsBtn).display !== 'none' : false,
+        panelHidden: panel ? panel.hidden : null,
         label: (document.querySelector('#sheet #nkindLbl') || {}).textContent || '',
         hint: (document.querySelector('#sheet #nkindHint') || {}).textContent || '',
-        activeKinds: [...document.querySelectorAll('#sheet .nk-card.active')].map(c => c.getAttribute('data-kind'))};
+        activeKinds: [...document.querySelectorAll('#sheet .nk-card.active')].map(c => c.getAttribute('data-kind')),
+        kinds: [...document.querySelectorAll('#sheet #nkPanel .nk-card')].map(c => c.getAttribute('data-kind'))};
     }""")
     by_name = {r["name"]: r for r in ui["rows"]}
     check("카테고리 줄마다 지금 속지 배지가 있음",
@@ -220,47 +221,46 @@ with sync_playwright() as p:
           and by_name.get("영화·먹방", {}).get("badge") == "카드",
           {k: v["badge"] for k, v in by_name.items()})
     custom_badges = [r["badge"] for r in ui["rows"] if "여행 준비물" in r["name"] or "주말 데이트" in r["name"]]
-    check("내 카테고리 배지는 그 속지 이름", custom_badges == ["투두리스트", "줄글 메모"], custom_badges)
-    check("처음에는 고른 줄이 없고 속지는 새 카테고리용 (투두리스트)",
-          not any(r["active"] for r in ui["rows"]) and ui["activeKinds"] == ["check"], ui["activeKinds"])
-    check("기본 카테고리용 「카드」 선택지는 줄을 고르기 전엔 숨어 있음",
-          ui["cardsBtn"] and not ui["cardsShown"], ui["cardsShown"])
+    check("내 카테고리 배지는 그 속지 이름", custom_badges == ["투두리스트", "모눈 메모"], custom_badges)
+    check("처음에는 고른 줄이 없고 속지 패널도 접혀 있음",
+          not any(r["active"] for r in ui["rows"]) and ui["panelHidden"] is True, ui)
+    check("새 카테고리용 패널은 투두리스트부터 (「카드」 없음)",
+          ui["activeKinds"] == ["check"] and ui["kinds"] == ["check", "memo", "review", "expense"], ui)
 
     row_loc(page, "버킷리스트").locator(".nord-nm").click()
-    page.wait_for_timeout(260)
+    page.wait_for_timeout(280)
     sel = page.evaluate("""() => {
       const r = document.querySelector('#sheet #noteOrderList .nord-row.active');
-      const cardsBtn = document.querySelector('#sheet .nk-cards');
+      const panel = document.getElementById('nkPanel');
+      const rr = r.getBoundingClientRect(), pr = panel.getBoundingClientRect();
       return {
         row: r ? (r.querySelector('.nord-nm') || {}).value : null,
         border: r ? getComputedStyle(r).borderTopColor : null,
         label: (document.querySelector('#sheet #nkindLbl') || {}).textContent || '',
         hint: (document.querySelector('#sheet #nkindHint') || {}).textContent || '',
-        activeKinds: [...document.querySelectorAll('#sheet .nk-card.active')].map(c => c.getAttribute('data-kind')),
-        cardsShown: cardsBtn ? getComputedStyle(cardsBtn).display !== 'none' : false,
-        cardsActive: cardsBtn ? cardsBtn.classList.contains('active') : false};
+        activeKinds: [...document.querySelectorAll('#sheet #nkPanel .nk-card.active')].map(c => c.getAttribute('data-kind')),
+        kinds: [...document.querySelectorAll('#sheet #nkPanel .nk-card')].map(c => c.getAttribute('data-kind')),
+        hidden: panel.hidden, gap: Math.round(pr.top - rr.bottom)};
     }""")
     check("기본 카테고리 줄을 누르면 그 줄이 선택됨", sel["row"] == "버킷리스트"
           and sel["border"] not in ("", "rgb(232, 232, 237)"), sel)
+    check("속지 패널이 그 줄 바로 아래에 펼쳐짐", sel["hidden"] is False and 0 <= sel["gap"] <= 16, sel)
     check("속지 제목에 고른 카테고리 이름", "속지 레이아웃" in sel["label"] and "버킷리스트" in sel["label"], sel["label"])
     check("안내 문구도 그 카테고리", "버킷리스트" in sel["hint"], sel["hint"])
-    check("지금은 「카드」가 체크되고 2×2 는 비어 있음",
-          sel["cardsShown"] and sel["cardsActive"] and sel["activeKinds"] == [], sel)
+    check("기본 카테고리 패널은 「카드」 + 세 속지", sel["kinds"] == ["", "memo", "review", "expense"], sel["kinds"])
+    check("지금은 「카드」가 체크됨", sel["activeKinds"] == [""], sel["activeKinds"])
 
     pick_kind(page, "expense")
     page.wait_for_timeout(240)
     after = page.evaluate("""() => {
       const r = document.querySelector('#sheet #noteOrderList .nord-row.active');
-      const cardsBtn = document.querySelector('#sheet .nk-cards');
       return {badge: ((r.querySelector('.nord-kb') || {}).textContent || '').trim(),
               kind: r.getAttribute('data-kind'),
-              cardsActive: cardsBtn ? cardsBtn.classList.contains('active') : false,
               hidden: (document.querySelector('#sheet input[name="nkind"]') || {}).value,
-              activeKinds: [...document.querySelectorAll('#sheet .nk-card.active')].map(c => c.getAttribute('data-kind'))};
+              activeKinds: [...document.querySelectorAll('#sheet #nkPanel .nk-card.active')].map(c => c.getAttribute('data-kind'))};
     }""")
     check("속지를 고르면 그 줄 배지가 바로 바뀜", after["badge"] == "지출·정산" and after["kind"] == "expense", after)
-    check("고른 속지 카드만 체크 · 「카드」는 풀림",
-          after["activeKinds"] == ["expense"] and after["cardsActive"] is False, after)
+    check("고른 속지 카드만 체크됨", after["activeKinds"] == ["expense"], after)
     page.evaluate("document.querySelector('#sheet').scrollTop = 9999")
     page.wait_for_timeout(280)
     page.screenshot(path=os.path.join(SHOT, "note-v39-templates.png"))
@@ -325,7 +325,7 @@ with sync_playwright() as p:
       kinds: window.__app.state.noteKinds || {}})""")
     check("「카드」를 누르면 지금 모양(카드)으로 되돌아감", back["cards"] > 0 and "bucket" not in back["kinds"], back)
 
-    # 메모 → 줄글 메모
+    # 메모 → 모눈 메모
     open_add_sheet(page)
     row_loc(page, "메모").locator(".nord-nm").click()
     page.wait_for_timeout(200)
@@ -338,7 +338,7 @@ with sync_playwright() as p:
       cards: document.querySelectorAll('#s-diary .memo-card').length,
       quick: !!document.querySelector('#s-diary #listQuickForm'),
       circles: document.querySelectorAll('#s-diary .trow .circ').length})""")
-    check("메모 탭이 줄글 메모 속지로 (체크 동그라미 없음)", mm["tag"] == "줄글 메모" and mm["quick"] and mm["circles"] == 0, mm)
+    check("메모 탭이 모눈 메모 속지로 (체크 동그라미 없음)", mm["tag"] == "모눈 메모" and mm["quick"] and mm["circles"] == 0, mm)
     page.locator("#s-diary .nh-back").click()
     page.wait_for_timeout(460)
 
@@ -383,16 +383,18 @@ with sync_playwright() as p:
     page.wait_for_timeout(280)
     addrow = page.evaluate("""() => {
       const rows = [...document.querySelectorAll('#sheet #noteOrderList .nord-row')];
-      const last = rows[rows.length - 1];
+      const last = rows[rows.length - 1], panel = document.getElementById('nkPanel');
       return {active: last.classList.contains('active'),
               name: (last.querySelector('.nord-nm') || {}).value,
               label: (document.querySelector('#sheet #nkindLbl') || {}).textContent || '',
-              cardsShown: (() => { const c = document.querySelector('#sheet .nk-cards');
-                return c ? getComputedStyle(c).display !== 'none' : false; })()};
+              hidden: panel.hidden,
+              gap: Math.round(panel.getBoundingClientRect().top - last.getBoundingClientRect().bottom),
+              kinds: [...document.querySelectorAll('#sheet #nkPanel .nk-card')].map(c => c.getAttribute('data-kind'))};
     }""")
-    check("「추가」로 붙인 줄이 바로 선택됨", addrow["active"] and addrow["name"] == "가계부", addrow)
-    check("그 줄의 속지를 고르는 모드 · 새 카테고리라 「카드」는 없음",
-          "가계부" in addrow["label"] and addrow["cardsShown"] is False, addrow)
+    check("「추가」로 붙인 줄이 바로 선택되고 그 아래 속지가 펼쳐짐",
+          addrow["active"] and addrow["name"] == "가계부" and addrow["hidden"] is False and 0 <= addrow["gap"] <= 16, addrow)
+    check("그 줄의 속지 패널 · 새 카테고리라 「카드」는 없음",
+          "가계부" in addrow["label"] and addrow["kinds"] == ["check", "memo", "review", "expense"], addrow)
     pick_kind(page, "expense")
     page.locator("#sheet button.btn-primary").click()
     page.wait_for_timeout(760)
@@ -401,21 +403,19 @@ with sync_playwright() as p:
               sum: (document.querySelector('#s-diary .ex-sum .v') || {}).textContent || ''}; }""")
     check("붙인 줄로 만든 카테고리가 그 속지로 열림", nw["kind"] == "expense" and nw["on"].strip() == "가계부" and nw["sum"] != "", nw)
 
-    # 추가를 누르지 않고 위 칸 이름만 → 그 속지로 새 카테고리 (예전 흐름)
+    # 추가를 누르지 않고 위 칸 이름만 → v40 에서는 기본 속지(투두리스트)로 새 카테고리
     open_add_sheet(page)
     page.locator("#sheet .nord-new").fill("생각 정리")
     page.wait_for_timeout(160)
     state_after_focus = page.evaluate("""() => ({sel: !!document.querySelector('#sheet #noteOrderList .nord-row.active'),
-      cardsShown: (() => { const c = document.querySelector('#sheet .nk-cards');
-        return c ? getComputedStyle(c).display !== 'none' : false; })()})""")
-    check("위 「새 카테고리 이름」 칸으로 가면 새 카테고리 모드로",
-          state_after_focus["sel"] is False and state_after_focus["cardsShown"] is False, state_after_focus)
-    pick_kind(page, "memo")
+      hidden: document.getElementById('nkPanel').hidden})""")
+    check("위 「새 카테고리 이름」 칸으로 가면 패널이 접히고 새 카테고리 모드로",
+          state_after_focus["sel"] is False and state_after_focus["hidden"] is True, state_after_focus)
     page.locator("#sheet button.btn-primary").click()
     page.wait_for_timeout(760)
     plain = page.evaluate("""() => { const l = (window.__app.state.lists || []).filter(x => x.title === '생각 정리')[0] || {};
-      return {kind: l.kind, cards: document.querySelectorAll('#s-diary .memo-card').length}; }""")
-    check("이름만 적고 저장해도 그 속지로 새 카테고리", plain["kind"] == "memo", plain)
+      return {kind: l.kind, grid: !!document.querySelector('#s-diary .ngrid')}; }""")
+    check("이름만 적고 저장하면 기본 속지(투두리스트)로 새 카테고리 — 2열 카드 화면", plain["kind"] == "check" and plain["grid"], plain)
 
     check("브라우저 콘솔/페이지 오류 없음 (로컬)", len(errs) == 0, errs[:4])
     ctx.close()
@@ -585,11 +585,14 @@ with sync_playwright() as p:
     sc = page3.evaluate("""() => { const box = document.getElementById('screens');
       const br = box.getBoundingClientRect();
       const s = document.querySelector('#s-photo .pcal-stick');
-      const m = document.querySelector('#s-photo .pcal-m');
+      const hd = document.querySelector('#s-photo .hdr');
       return {stickTop: s ? Math.round(s.getBoundingClientRect().top - br.top) : null,
+              hdrH: hd ? Math.round(hd.getBoundingClientRect().height) : 0,
               scroll: Math.round(box.scrollTop),
               months: document.querySelectorAll('#s-photo .pcal-m').length}; }""")
-    check("위아래로 넘겨도 요일 줄은 화면 위에 붙어 있음", sc["stickTop"] == 0 and sc["scroll"] > 300, sc)
+    # v40: 요일 줄은 «위에 붙어 있는 머리줄(달력 아이콘 줄)» 바로 아래에 붙어요
+    check("위아래로 넘겨도 요일 줄은 머리줄 바로 아래에 붙어 있음",
+          sc["stickTop"] == sc["hdrH"] and sc["scroll"] > 300, sc)
     check("스크롤 뒤에도 달력은 계속 이어짐", sc["months"] >= 25, sc["months"])
     page3.evaluate("document.getElementById('screens').scrollTop += 99999")
     page3.wait_for_timeout(420)

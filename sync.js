@@ -378,6 +378,45 @@
   /* =====================================================================
      상태 → 테이블 행 / 테이블 행 → 상태
      ===================================================================== */
+  /* v40: 사진 댓글·대댓글 — photos 테이블에 따로 칸을 만들지 않고 memo 칸에 안전하게 실어요.
+     (예전에 적어 둔 «글 메모» 는 그대로 두고, 댓글이 있을 때만 표시를 붙여 JSON 으로) */
+  var PHOTO_CMT_TAG = "twolog:c:";
+  function flipCmtWho(who, swap) {
+    if (who !== "me" && who !== "you") return "me";
+    if (!swap) return who;
+    return who === "me" ? "you" : "me";
+  }
+  function encodePhotoMemo(p, swap) {
+    var memo = String((p && p.memo) || "");
+    var cs = arr(p && p.comments);
+    if (!cs.length) return memo;
+    var out = cs.map(function (c) {
+      var o = { id: String(c.id || ""), who: flipCmtWho(c.who, swap), text: String(c.text || ""), at: String(c.at || "") };
+      o.replies = arr(c.replies).map(function (r) {
+        return { id: String(r.id || ""), who: flipCmtWho(r.who, swap), text: String(r.text || ""),
+                 at: String(r.at || ""), to: String(r.to || "") };
+      });
+      return o;
+    });
+    try { return PHOTO_CMT_TAG + JSON.stringify({ m: memo, c: out }); } catch (e) { return memo; }
+  }
+  function decodePhotoMemo(v, swap) {
+    var s = String(v == null ? "" : v);
+    if (s.indexOf(PHOTO_CMT_TAG) !== 0) return { text: s, comments: [] };
+    try {
+      var o = JSON.parse(s.slice(PHOTO_CMT_TAG.length));
+      var cs = arr(o && o.c).filter(function (c) { return c && typeof c === "object"; }).map(function (c) {
+        return { id: String(c.id || randId()), who: flipCmtWho(c.who, swap), text: String(c.text || ""),
+                 at: String(c.at || ""),
+                 replies: arr(c.replies).filter(function (r) { return r && typeof r === "object"; }).map(function (r) {
+                   return { id: String(r.id || randId()), who: flipCmtWho(r.who, swap), text: String(r.text || ""),
+                            at: String(r.at || ""), to: String(r.to || "") };
+                 }) };
+      });
+      return { text: String((o && o.m) || ""), comments: cs };
+    } catch (e) { return { text: "", comments: [] }; }
+  }
+
   function stateToRows(doc, coupleId, swap) {
     var flip = function (who) {
       if (who !== "me" && who !== "you") return "both";
@@ -418,7 +457,7 @@
     (doc.photos || []).forEach(function (p, i) {
       rows.photos.push({
         id: String(p.id), couple_id: coupleId, date: p.date || nowIso(), album: p.album || "",
-        title: p.title || "", place: p.place || "", memo: p.memo || "",
+        title: p.title || "", place: p.place || "", memo: encodePhotoMemo(p, swap),
         art: typeof p.art === "number" ? p.art : null,
         cap_bg: p.capBg || null, storage_path: p.path || null, sort: i
       });
@@ -444,6 +483,10 @@
       p = { title: o.title || "", emoji: o.emoji || "", kind: lk,
         items: arr(o.items).map(function (it) {
           var x = { id: it.id, text: it.text || "", memo: it.memo || "", done: !!it.done };
+          /* v40: 투두리스트 속지는 카드 묶음(gid) 안에 항목이 들어가요 — 카드 id 도 함께 */
+          if (it.gid) x.gid = String(it.gid);
+          /* v40: 모눈 메모에 붙인 사진 한 장 */
+          if (it.img) x.img = String(it.img);
           if (it.rating != null) x.rating = Number(it.rating) || 0;
           if (it.place != null) x.place = String(it.place);
           if (it.date != null) x.date = String(it.date);
@@ -468,14 +511,20 @@
   function normalizeGroups(value) {
     var src = value && typeof value === "object" ? value : {};
     var out = { todo: [], bucket: [], log: [] };
-    ["todo", "bucket", "log"].forEach(function (k) {
-      out[k] = arr(src[k]).filter(function (g) { return g && typeof g === "object"; }).map(function (g) {
+    var clean = function (list) {
+      return arr(list).filter(function (g) { return g && typeof g === "object"; }).map(function (g) {
         var c;
         try { c = JSON.parse(JSON.stringify(g)); } catch (e) { c = {}; }
         if (!c.id) c.id = freshId();
         c.id = String(c.id);
         return c;
       });
+    };
+    ["todo", "bucket", "log"].forEach(function (k) { out[k] = clean(src[k]); });
+    /* v40: 내가 만든 카테고리(list:<id>)의 투두리스트 카드도 두 기기가 함께 써요 */
+    Object.keys(src).forEach(function (k) {
+      if (k.indexOf("list:") !== 0) return;
+      out[k] = clean(src[k]);
     });
     return out;
   }
@@ -483,9 +532,16 @@
     var g = normalizeGroups(groups);
     return { todo: g.todo.length, bucket: g.bucket.length, log: g.log.length };
   }
+  /* v40: 카드 묶음 전체 개수 — 기본 3탭 + 내 카테고리(list:<id>)까지 */
+  function groupTotal(groups) {
+    var g = normalizeGroups(groups);
+    var n = 0;
+    Object.keys(g).forEach(function (k) { n += g[k].length; });
+    return n;
+  }
   function groupsEmpty(value) {
     if (!value || typeof value !== "object") return true;
-    return !(arr(value.todo).length + arr(value.bucket).length + arr(value.log).length);
+    return groupTotal(value) === 0;
   }
 
   /* v34: 노트 탭 이름·순서(note_meta) — 두 기기가 같은 탭 이름과 순서를 봅니다.
@@ -596,6 +652,9 @@
             items: arr(p.items).map(function (it) {
               /* v38: 별점·장소·날짜·금액도 그대로 되살립니다 */
               var x = { id: it.id || randId(), text: it.text || "", memo: it.memo || "", done: !!it.done };
+              /* v40: 어느 카드(리스트) 안의 항목인지 — 없으면 앱이 첫 카드로 이어 줘요 */
+              if (it.gid) x.gid = String(it.gid);
+              if (it.img) x.img = String(it.img);
               if (it.rating != null) x.rating = Number(it.rating) || 0;
               if (it.place != null) x.place = String(it.place);
               if (it.date != null) x.date = String(it.date);
@@ -607,9 +666,10 @@
         }
       });
     (photoRows || []).sort(function (a, b) { return (a.sort || 0) - (b.sort || 0); }).forEach(function (r) {
+      var pmemo = decodePhotoMemo(r.memo, swap);
       doc.photos.push({
         id: r.id, date: r.date, album: r.album || "", title: r.title || "", place: r.place || "",
-        memo: r.memo || "", art: typeof r.art === "number" ? r.art : 0,
+        memo: pmemo.text, comments: pmemo.comments, art: typeof r.art === "number" ? r.art : 0,
         capBg: r.cap_bg || null, path: r.storage_path || null
       });
     });
@@ -620,7 +680,7 @@
       else if (r.key === K_GROUPS && r.value) {
         /* v27: 노트 카드 묶음 — 두 기기가 같은 카드 id·제목·색을 봅니다 */
         var gs = normalizeGroups(r.value);
-        if (gs.todo.length || gs.bucket.length || gs.log.length) doc.groups = gs;
+        if (groupTotal(gs)) doc.groups = gs;
       }
       else if (r.key === K_NOTE_META && r.value && !noteMetaEmpty(r.value)) {
         /* v34: 노트 탭 이름·순서 — 예전 데이터(값 없음)면 앱 기본값 그대로 */
@@ -939,9 +999,8 @@
     /* notes */
     jobs.push(this.upsertTable("notes", rows.notes, this.prev.notes));
     /* photos (Storage 파일은 addPhoto 에서 이미 올라감) */
-    jobs.push(this.upsertTable("photos", rows.photos.map(function (p) {
-      return { id: p.id, couple_id: p.couple_id, date: p.date, album: p.album, title: p.title, place: p.place, memo: p.memo, art: p.art, cap_bg: p.cap_bg, storage_path: p.storage_path, sort: p.sort };
-    }), this.prev.photos));
+    /* v40: photos 행은 stateToRows 가 만든 그대로 (memo 에 댓글 JSON 포함) */
+    jobs.push(this.upsertTable("photos", rows.photos, this.prev.photos));
 
     /* v35: 테마(settings key="theme")는 올리지 않습니다 — 화면 모드·캡션 색·홈 제목 색·폰트는
        각자 폰(app.js 의 localTheme)에만 저장하고, 상대 폰의 화면을 바꾸지 않아요. */
@@ -950,7 +1009,7 @@
     var groupsValue = normalizeGroups(doc.groups);
     var prevGroups = this.prev.settings[K_GROUPS];
     var groupsChanged = !prevGroups || !prevGroups.value || !sameRow(prevGroups.value, groupsValue);
-    if (groupsChanged && (groupsValue.todo.length || groupsValue.bucket.length || groupsValue.log.length)) {
+    if (groupsChanged && groupTotal(groupsValue)) {                          /* v40: 내 카테고리 카드까지 */
       var groupsRow = { couple_id: cid, key: K_GROUPS, value: groupsValue };
       jobs.push(client.from("settings").upsert(groupsRow, { onConflict: "couple_id,key" }).then(function (r) {
         if (r.error) throw r.error;
@@ -1277,7 +1336,7 @@
         /* ---- 4-1. v27 노트 카드 묶음(settings groups) — 원격에 아직 없을 때만 ---- */
         var groupsRow = setRows.filter(function (r) { return r.key === K_GROUPS; })[0];
         var localGroups = normalizeGroups(local.groups);
-        var localGroupTotal = localGroups.todo.length + localGroups.bucket.length + localGroups.log.length;
+        var localGroupTotal = groupTotal(localGroups);
         if (groupsEmpty(groupsRow && groupsRow.value) && localGroupTotal) {
           jobs.push(client.from("settings").upsert({ couple_id: cid, key: K_GROUPS, value: localGroups }, { onConflict: "couple_id,key" }).then(function (r) {
             if (r && r.error) throw r.error;
@@ -1389,7 +1448,7 @@
     if (!local) return Promise.resolve({ ok: false, reason: "no_local" });
 
     var localGroups = normalizeGroups(local.groups);
-    var localGroupTotal = localGroups.todo.length + localGroups.bucket.length + localGroups.log.length;
+    var localGroupTotal = groupTotal(localGroups);
     var localNotes = arr(local.todos).length + arr(local.bucket).length + arr(local.logs).length;
     if (!localGroupTotal || !localNotes) return Promise.resolve({ ok: false, reason: "no_groups" });
 

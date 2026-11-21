@@ -4,7 +4,7 @@
 2) 한 날/한 주에 일정이 2개 이상이면 막대가 세로·가로로 떨어져 또렷하게 보임 (세 줄까지 펼침)
 3) 일정 추가 시트 — 큰 날짜와 시간 글씨 크기가 «완전히 같고», 물결(~)은 더 큼
 4) 노트 카드 제목 — 얇게(400) · 가운데 정렬
-5) My 탭 맨 윗줄 「버전 v39」 · sw.js 캐시 twolog-v39
+5) My 탭 맨 윗줄 「버전 v40」 · sw.js 캐시 twolog-v40
 
     python3 tests/v23.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
 """
@@ -83,11 +83,11 @@ with sync_playwright() as p:
 
     # ---------------- 0. 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
-    check("sw.js 캐시 버전 twolog-v39", 'const VERSION = "twolog-v39"' in sw,
+    check("sw.js 캐시 버전 twolog-v40", 'const VERSION = "twolog-v40"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
     app_js = page.request.get(URL + "app.js").text()
-    check("app.js 버전 상수 v39", 'var APP_VERSION = "v39"' in app_js)
-    check("캐시 목록이 새 버전(shell-twolog-v39)", "shell-" in sw)
+    check("app.js 버전 상수 v40", 'var APP_VERSION = "v40"' in app_js)
+    check("캐시 목록이 새 버전(shell-twolog-v40)", "shell-" in sw)
 
     # 예시 데이터로 상태를 만들고 일반 모드로
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -342,7 +342,7 @@ with sync_playwright() as p:
       return {ok: !!v, txt: v ? v.textContent.trim() : null,
               right: v ? window.innerWidth - v.getBoundingClientRect().right : null};
     })()""")
-    check("My 탭에 버전 v37 표시", my.get("ok") and "v39" in str(my.get("txt")), my.get("txt"))
+    check("My 탭에 버전 v37 표시", my.get("ok") and "v40" in str(my.get("txt")), my.get("txt"))
     page.wait_for_timeout(400)
     page.screenshot(path=os.path.join(SHOT, "my-v23.png"))
 
@@ -500,7 +500,7 @@ with sync_playwright() as p:
               hasView: !!pv, count: (document.querySelector('#sheet .pv-count') || {}).textContent || null};
     })()""")
     check("모아보기에서 사진을 누르면 크게 보기", pv["open"] and pv["hasView"], pv)
-    page.locator("#sheet [data-close]").first.click()
+    page.locator("#sheet .pv40-slide").first.click()
     page.wait_for_timeout(400)
     page.locator('#s-photo [data-act="photoDayBack"]').click()
     page.wait_for_timeout(500)

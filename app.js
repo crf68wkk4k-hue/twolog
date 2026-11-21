@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v39";
+  var APP_VERSION = "v40";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -63,7 +63,10 @@
     /* v28: 노트 알약 탭 옆 — 「목록 +」 아이콘 */
     listPlus: svg('<path d="M4.6 6.4h9.2M4.6 11h6.4M4.6 15.6h4.4"/><path d="M17.6 12.4v6.2M14.5 15.5h6.2"/>', 20),
     /* v34: + 시트의 카테고리 순서를 끌어 옮기는 3줄 손잡이 (≡) */
-    grip: svg('<path d="M5 8h14M5 12h14M5 16h14"/>', 20)
+    grip: svg('<path d="M5 8h14M5 12h14M5 16h14"/>', 20),
+    /* v40: 사진 크게 보기의 댓글·더 보기 */
+    chat: svg('<path d="M4.2 5.6h15.6v10.2H9.6l-4 3.4v-3.4H4.2z"/>', 19),
+    more: svg('<circle cx="6" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.4" fill="currentColor" stroke="none"/>', 19)
   };
   var STAR = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.8l2.86 5.94 6.54.9-4.77 4.55 1.18 6.5L12 17.6l-5.81 3.09 1.18-6.5L2.6 9.64l6.54-.9z"/></svg>';
 
@@ -206,6 +209,8 @@
   if (!S.noteKinds || typeof S.noteKinds !== "object") S.noteKinds = {};
   ["todo", "bucket", "log"].forEach(function (k) {
     if (["check", "memo", "review", "expense"].indexOf(S.noteKinds[k]) < 0) delete S.noteKinds[k];
+    /* v40: 기본 카테고리의 「투두리스트」는 이제 「카드」와 같은 화면이라 값을 걷어요 */
+    if (S.noteKinds[k] === "check") delete S.noteKinds[k];
   });
   if (S.couple.fmt !== "Y") S.couple.fmt = "D";
   if (typeof S.couple.phrase !== "string" || !S.couple.phrase.trim()) S.couple.phrase = defaultPhrase();
@@ -280,6 +285,15 @@
     if (!p || typeof p !== "object") return;
     if (typeof p.capBg === "string" && /^#[0-9a-fA-F]{6}$/.test(p.capBg)) p.capBg = p.capBg.toUpperCase();
     else p.capBg = null;
+    /* v40: 사진 댓글·대댓글 — 모양이 깨진 값은 조용히 걷어 내요 */
+    if (!Array.isArray(p.comments)) p.comments = [];
+    p.comments = p.comments.filter(function (c) { return c && typeof c === "object" && String(c.text || "").trim(); });
+    p.comments.forEach(function (c) {
+      if (c.who !== "you") c.who = "me";
+      if (!Array.isArray(c.replies)) c.replies = [];
+      c.replies = c.replies.filter(function (r) { return r && typeof r === "object" && String(r.text || "").trim(); });
+      c.replies.forEach(function (r) { if (r.who !== "you") r.who = "me"; });
+    });
   });
   S.lists.forEach(function (l) {
     if (!l || typeof l !== "object") return;
@@ -290,6 +304,16 @@
     if (!Array.isArray(l.items)) l.items = [];
   });
   S.lists = S.lists.filter(function (l) { return l && typeof l === "object"; });
+  /* v40: 「투두리스트」 속지는 2열 카드 묶음 화면이 됐어요 — 내 카테고리도 카드 묶음을 갖고,
+     v38·v39 에서 카드 없이 한 줄씩 적어 둔 항목은 카테고리 이름의 첫 카드 안으로 옮겨 담습니다. */
+  var listKeysLive = {};
+  S.lists.forEach(function (l) {
+    listKeysLive["list:" + l.id] = 1;
+    if (l.kind === "check") ensureListCards(l);
+  });
+  Object.keys(S.groups).forEach(function (k) {
+    if (k.indexOf("list:") === 0 && !listKeysLive[k]) delete S.groups[k];   /* 지운 카테고리의 카드 정리 */
+  });
   /* v39: 기본 카테고리에도 속지(투두·메모·리뷰·지출)를 고를 수 있어, 항목의 «제목/본문» 자리를
      탭마다 다른 이름(text·title / memo·review)으로 쓰던 것을 한 가지로 읽고 쓸 수 있게 맞춥니다. */
   (S.todos || []).forEach(function (t) { if (t && typeof t.memo !== "string") t.memo = ""; });
@@ -1551,8 +1575,51 @@
   var CIR_ON = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7.4 12.3l3 3 5.8-6.2" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var GROUP_ARR = { todo: "todos", bucket: "bucket", log: "logs" };
   var GROUP_DEF = { todo: "메모", bucket: "버킷리스트", log: "영화·먹방" };
-  function itemsOf(k) { return S[GROUP_ARR[k]] || []; }
+  /* v40: 「투두리스트」 속지가 2열 카드 묶음이 되면서, 카드 묶음(S.groups)이 내가 만든 카테고리
+     (list:<id>)에도 생겼어요. 그 카테고리의 항목은 원래처럼 그 리스트의 items 안에 그대로 있어요. */
+  var LIST_SEG = "list:";
+  function isListSeg(k) { return String(k == null ? "" : k).indexOf(LIST_SEG) === 0; }
+  function listOfSeg(k) { return isListSeg(k) ? findList(String(k).slice(LIST_SEG.length)) : null; }
+  function itemsOf(k) {
+    if (GROUP_ARR[k]) return S[GROUP_ARR[k]] || [];
+    var l = listOfSeg(k);
+    return l && Array.isArray(l.items) ? l.items : [];
+  }
   function groupsOf(k) { return (S.groups && S.groups[k]) || []; }
+  /* 카드 제목이 비었을 때 보여 줄 이름 — 기본 카테고리는 그 탭 이름, 내 카테고리는 카테고리 이름 */
+  function groupTitleOf(k, g) {
+    if (g && g.title) return String(g.title);
+    if (GROUP_DEF[k]) return GROUP_DEF[k];
+    var l = listOfSeg(k);
+    return l ? String(l.title || "리스트") : "리스트";
+  }
+  /* v40: 카드가 없이 항목만 있는 예전 리스트(v38·v39)를 카드 묶음으로 이어 줌 —
+     카드가 하나도 없으면 카테고리 이름의 첫 카드를 만들고, gid 가 없는 항목을 그 안에 넣어요. */
+  function ensureListCards(l) {
+    if (!l) return 0;
+    var k = LIST_SEG + l.id;
+    if (!S.groups || typeof S.groups !== "object") S.groups = {};
+    if (!Array.isArray(S.groups[k])) S.groups[k] = [];
+    S.groups[k] = S.groups[k].filter(function (g) { return g && typeof g === "object"; });
+    var gs = S.groups[k];
+    gs.forEach(function (g) {
+      if (!g.id) g.id = uid();
+      if (typeof g.title !== "string") g.title = "";
+      if (g.who !== "you") g.who = "me";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(g.date || "")) || isNaN(parse(g.date).getTime())) g.date = today;
+    });
+    if (!Array.isArray(l.items)) l.items = [];
+    var moved = 0;
+    if (l.items.length) {
+      if (!gs.length) gs.push({ id: uid(), title: String(l.title || "리스트"), who: "me", date: today });
+      var ids = gs.map(function (g) { return g.id; });
+      l.items.forEach(function (it) {
+        if (!it || typeof it !== "object") return;
+        if (!it.gid || ids.indexOf(it.gid) < 0) { it.gid = gs[0].id; moved += 1; }
+      });
+    }
+    return moved;
+  }
   function groupOf(k, gid) {
     var gs = groupsOf(k);
     for (var i = 0; i < gs.length; i++) if (gs[i].id === gid) return gs[i];
@@ -1573,7 +1640,7 @@
   var CIR_S_ON = '<svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7.4 12.3l3 3 5.8-6.2" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   function cardItem(k, it) {
-    var label = k === "todo" ? it.text : it.title;
+    var label = k === "log" ? it.title : itTitle(it);
     if (k === "log") {
       return '<div class="cti log"><span class="lt">' + (it.kind === "movie" ? "영화" : "먹방") + "</span>" +
         '<span class="cx">' + esc(label) + "</span></div>";
@@ -1588,7 +1655,7 @@
   function noteCard(k, g) {
     var items = itemsOf(k).filter(function (x) { return x.gid === g.id; }).sort(byDone);
     /* v17: 「주제」 줄을 없애고 카드는 제목부터 — 제목 아래로 To-do 미리보기 */
-    var gTitle = g.title || GROUP_DEF[k];
+    var gTitle = groupTitleOf(k, g);
     var tBg = String(g.titleBg || "").toUpperCase();
     var h = '<div class="ncard" role="button" tabindex="0" data-act="openGroup" data-tab="' + k + '" data-gid="' + g.id +
       '" aria-label="' + esc(gTitle) + ' 목록 열기">';
@@ -1629,10 +1696,12 @@
     /* 제목을 시트 맨 위로 — 카드에서 가장 크게 보이는 값이라 먼저 고쳐요.
        v19: 입력칸 아래 부가설명 줄은 지웠어요 (제목 → To-do 로 바로).
        v21: 제목 입력칸 바로 위에 제목 바탕색 컬러판을 두었어요. */
-    h += cardColorPanel(k, g);
+    /* v40: 「제목」을 맨 위로, 「제목 색」은 한 칸 띄워 그 아래로 — 제목 글씨도 크게 */
     h += '<form class="form card-meta" id="sheetForm">' +
-      '<div class="f"><label>제목</label><input class="field" name="title" value="' + esc(g.title || GROUP_DEF[k]) + '" required autocomplete="off"></div>' +
+      '<div class="f"><label>제목</label><input class="field card-title-in" name="title" value="' + esc(groupTitleOf(k, g)) + '" required autocomplete="off"></div>' +
       "</form>";
+    h += '<div class="card-color-gap"></div>';
+    h += cardColorPanel(k, g);
     h += '<div class="todo-label" style="margin-top:20px">To-do</div>';
     h += '<form class="todo-add" id="listAddForm" data-tab="' + k + '" data-gid="' + g.id + '">' +
       '<span class="circ" aria-hidden="true">' + CIR_OFF + "</span>" +
@@ -1692,7 +1761,10 @@
     rowMoveAnim("#sheet .card-items", rtBefore);
   }
 
+  /* v40: 2열 카드 묶음 + 「+ 새 리스트」 — 기본 카테고리(todo·bucket·log)와
+     투두리스트 속지를 고른 내 카테고리(list:<id>)가 같은 화면을 씁니다. */
   function viewCards(k) {
+    if (isListSeg(k)) ensureListCards(listOfSeg(k));
     var h = '<div class="ngrid">';
     groupsOf(k).forEach(function (g) { h += noteCard(k, g); });
     h += '<button type="button" class="ncard new" data-act="addGroup" data-tab="' + k + '">' +
@@ -1715,6 +1787,14 @@
 
   /* 탭별 항목 한 줄 (토글·수정·삭제 동작까지) */
   function diaryRow(k, it) {
+    /* v40: 내 카테고리 투두리스트 카드 안 항목 — 그 카테고리의 항목을 그대로 토글·삭제 */
+    if (isListSeg(k)) {
+      return listItemRow(it, '<div class="t tw">' + esc(itTitle(it)) + "</div>" +
+        (itBody(it) ? '<div class="sub">' + esc(itBody(it)) + "</div>" : ""),
+        'data-act="toggleListItem" data-list="' + k + '" data-id="' + it.id + '"',
+        'data-act="editListItem" data-list="' + k + '" data-id="' + it.id + '"',
+        'data-act="delListItem" data-list="' + k + '" data-id="' + it.id + '"');
+    }
     if (k === "todo") {
       return listItemRow(it, '<div class="t tw">' + esc(it.text) + "</div>" +
         (it.memo ? '<div class="sub">' + esc(it.memo) + "</div>" : ""),
@@ -1744,14 +1824,14 @@
      --------------------------------------------------------------------------
      카테고리를 만들 때 속지를 고르면 그 카테고리 화면이 속지에 맞춰 그려집니다.
        · check   투두리스트   — 체크 동그라미 + Add + 완료는 아래로 (예전 그대로)
-       · memo    줄글 메모   — 제목·본문을 자유롭게 쓰는 메모 카드
+       · memo    모눈 메모   — 모눈종이 바탕에 제목·본문을 자유롭게 쓰는 메모 카드
        · review  별점 리뷰   — 별점(1~5)·장소·날짜·한줄평
        · expense 지출·정산   — 항목 + 금액, 위에 합계 자동
-     예전에 만들어 둔 「memo」 리스트는 그대로 줄글 메모로 이어집니다.
+     예전에 만들어 둔 「memo」 리스트는 그대로 모눈 메모로 이어집니다.
      ========================================================================== */
   var LIST_KIND_DEF = {
-    check:   { n: "투두리스트", d: "체크하며 하나씩" },
-    memo:    { n: "줄글 메모", d: "제목·본문을 자유롭게" },
+    check:   { n: "투두리스트", d: "리스트를 카드로 묶어서" },
+    memo:    { n: "모눈 메모", d: "모눈 바탕에 자유롭게" },
     review:  { n: "별점 리뷰", d: "별점·장소·한줄평" },
     expense: { n: "지출·정산", d: "금액을 적으면 합계까지" }
   };
@@ -1777,12 +1857,14 @@
     return { id: BASE_SEG + k, base: k, kind: noteBaseKind(k) || "check", items: itemsOf(k) };
   }
   function isBaseContainer(c) { return !!(c && c.base); }
-  /* 화면의 data-list 값 → 진짜 리스트(내 카테고리) 또는 기본 카테고리의 속지 화면 */
+  /* 화면의 data-list 값 → 진짜 리스트(내 카테고리) 또는 기본 카테고리의 속지 화면
+     v40: 투두리스트 카드 안에서는 data-list="list:<id>" 도 써요 */
   function containerOf(id) {
     id = String(id == null ? "" : id);
     if (id.indexOf(BASE_SEG) === 0 && NOTE_BASE.indexOf(id.slice(BASE_SEG.length)) >= 0) {
       return baseContainer(id.slice(BASE_SEG.length));
     }
+    if (isListSeg(id)) return findList(id.slice(LIST_SEG.length));
     return findList(id);
   }
   /* 속지 화면이 항목의 «제목·본문»을 읽고 쓰는 자리 — 기본 카테고리는 탭마다 이름이 달라요
@@ -1853,10 +1935,12 @@
   function viewListBody(l) {
     if (!l) return "";
     var kind = listKindOf(l);
+    /* v40: 투두리스트 속지는 2열 카드 묶음 + 「+ 새 리스트」 (기본 카테고리도 같은 화면) */
+    if (kind === "check") return viewCards(isBaseContainer(l) ? l.base : LIST_SEG + l.id);
     if (kind === "memo") return viewListMemo(l);
     if (kind === "review") return viewListReview(l);
     if (kind === "expense") return viewListExpense(l);
-    return viewListCheck(l);
+    return "";
   }
   /* v39: 기본 카테고리를 속지로 보기(메모·버킷리스트·영화·먹방 탭에서 고른 경우) */
   function viewBasePage(k) {
@@ -1873,50 +1957,32 @@
   }
 
   /* 1) 투두리스트 — 예전과 똑같이 ○ + 입력 + Add, 완료는 아래로 */
-  function viewListCheck(l) {
-    var h = "";
-    var done = l.items.filter(function (i) { return i.done; }).length;
-    var pct = l.items.length ? Math.round(done / l.items.length * 100) : 0;
-    h += '<div class="progress" data-list="' + l.id + '"><span class="n">' + done + " / " + l.items.length + ' 완료</span><span class="bar"><i style="width:' + pct + '%"></i></span></div>';
-    h += doneToggle(done);
+  /* v40: 예전「투두리스트」한 줄 체크 화면(viewListCheck)은 없앴어요 —
+     이제 투두리스트 속지는 viewCards() 의 2열 카드 묶음 + 「+ 새 리스트」로 그립니다. */
 
-    var hide = !!(S.ui && S.ui.hideDone);
-    var items = l.items.slice().sort(byDone);
-    if (hide) items = items.filter(function (i) { return !i.done; });
-
-    /* 제목 칸 없이 바로 To-do — ○ + 입력 + Add 로 한 줄씩 바로 더해요 */
-    h += '<div class="todo-block" data-list="' + l.id + '">';
-    h += '<div class="todo-label">To-do</div>';
-    h += '<form class="todo-add" id="listAddForm" data-list="' + l.id + '">' +
-      '<span class="circ" aria-hidden="true">' + CIR_OFF + "</span>" +
-      '<input class="todo-in" name="text" placeholder="내용을 추가해보세요." autocomplete="off" enterkeyhint="done" aria-label="할 일 내용">' +
-      '<button class="todo-add-btn" type="submit">Add</button></form>';
-    h += '<div class="todo-items" data-list="' + l.id + '">';
-    if (!items.length) h += '<div class="empty">' + (l.items.length ? "완료한 항목을 숨겼어요." : "위 칸에 할 일을 적고 Add 를 눌러 보세요.") + "</div>";
-    items.forEach(function (it) {
-      h += listItemRow(it, '<div class="t tw">' + esc(itTitle(it)) + "</div>" +
-        (itBody(it) ? '<div class="sub">' + esc(itBody(it)) + "</div>" : ""),
-        'data-act="toggleListItem" data-list="' + l.id + '" data-id="' + it.id + '"',
-        'data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '"',
-        'data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '"');
-    });
-    h += "</div></div>";
-    h += '<div style="height:6px"></div>';
-    return h;
+  /* 2) 모눈 메모 — 모눈종이 바탕의 제목·본문 카드. 눌러서 본문을 써요 (v40) */
+  /* v40: 모눈 메모 카드의 날짜 머리 — 「2026.11.21 토요일」 */
+  function memoDayLabel(ds) {
+    var d = parse(String(ds || today).slice(0, 10));
+    if (!d || isNaN(d.getTime())) return itemDateTxt(ds);
+    return d.getFullYear() + "." + pad(d.getMonth() + 1) + "." + pad(d.getDate()) + " " + DOW_FULL[d.getDay()];
   }
 
-  /* 2) 줄글 메모 — 체크 동그라미 없이 제목·본문 카드. 눌러서 본문을 써요 */
+  /* 2) 모눈 메모 — 모눈종이 바탕 위에 흰 일기 카드가 세로로 쌓여요.
+     카드 맨 위 가운데에 날짜+요일, 그 아래 제목(있으면)과 본문. 제목 없이 본문만 써도 돼요. */
   function viewListMemo(l) {
     var h = '<div class="todo-block" data-list="' + l.id + '">';
-    h += quickAddForm(l, "memo", "메모 제목을 적고 Add");
-    h += '<div class="memo-list" data-list="' + l.id + '">';
-    if (!l.items.length) h += '<div class="empty">아직 메모가 없어요. 위 칸에 제목을 적고 Add 를 눌러 보세요.</div>';
+    h += quickAddForm(l, "memo", "오늘 있었던 일을 적고 Add");
+    h += '<div class="memo-list nmemo-list" data-list="' + l.id + '">';
+    if (!l.items.length) h += '<div class="empty">아직 메모가 없어요. 위 칸에 적고 Add 를 눌러 보세요.</div>';
     l.items.forEach(function (it) {
-      h += '<div class="memo-card" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '" role="button" tabindex="0">' +
-        (itTitle(it) ? '<div class="mc-t">' + esc(itTitle(it)) + "</div>" : "") +
-        (itBody(it) ? '<div class="mc-b">' + esc(itBody(it)) + "</div>" : "") +
-        '<div class="mc-f"><span class="mc-d">' + esc(itemDateTxt(it.date)) + "</span>" +
-        '<button type="button" class="x" data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="삭제">' + IC.x + "</button></div></div>";
+      var body = itBody(it);
+      h += '<article class="memo-card nmemo-card" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '" role="button" tabindex="0">' +
+        '<div class="mc-d nmemo-date">' + esc(memoDayLabel(it.date)) + "</div>" +
+        (itTitle(it) ? '<div class="mc-t nmemo-t">' + esc(itTitle(it)) + "</div>" : "") +
+        (body ? '<div class="mc-b nmemo-b">' + esc(body) + "</div>" : "") +
+        (it.img ? '<img class="nmemo-photo" src="' + esc(it.img) + '" alt="메모 사진" loading="lazy" decoding="async">' : "") +
+        '<button type="button" class="x nmemo-x" data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="삭제">' + IC.x + "</button></article>";
     });
     h += "</div></div>";
     h += '<div style="height:6px"></div>';
@@ -2091,7 +2157,8 @@
     h += '<div class="pcal-week pcal-stick" aria-hidden="true"><span>일</span><span>월</span><span>화</span>' +
       "<span>수</span><span>목</span><span>금</span><span>토</span></div>";
     months.forEach(function (ym) { h += photoMonthBlock(ym, byDay); });
-    h += '<div style="height:26px"></div></div>';
+    /* v40: 아래 탭바 위로 답답하지 않게 숨통 — 달력 끝에 여백을 둬요 */
+    h += '<div style="height:42px"></div></div>';
     return h;
   }
 
@@ -2102,8 +2169,10 @@
     if (!el || !box) return;
     var r = el.getBoundingClientRect(), b = box.getBoundingClientRect();
     var mid = (box.scrollHeight - b.height) / 2;
-    /* v39: 요일 줄(sticky)이 위에 붙어도 이번 달 제목이 가리지 않게 조금 아래에서 시작 */
-    var top = box.scrollTop + (r.top - b.top) - Math.max(48, Math.round(b.height * 0.2));
+    /* v40: 위에 붙어 있는 머리줄(달력 아이콘 줄) 아래로 이번 달이 오도록 — 그 높이만큼 더 내려요 */
+    var hdr = document.querySelector("#s-photo .hdr");
+    var hh = hdr ? Math.round(hdr.getBoundingClientRect().height) : 48;
+    var top = box.scrollTop + (r.top - b.top) - Math.max(hh + 12, Math.round(b.height * 0.2));
     box.scrollTop = Math.max(0, Math.min(top, Math.max(0, mid + 240)));
   }
 
@@ -2196,32 +2265,84 @@
     renderPhoto();
     $("#screens").scrollTop = 0;
   }
+  /* ==========================================================================
+     v40: 날짜 모아보기 — 위에 3열 사진, 그 아래 «사진마다 댓글»
+     사진을 누르면 사진만 보이는 크게 보기(풀스크린)로 넘어가고,
+     댓글·대댓글은 이 화면에서 사진 아래에 바로 달아요.
+     ========================================================================== */
+  function cmtBlockBody(p) {
+    var h = cmtListHtml(p);
+    h += cmtFormHtml(p);
+    return h;
+  }
+  function dayCmtBlock(p, idx) {
+    var cn = photoCommentCount(p);
+    var nm = p.title || p.album || "사진";
+    return '<section class="dcmt" data-pid="' + esc(p.id) + '">' +
+      '<div class="dcmt-hd">' +
+      '<button class="dcmt-th" type="button" data-act="openPhoto" data-id="' + esc(p.id) + '" aria-label="사진 크게 보기">' + photoImg(p) + "</button>" +
+      '<div class="dcmt-ti"><b>' + (idx + 1) + "번째 사진</b><span>" + esc(nm) + "</span></div>" +
+      '<span class="dcmt-c' + (cn ? " on" : "") + '">' + (cn ? "댓글 " + cn : "댓글") + "</span>" +
+      '<button class="dcmt-more" type="button" data-act="photoMenu" data-id="' + esc(p.id) + '" aria-label="사진 메뉴" title="정보 수정·삭제">' + IC.more + "</button>" +
+      "</div>" +
+      '<div class="dcmt-b" data-pid="' + esc(p.id) + '">' + cmtBlockBody(p) + "</div></section>";
+  }
+
   function renderPhotoDay() {
     var day = photoDayView;
     var d = parse(day);
     var items = photoDayItems(day);
     var h = '<header class="hdr hdr-min dgal-hd' + capCls("photo") + '"' + capStyle("photo") + ' data-pg="photo">' +
       '<div class="dgal-l">' +
-      '<button class="dgal-back" type="button" data-act="photoDayBack" aria-label="뒤로" title="뒤로">' + IC.left + "</button>" +
+      '<button class="dgal-back" type="button" data-act="photoDayBack" aria-label="사진첩으로 돌아가기" title="사진첩으로">' + IC.left + "</button>" +
       '<div class="dgal-tt"><h1>' + (d.getMonth() + 1) + "월 " + d.getDate() + "일</h1>" +
       '<span class="dgal-y">' + d.getFullYear() + "년" + (day === today ? " · 오늘" : (day === addDays(today, -1) ? " · 어제" : "")) + "</span>" +
-      '<button type="button" class="dgal-tag' + (dateTagOf(day) ? " on" : "") + '" data-act="dateTag" data-date="' + day + '">' +
-      (dateTagOf(day) ? esc(dateTagOf(day)) : "+ 태그") + "</button></div></div>" +
-      '<div class="hdr-acts"><button class="round-btn" type="button" data-act="addPhotoDay" data-date="' + day +
-      '" aria-label="이 날짜에 사진 추가" title="이 날짜에 사진 추가">' + IC.plus + "</button></div></header>";
+      (dateTagOf(day) ? '<button type="button" class="dgal-tag on" data-act="dateTag" data-date="' + day + '">' + esc(dateTagOf(day)) + "</button>" : "") +
+      "</div></div>" +
+      /* v40: 오른쪽 위 「+」 대신 «수정» 아이콘 — 누르면 이 날짜 사진 편집 시트(날짜·태그·순서·삭제·추가) */
+      '<div class="hdr-acts"><button class="round-btn" type="button" data-act="editPhotoDay" data-date="' + day +
+      '" aria-label="이 날짜 사진 수정" title="이 날짜 사진 수정">' + IC.pencil + "</button></div></header>";
     h += '<div class="dgal"><div class="dgal-meta">총 ' + items.length + "장</div>";
     if (items.length) {
       h += '<div class="dgrid" data-day="' + day + '">';
       items.forEach(function (p) {
+        var cn = photoCommentCount(p);
         h += '<button class="dg-cell" type="button" data-act="openPhoto" data-id="' + p.id +
-          '" aria-label="' + esc(p.title || p.album || "사진") + ' 크게 보기">' + photoImg(p) + "</button>";
+          '" aria-label="' + esc(p.title || p.album || "사진") + ' 크게 보기">' + photoImg(p) +
+          (cn ? '<span class="dg-cmt">' + IC.chat + "<b>" + cn + "</b></span>" : "") + "</button>";
       });
+      h += "</div>";
+      /* 사진마다 댓글 — 사진 아래에서 바로 달고 봐요 */
+      h += '<div class="dcmt-wrap" id="dcmtWrap">';
+      items.forEach(function (p, i) { h += dayCmtBlock(p, i); });
       h += "</div>";
     } else {
       h += '<div class="empty">이 날 담은 사진이 아직 없어요.<br>오른쪽 위 <b>+</b> 로 담아 보세요.</div>';
     }
     h += "</div>";
     $("#s-photo").innerHTML = h;
+  }
+
+  /* 한 사진의 댓글 칸만 다시 그림 (댓글·답글·삭제 뒤) */
+  function refreshDayCmt(p) {
+    if (!p) return;
+    var box = document.querySelector('#s-photo .dcmt-b[data-pid="' + p.id + '"]');
+    if (box) box.innerHTML = cmtBlockBody(p);
+    var sec = document.querySelector('#s-photo .dcmt[data-pid="' + p.id + '"]');
+    if (sec) {
+      var cb = sec.querySelector(".dcmt-c");
+      var cn = photoCommentCount(p);
+      if (cb) { cb.textContent = cn ? "댓글 " + cn : "댓글"; cb.classList.toggle("on", !!cn); }
+    }
+    var cell = document.querySelector('#s-photo .dg-cell[data-id="' + p.id + '"]');
+    if (cell) {
+      var bdg = cell.querySelector(".dg-cmt");
+      var n2 = photoCommentCount(p);
+      if (n2) {
+        if (!bdg) { cell.insertAdjacentHTML("beforeend", '<span class="dg-cmt">' + IC.chat + "<b>" + n2 + "</b></span>"); }
+        else { var bb = bdg.querySelector("b"); if (bb) bb.textContent = String(n2); }
+      } else if (bdg) bdg.parentNode.removeChild(bdg);
+    }
   }
 
   function renderPhoto() {
@@ -2231,12 +2352,15 @@
     /* v21: 사진첩은 제목·「N장의 순간」 없이 오른쪽 + 버튼만 — 상단 여백도 군더더기 없이 */
     /* v23: + 옆에 달력 아이콘 — 누르면 그 달 사진을 달력으로 (다시 누르면 목록으로) */
     var pcOn = !!(S.ui && S.ui.photoCal);
-    var h = '<header class="hdr hdr-min' + capCls("photo") + '"' + capStyle("photo") + ' data-pg="photo">' +
+    /* v40: 달력 보기에서도 머리줄은 화면 위에 붙어 있어요 — 오른쪽 위 달력 아이콘을 한 번 더 누르면
+       사진첩 기본 목록으로 돌아갑니다 (아이콘은 늘 달력 모양, 켜져 있으면 진하게). */
+    var h = '<header class="hdr hdr-min' + (pcOn ? " hdr-cal" : "") + capCls("photo") + '"' + capStyle("photo") + ' data-pg="photo">' +
       '<div class="hdr-empty"></div>' +
       '<div class="hdr-acts">' +
       '<button class="round-btn photo-search" data-act="photoSearch" aria-label="사진 검색" title="사진 검색">' + IC.search + "</button>" +
-      '<button class="round-btn" data-act="togglePhotoCal" aria-label="' + (pcOn ? "사진 목록으로" : "사진 달력 보기") +
-      '" title="' + (pcOn ? "사진 목록으로" : "사진 달력 보기") + '">' + (pcOn ? IC.grid : IC.cal) + "</button>" +
+      '<button class="round-btn pc-toggle' + (pcOn ? " on" : "") + '" data-act="togglePhotoCal" aria-pressed="' + (pcOn ? "true" : "false") +
+      '" aria-label="' + (pcOn ? "사진 목록으로" : "사진 달력 보기") +
+      '" title="' + (pcOn ? "사진 목록으로" : "사진 달력 보기") + '">' + IC.cal + "</button>" +
       '<button class="round-btn" data-act="addPhoto" aria-label="사진 추가" title="사진 추가">' + IC.plus + "</button></div></header>";
     if (pcOn) {
       h += photoCalHtml();
@@ -2259,9 +2383,9 @@
     groups.reverse();
     var daysHtml = "";
     groups.forEach(function (g) {
-      /* v37: 날짜 옆에는 장수를 매번 적지 않고, 3장을 넘길 때만 「+N장」 */
+      /* v40: 3장을 넘기면 마지막 사진 오른쪽 아래에 작게 「+N」 만 (날짜 줄에는 안 적어요) */
       var rest = g.items.length - PHOTOS_PER_DAY;
-      var meta = rest > 0 ? "+" + rest + "장" : "";
+      var meta = "";
       /* v18: 하루는 사진 3장까지 — 넘치면 세 번째에 +N, 눌러서 그날 사진을 모두 봐요 */
       var shown = g.items.slice(0, PHOTOS_PER_DAY);
       daysHtml += '<div class="pday"><div class="pday-hd" role="button" tabindex="0" data-act="openPhotoDay" data-date="' + g.date + '">' + photoDayLabel(g.date) +
@@ -2272,12 +2396,10 @@
           var more = (rest > 0 && i === shown.length - 1) ? '<span class="pola-more">+' + rest + "</span>" : "";
           /* v37: 흰 틀·기울기 없이 사진만 꽉 채운 정사각형 칸 — 캡션이 있으면 사진 아래 한 줄
              v38: 누르면 바로 크게 보기가 아니라 그날 사진 모아보기가 먼저 열려요 */
+          /* v40: 사진 아래 캡션 줄은 없앴어요 — 사진만 (예전 캡션 글씨는 저장돼 있어도 안 보여요) */
           return '<button class="pola" data-act="openPhotoDay" data-date="' + g.date +
-            '" aria-label="' + esc(p.title || p.album || "사진") + ' — 그날 사진 모아보기">' +
-            '<span class="pola-pic">' + photoImg(p) + more + "</span>" +
-            (p.title ? '<span class="pola-chin' + (p.capBg ? " tinted" : "") + '"' +
-              (p.capBg ? ' style="background:' + esc(p.capBg) + '"' : "") + ">" +
-              esc(p.title) + "</span>" : "") + "</button>";
+            '" aria-label="' + esc(p.album || "사진") + ' — 그날 사진 모아보기">' +
+            '<span class="pola-pic">' + photoImg(p) + more + "</span></button>";
         }).join("") + "</div></div>";
     });
     if (!groups.length) {
@@ -2345,6 +2467,9 @@
   function closeSheet() {
     personSheetWho = null;
     openCard = null;
+    upMode = "pending";            /* v40: 사진 편집 시트를 닫으면 순서 모드도 새로 담기로 */
+    dayEdit = null;
+    dayAddMore = false;
     photoView = null;   /* v37: 사진 크게 보기를 닫으면 보던 목록도 끝 — 달럭 밑기·사진 넘기기가 남아 있지 않게 */
     sheetWrap.classList.remove("sheet-center");
     sheetWrap.classList.remove("sheet-full");
@@ -2389,33 +2514,76 @@
       '<input class="nord-new" name="title" value="" placeholder="새 카테고리 이름" aria-label="새 카테고리 이름" autocomplete="off">' +
       '<button type="button" class="nord-add-btn" data-act="nordAdd">추가</button></div>';
     h += '<div class="set-lbl" style="margin-top:18px">노트 카테고리</div>';
-    /* v39: 줄을 누르면 그 카테고리의 속지를 바로 고를 수 있어요 */
-    h += '<div class="nord-hint nord-hint-top">줄을 누르면 그 카테고리의 속지를 고를 수 있어요. ≡ 를 끌면 탭 순서가 바뀝니다.</div>';
+    /* v40: 속지 레이아웃은 목록 맨 아래가 아니라 «카테고리 줄을 눌렀을 때 그 줄 바로 아래»에 펼쳐져요 */
+    h += '<div class="nord-hint nord-hint-top">줄을 누르면 그 카테고리의 속지가 바로 아래에 펼쳐져요. ≡ 를 끌면 탭 순서가 바뀝니다.</div>';
     h += '<div class="nord" id="noteOrderList">';
     var selKey = l ? "list:" + l.id : "";
     noteOrderList().forEach(function (k) { h += noteOrderRow(k, null, null, k === selKey); });
     h += "</div>";
+    h += '<div class="nk-panel" id="nkPanel" hidden></div>';
     h += '<input type="hidden" name="del" id="noteDelIds" value="">';
-    /* v38: 속지 레이아웃 — 고른 카테고리(없으면 새 카테고리)의 속지를 2×2 로 고름 (기본 투두리스트)
-       v39: 카테고리 줄을 누르면 그 줄의 속지를 바꾸는 모드로 바뀌고, 기본 카테고리는 「카드」로 되돌릴 수 있어요 */
-    var curKind = l ? listKindOf(l) : "check";
-    h += '<div class="set-lbl" id="nkindLbl" style="margin-top:24px">속지 레이아웃</div>';
-    h += '<div class="nkind-hint" id="nkindHint">새 카테고리에 쓸 속지를 골라요. 나중에 바꿀 수 있어요.</div>';
-    h += '<div class="nkind" data-group="nkind">';
-    LIST_KINDS.forEach(function (k) {
-      h += '<button type="button" class="nk-card' + (k === curKind ? " active" : "") + '" data-act="nkind" data-kind="' + k + '">' +
-        '<span class="nk-n">' + LIST_KIND_DEF[k].n + "</span>" +
-        '<span class="nk-d">' + LIST_KIND_DEF[k].d + "</span>" +
-        '<span class="nk-ck">' + IC.check + "</span></button>";
-    });
-    /* 기본 카테고리만: 속지를 걷고 지금 모양(카드)으로 되돌리기 */
-    h += '<button type="button" class="nk-cards" data-act="nkind" data-kind="">' +
-      '<span class="nk-n">카드</span><span class="nk-d">지금처럼 카드로 모아 보기</span>' +
-      '<span class="nk-ck">' + IC.check + "</span></button>";
-    h += '<input type="hidden" name="nkind" value="' + curKind + '">';
-    h += "</div>";
     h += '<div style="height:14px"></div><button class="btn-primary" type="submit">저장하기</button></form>';
     return h;
+  }
+
+  /* v40: 카테고리 줄 아래에 펼쳐지는 속지 레이아웃 2×2 —
+     기본 카테고리는 「카드」까지, 내 카테고리·새로 더한 줄은 네 속지만 보여요. */
+  function nkPanelHtml(kind, isBase, name, key) {
+    var list = isBase
+      ? [{ k: "", n: "카드", d: "지금처럼 카드로 모아 보기" }].concat(
+          LIST_KINDS.filter(function (k) { return k !== "check"; }).map(function (k) {
+            return { k: k, n: LIST_KIND_DEF[k].n, d: LIST_KIND_DEF[k].d };
+          }))
+      : LIST_KINDS.map(function (k) { return { k: k, n: LIST_KIND_DEF[k].n, d: LIST_KIND_DEF[k].d }; });
+    var cur = isBase ? (kind || "") : (LIST_KINDS.indexOf(kind) >= 0 ? kind : "check");
+    var nm = String(name || "").trim();
+    var h = '<div class="set-lbl" id="nkindLbl">' + esc(nm ? "속지 레이아웃 · " + nm : "속지 레이아웃") + "</div>";
+    h += '<div class="nkind-hint" id="nkindHint">' + esc((nm ? "\u300c" + nm + "\u300d" : "이 카테고리") + "에 쓸 속지를 골라요.") + "</div>";
+    h += '<div class="nkind" data-group="nkind" data-key="' + esc(key || "") + '">';
+    list.forEach(function (o) {
+      h += '<button type="button" class="nk-card' + (o.k === cur ? " active" : "") + '" data-act="nkind" data-kind="' + o.k + '">' +
+        '<span class="nk-n">' + esc(o.n) + "</span>" +
+        '<span class="nk-d">' + esc(o.d) + "</span>" +
+        '<span class="nk-ck">' + IC.check + "</span></button>";
+    });
+    h += "</div>";
+    /* 새 카테고리 이름을 위 칸에 적고 바로 저장할 때 쓸 기본 속지 */
+    h += '<input type="hidden" name="nkind" value="' + esc(cur) + '">';
+    return h;
+  }
+  function nkPanelEl() { return document.getElementById("nkPanel"); }
+  function nkHiddenKind() {
+    var i = document.querySelector('#sheet input[name="nkind"]');
+    return i ? String(i.value || "") : "";
+  }
+  /* 고른 줄 바로 아래로 패널을 옮겨 펼칩니다. 줄이 없으면 접어 두고, 올린 순서는 그대로 둬요. */
+  function nkPlacePanel(row) {
+    var box = document.querySelector("#sheet #noteOrderList");
+    if (!box) return null;
+    var p = nkPanelEl();
+    if (!p) {
+      p = document.createElement("div");
+      p.id = "nkPanel";
+      p.className = "nk-panel";
+      box.parentNode.insertBefore(p, box.nextSibling);
+    }
+    if (!row) {
+      var dk = nkHiddenKind();
+      if (LIST_KINDS.indexOf(dk) < 0) dk = "check";
+      p.innerHTML = nkPanelHtml(dk, false, "", "");
+      p.hidden = true;
+      p.classList.remove("open");
+      return p;
+    }
+    var key = row.getAttribute("data-key") || "";
+    var isBase = NOTE_BASE.indexOf(key) >= 0;
+    var kind = row.getAttribute("data-kind") || "";
+    var nmIn = row.querySelector(".nord-nm");
+    p.innerHTML = nkPanelHtml(kind, isBase, nmIn ? nmIn.value : "", key);
+    if (row.nextElementSibling !== p) box.insertBefore(p, row.nextElementSibling || null);
+    p.hidden = false;
+    p.classList.add("open");
+    return p;
   }
 
   /* + 시트의 카테고리 한 줄 — 3줄 손잡이 · 이름 칸 · 지금 속지 배지 · (내가 만든 카테고리·새로 더한 줄만) 삭제 */
@@ -2453,47 +2621,18 @@
   function nkSelectedRow() {
     return document.querySelector("#sheet #noteOrderList .nord-row.active");
   }
-  /* + 시트의 표시를 한 번에 맞춤 — 줄 배지 · 「속지 레이아웃」 제목 · 2×2 카드 체크 · hidden nkind */
+  /* + 시트의 표시를 한 번에 맞춤 — 줄 배지 · 속지 패널(고른 줄 바로 아래) · 2×2 카드 체크
+     v40: 패널은 고른 줄 아래로만 붙고, 아무 줄도 고르지 않았으면 접혀 있어요. */
   function nkPaint() {
     var box = document.querySelector("#sheet #noteOrderList");
     if (!box) return;
-    var grp = document.querySelector('#sheet [data-group="nkind"]');
     var rows = Array.prototype.slice.call(box.querySelectorAll(".nord-row"));
     rows.forEach(function (r) {
       var kind0 = r.getAttribute("data-kind") || "";
       var kb = r.querySelector(".nord-kb");
       if (kb) kb.textContent = nkKindName(kind0);
     });
-    if (!grp) return;
-    var sel = nkSelectedRow();
-    var kind, label = "속지 레이아웃", hint;
-    if (sel) {
-      kind = sel.getAttribute("data-kind") || "";
-      var nmIn = sel.querySelector(".nord-nm");
-      var nmTxt = nmIn ? String(nmIn.value || "").trim() : "";
-      if (nmTxt) label = "속지 레이아웃 · " + nmTxt;
-      hint = (nmTxt ? "\u300c" + nmTxt + "\u300d" : "이 카테고리") + "에 쓸 속지를 골라요.";
-    } else {
-      var nin0 = grp.querySelector('input[name="nkind"]');
-      var nk0 = nin0 ? String(nin0.value || "") : "check";
-      kind = LIST_KINDS.indexOf(nk0) >= 0 ? nk0 : "check";
-      hint = "새 카테고리에 쓸 속지를 골라요. 나중에 바꿀 수 있어요.";
-    }
-    var lblEl = document.querySelector("#sheet #nkindLbl");
-    if (lblEl) lblEl.textContent = label;
-    var hintEl = document.querySelector("#sheet #nkindHint");
-    if (hintEl) hintEl.textContent = hint;
-    Array.prototype.forEach.call(grp.querySelectorAll(".nk-card"), function (c) {
-      c.classList.toggle("active", (c.getAttribute("data-kind") || "") === kind);
-    });
-    var cardsBtn = grp.querySelector(".nk-cards");
-    if (cardsBtn) {
-      var baseSel = !!(sel && NOTE_BASE.indexOf(sel.getAttribute("data-key") || "") >= 0);
-      cardsBtn.classList.toggle("on", baseSel);
-      cardsBtn.classList.toggle("active", baseSel && kind === "");
-    }
-    var nin = grp.querySelector('input[name="nkind"]');
-    if (nin && LIST_KINDS.indexOf(kind) >= 0) nin.value = kind;
+    nkPlacePanel(nkSelectedRow());
   }
   function nkSelectRow(row) {
     var box = document.querySelector("#sheet #noteOrderList");
@@ -2503,15 +2642,16 @@
     });
     nkPaint();
   }
-  /* 줄을 누르면 그 줄이 선택되고, 위 「새 카테고리 이름」 칸으로 가면 새 카테고리 모드로 돌아갑니다.
-     ≡ 손잡이·삭제 버튼은 그대로 자기 일을 해요. */
+  /* 줄을 누르면 그 줄이 선택되고 그 아래에 속지가 펼쳐져요. 같은 줄을 한 번 더 누르면 접힙니다.
+     이름칸을 고치러 들어갈 때는 접히지 않고, ≡ 손잡이·삭제 버튼은 그대로 자기 일을 해요. */
   document.addEventListener("pointerdown", function (ev) {
     var t = ev.target;
     if (!t || !t.closest || !t.closest("#sheet")) return;
     var row = t.closest("#sheet #noteOrderList .nord-row");
     if (row) {
       if (t.closest(".nord-grip") || t.closest(".nord-del")) return;
-      if (!row.classList.contains("active")) nkSelectRow(row);
+      if (t.closest(".nord-nm")) { if (!row.classList.contains("active")) nkSelectRow(row); return; }
+      nkSelectRow(row.classList.contains("active") ? null : row);
       return;
     }
     if (t.closest("#sheet .nord-new") || t.closest("#sheet .nord-add-btn")) nkSelectRow(null);
@@ -2544,8 +2684,9 @@
     return gap;
   }
   /* 자리를 비켜 주는 줄들만 부드럽게 미끄러지게 (FLIP: 먼저 재고 → 옮기고 → 되돌려 놀았다가 → 제자리) */
-  function nordFlip(box, keep, mutate) {
-    var rows = nordRowsOf(box).filter(function (r) { return r !== keep; });
+  function nordFlip(box, keep, mutate, sel) {
+    var rows = (sel ? Array.prototype.slice.call(box.querySelectorAll(sel)) : nordRowsOf(box))
+      .filter(function (r) { return r !== keep; });
     var before = rows.map(function (r) { return r.getBoundingClientRect().top; });
     mutate();
     rows.forEach(function (r, i) {
@@ -2567,11 +2708,13 @@
     if (!box) return false;
     if (dir < 0 && row.previousElementSibling) {
       nordFlip(box, row, function () { box.insertBefore(row, row.previousElementSibling); });
+      if (row.classList.contains("active")) nkPaint();     /* v40: 펼친 패널도 줄을 따라가요 */
       return true;
     }
     if (dir > 0 && row.nextElementSibling) {
       var nx = row.nextElementSibling;
       nordFlip(box, nx, function () { box.insertBefore(nx, row); });
+      if (row.classList.contains("active")) nkPaint();
       return true;
     }
     return false;
@@ -2600,6 +2743,8 @@
     var row = g.closest(".nord-row"), box = g.closest(".nord");
     if (!row || !box) return;
     ev.preventDefault();                 /* 끄는 동안 시트가 스크롤되지 않도록 */
+    /* v40: 펼쳐진 속지 패널이 끌기 계산을 흔들지 않게 끌기 시작할 때 접어요 */
+    if (document.getElementById("nkPanel")) nkSelectRow(null);
     var rb = row.getBoundingClientRect();
     nordDrag = {
       grip: g, row: row, box: box, id: ev.pointerId,
@@ -2648,6 +2793,129 @@
     if (!d) return;
     ev.preventDefault();
     if (nordMove(g.closest(".nord-row"), d)) g.focus();
+  }, true);
+
+  /* ==========================================================================
+     v40: 사진 추가 시트의 고른 사진 순서 — 맨 앞 ≡ 손잡이를 끌어 위아래로 옮겨요.
+     노트 카테고리(nordDrag)와 같은 방식: 손가락을 따라 떠 있고, 자리를 비켜 주는
+     줄들은 FLIP 으로 미끄러지며, 놓으면 pendingFiles 배열 순서도 그대로 바뀝니다.
+     (키보드 ↑ ↓ 로도 옮길 수 있어요)
+     ========================================================================== */
+  var upDrag = null;
+  function upRowsOf(box) { return Array.prototype.slice.call(box.querySelectorAll(".up-item")); }
+  /* v40: 같은 ≡ 손잡이로 «사진 추가 시트»와 «날짜 사진 편집 시트» 둘 다 순서를 바꿔요 */
+  var upMode = "pending";      // pending: 새로 담는 사진들 · day: 그날 이미 올라간 사진 편집
+  function upArray() { return (upMode === "day" && dayEdit) ? dayEdit.items : pendingFiles; }
+  /* 화면에 보이는 순서를 지금 목록(pendingFiles · dayEdit.items)에 반영해요 */
+  function upCommitOrder() {
+    var box = document.querySelector("#sheet #upList");
+    if (!box) return;
+    var arr = upArray();
+    var order = upRowsOf(box).map(function (r) { return Number(r.getAttribute("data-i")); });
+    var next = [];
+    order.forEach(function (i) { if (arr[i]) next.push(arr[i]); });
+    arr.forEach(function (f) { if (next.indexOf(f) < 0) next.push(f); });
+    if (upMode === "day" && dayEdit) dayEdit.items = next;
+    else pendingFiles = next;
+    /* 줄은 그대로 두고 data-i 만 지금 순서로 다시 매겨요 (손잡이 포커스도 유지) */
+    upRowsOf(box).forEach(function (r, i) {
+      r.setAttribute("data-i", String(i));
+      var del = r.querySelector(".up-del");
+      if (del) del.setAttribute("data-i", String(i));
+    });
+    var cnt = document.querySelector("#sheet #upCount");
+    if (cnt) cnt.textContent = String(arr.length);
+    if (upMode === "day") return;
+    var sum = document.querySelector("#sheet #upSum");
+    if (sum) sum.textContent = pendingFiles.length + "장 · " + fmtBytes(upTotal()) + " · 긴 변 1800px 로 줄여서 보관해요.";
+    var btn = document.querySelector("#sheet #upBtn");
+    if (btn) btn.textContent = pendingFiles.length + "장 담기";
+  }
+  function upEnd() {
+    var d = upDrag;
+    if (!d) return;
+    upDrag = null;
+    var row = d.row;
+    row.style.transition = "transform 200ms " + NORD_EASE;
+    row.style.transform = "translateY(0)";
+    var settle = function () {
+      row.removeEventListener("transitionend", settle);
+      row.style.transition = "";
+      row.style.transform = "";
+      row.style.zIndex = "";
+      row.classList.remove("dragging");
+    };
+    row.addEventListener("transitionend", settle);
+    setTimeout(settle, 260);
+    upCommitOrder();
+  }
+  function upMove(row, dir) {
+    if (!row) return false;
+    var box = row.parentNode;
+    if (!box) return false;
+    if (dir < 0 && row.previousElementSibling) {
+      nordFlip(box, row, function () { box.insertBefore(row, row.previousElementSibling); }, ".up-item");
+      upCommitOrder();
+      return true;
+    }
+    if (dir > 0 && row.nextElementSibling) {
+      var nx = row.nextElementSibling;
+      nordFlip(box, nx, function () { box.insertBefore(nx, row); }, ".up-item");
+      upCommitOrder();
+      return true;
+    }
+    return false;
+  }
+  document.addEventListener("pointerdown", function (ev) {
+    var g = ev.target && ev.target.closest ? ev.target.closest("#sheet .up-grip") : null;
+    if (!g) return;
+    var row = g.closest(".up-item"), box = g.closest(".up-list");
+    if (!row || !box) return;
+    ev.preventDefault();
+    var rb = row.getBoundingClientRect();
+    upDrag = {
+      grip: g, row: row, box: box, id: ev.pointerId,
+      startY: ev.clientY, translate: 0,
+      h: rb.height, center: rb.top + rb.height / 2,
+      step: rb.height + nordGapOf(box), order: upRowsOf(box)
+    };
+    row.style.transition = "none";
+    row.style.zIndex = "5";
+    row.classList.add("dragging");
+    try { g.setPointerCapture(ev.pointerId); } catch (e) {}
+  }, true);
+  document.addEventListener("pointermove", function (ev) {
+    var d = upDrag;
+    if (!d || ev.pointerId !== d.id) return;
+    if (ev.cancelable) ev.preventDefault();
+    var row = d.row, box = d.box;
+    var boxTop = box.getBoundingClientRect().top;
+    var desiredTop = (d.center + (ev.clientY - d.startY)) - d.h / 2;
+    var want = Math.round((desiredTop - boxTop) / d.step);
+    want = Math.max(0, Math.min(d.order.length - 1, want));
+    var cur = d.order.indexOf(row);
+    if (want !== cur) {
+      nordFlip(box, row, function () {
+        d.order.splice(cur, 1);
+        d.order.splice(want, 0, row);
+        box.insertBefore(row, d.order[want + 1] || null);
+      }, ".up-item");
+    }
+    var natural = row.getBoundingClientRect().top - d.translate;
+    d.translate = desiredTop - natural;
+    row.style.transform = "translateY(" + d.translate + "px)";
+  }, true);
+  document.addEventListener("pointerup", upEnd, true);
+  document.addEventListener("pointercancel", upEnd, true);
+  /* 손잡이를 고르고 ↑ ↓ 키로도 옮길 수 있게 */
+  document.addEventListener("keydown", function (ev) {
+    var g = ev.target && ev.target.closest ? ev.target.closest("#sheet .up-grip") : null;
+    if (!g) return;
+    var d = ev.key === "ArrowUp" ? -1 : (ev.key === "ArrowDown" ? 1 : 0);
+    if (!d) return;
+    ev.preventDefault();
+    /* 줄을 옮기면 포커스가 풀리므로 손잡이를 다시 잡아 줘요 (계속 ↑ ↓ 로 옮길 수 있게) */
+    if (upMove(g.closest(".up-item"), d)) g.focus();
   }, true);
 
   /* v36: 「추가」/엔터 — 입력칸의 이름을 목록 맨 아래 줄로 붙입니다.
@@ -2801,7 +3069,7 @@
       '<div class="nt-row">' +
       '<input class="field nt-nm" name="new_n" placeholder="예) 여행 준비물" aria-label="새 카테고리 이름" autocomplete="off">' +
       '<select class="field nt-kind" name="new_kind" aria-label="새 카테고리 형식">' +
-      '<option value="check">투두리스트</option><option value="memo">줄글 메모</option>' +
+      '<option value="check">투두리스트</option><option value="memo">모눈 메모</option>' +
       '<option value="review">별점 리뷰</option><option value="expense">지출·정산</option></select>' +
       "</div></div>";
     h += '<div style="height:14px"></div><button class="btn-primary" type="submit">저장하기</button></form>';
@@ -2820,12 +3088,24 @@
     var submit = '<button class="btn-primary" type="submit">' + (isEdit ? "저장하기" : "추가하기") + "</button></form>";
 
     if (kind === "memo") {
+      /* v40: 모눈 메모 — 제목은 있어도 없어도 되고, 본문만 써도 저장돼요. 사진 한 장은 골라서 붙일 수 있어요. */
+      var mimg = it && it.img ? String(it.img) : "";
       return sheetHead(isEdit ? "메모 수정" : "새 메모") +
         '<form class="form" id="sheetForm">' +
-        '<div class="f"><label>제목</label><input class="field" name="text" value="' + (it ? esc(itTitle(it)) : "") +
-        '" placeholder="예) 11월에 하고 싶은 것" autocomplete="off"></div>' +
-        '<div class="f"><label>본문</label><textarea class="field" name="memo" rows="7" placeholder="자유롭게 적어 두세요">' +
-        (it ? esc(itBody(it)) : "") + "</textarea></div>" + delBtn + submit;
+        '<div class="f"><label>제목 (선택)</label><input class="field" name="text" value="' + (it ? esc(itTitle(it)) : "") +
+        '" placeholder="예) 11월 21일의 기록" autocomplete="off"></div>' +
+        '<div class="f"><label>본문</label><textarea class="field nmemo-paper" name="memo" rows="7" placeholder="오늘 있었던 일을 자유롭게 적어 두세요">' +
+        (it ? esc(itBody(it)) : "") + "</textarea></div>" +
+        '<div class="f"><label>사진 (선택)</label>' +
+        '<div class="nmemo-pick">' +
+        '<button type="button" class="btn-line" data-act="memoImgPick">사진 고르기</button>' +
+        '<span class="nmemo-pick-n" id="memoImgName">' + (mimg ? "사진 한 장 붙임" : "없음") + "</span>" +
+        (mimg ? '<button type="button" class="btn-line" data-act="memoImgClear">빼기</button>' : "") +
+        "</div>" +
+        '<input type="file" id="memoImgIn" accept="image/*" hidden>' +
+        '<input type="hidden" name="img" value="' + esc(mimg) + '">' +
+        '<img class="nmemo-prev" id="memoImgPrev" alt=""' + (mimg ? ' src="' + esc(mimg) + '"' : " hidden") + ">" +
+        "</div>" + delBtn + submit;
     }
 
     if (kind === "review") {
@@ -3113,7 +3393,8 @@
   function formGroup(k, g) {
     var isNew = !g;
     return sheetHead(isNew ? "새 리스트" : "리스트 수정") +
-      '<p class="sheet-sub">탭 안에 리스트를 나눠 담을 수 있어요. 제목을 적어 주세요.</p>' +
+      '<p class="sheet-sub">' + (isListSeg(k) ? "이 카테고리 안에 리스트 카드를 하나 더 만들어요. 제목을 적어 주세요."
+        : "탭 안에 리스트를 나눠 담을 수 있어요. 제목을 적어 주세요.") + '</p>' +
       '<form class="form" id="sheetForm">' +
       '<div class="f"><label>제목</label><input class="field" name="title" value="' + esc(g ? g.title : "") +
       '" placeholder="예) 장보기" autocomplete="off"></div>' +
@@ -3172,49 +3453,130 @@
       .map(function (x) { return x.id; });
   }
 
-  function photoViewBody() {
+  /* ==========================================================================
+     v40: 사진 크게 보기 — 사진만 화면에 꽉 차게
+       · 아래 정보·「캡션 바탕색」·삭제 바는 없앴어요
+       · 위 좌우 화살표 대신 «옆으로 밀면 넘어가는» 가로 스냅 스크롤
+       · 위 왼쪽 ×로 닫고, 오른쪽에 💬 댓글(개수) · ⋯ 메뉴(정보 수정·삭제)만 조용히
+     ========================================================================== */
+  function pvPhotos() {
     var ids = (photoView && photoView.ids) || [];
+    var out = [];
+    ids.forEach(function (id) {
+      var p = S.photos.filter(function (x) { return x.id === id; })[0];
+      if (p) out.push(p);
+    });
+    return out;
+  }
+  /* 사진 한 장의 댓글·대댓글 수 */
+  function photoCommentCount(p) {
+    var n = 0;
+    ((p && p.comments) || []).forEach(function (c) { n += 1 + ((c.replies || []).length); });
+    return n;
+  }
+  function cmtTime(at) {
+    var d = parse(String(at || "").slice(0, 10));
+    var dt = null;
+    try { dt = new Date(at); } catch (e) { dt = null; }
+    if (!dt || isNaN(dt.getTime())) return "";
+    var h = dt.getHours(), m = dt.getMinutes();
+    var ap = h < 12 ? "오전" : "오후";
+    var hh = h % 12; if (!hh) hh = 12;
+    return ap + " " + hh + ":" + pad(m);
+  }
+  function cmtName(who) { return who === "you" ? String(S.couple.you || "준영") : String(S.couple.me || "나"); }
+  function cmtRowHtml(c, isReply, parentId) {
+    var who = c.who === "you" ? "you" : "me";
+    var mine = who === "me";
+    return '<div class="cmt' + (isReply ? " re" : "") + '" data-cid="' + esc(c.id) + '" data-parent="' + esc(parentId) + '">' +
+      avSpan(who) +
+      '<div class="cmt-b">' +
+      '<div class="cmt-h"><b>' + esc(cmtName(who)) + "</b><span>" + esc(cmtTime(c.at)) + "</span></div>" +
+      (isReply && c.to ? '<div class="cmt-to">@' + esc(c.to) + "</div>" : "") +
+      '<div class="cmt-t">' + esc(c.text || "") + "</div>" +
+      '<div class="cmt-acts">' +
+      '<button type="button" data-act="cmtReply" data-id="' + esc(parentId) + '" data-who="' + esc(who) + '" data-name="' + esc(cmtName(who)) + '">답글</button>' +
+      (mine ? '<button type="button" data-act="cmtDel" data-id="' + esc(c.id) + '" data-parent="' + esc(parentId) + '">삭제</button>' : "") +
+      "</div></div></div>";
+  }
+  function cmtListHtml(p) {
+    var cs = (p && p.comments) || [];
+    var h = '<div class="cmt-list">';
+    if (!cs.length) h += '<div class="cmt-empty">아직 댓글이 없어요. 첫 댓글을 남겨 보세요.</div>';
+    cs.forEach(function (c) {
+      h += cmtRowHtml(c, false, c.id);
+      (c.replies || []).forEach(function (r) { h += cmtRowHtml(r, true, c.id); });
+    });
+    h += "</div>";
+    return h;
+  }
+  function cmtFormHtml(p) {
+    return '<form class="cmt-form" data-id="' + esc(p ? p.id : "") + '">' +
+      '<input type="hidden" name="re" value="">' +
+      avSpan("me") +
+      '<input class="cmt-in" name="text" placeholder="댓글 달기" autocomplete="off" enterkeyhint="send" aria-label="댓글">' +
+      '<button class="cmt-send" type="submit">등록</button></form>';
+  }
+
+  /* v40: 사진만 보이는 풀스크린 크게 보기 — 위아래 어떤 글씨·버튼도 없이 사진만.
+     · 옆으로 밀면 같은 날의 이전·다음 사진 (가로 스냅 스크롤)
+     · 사진을 한 번 탭하거나 아래로 쓸어내리면 이전 화면(모아보기)으로 닫혀요 */
+  function photoViewBody() {
+    var ps = pvPhotos();
     var i = photoView ? photoView.i : 0;
-    var p = S.photos.filter(function (x) { return x.id === ids[i]; })[0];
+    if (i < 0) i = 0;
+    if (i > ps.length - 1) i = Math.max(0, ps.length - 1);
+    if (photoView) photoView.i = i;
+    var p = ps[i];
     if (!p) {
       return '<div class="sheet-hd"><h2>사진</h2><button class="icon-btn" data-close="1" aria-label="닫기">' + IC.x + "</button></div>" +
         '<p class="sheet-sub">사진을 찾을 수 없어요.</p>';
     }
-    var d = parse(p.date);
-    var cur = p.capBg || "";
-    var sw = '<div class="sw-grid" data-sw="cap">';
-    CAP_PALETTE.forEach(function (c) {
-      sw += '<button class="sw' + (cur === c.c ? " sel" : "") + '" data-act="pickCap" data-id="' + p.id +
-        '" data-color="' + c.c + '" style="background:' + c.c + '" aria-label="' + c.n + ' ' + c.c + '"></button>';
-    });
-    sw += "</div>";
-    var many = ids.length > 1;
-    /* v38: 크게 보기는 화면을 꽉 채우는 사진 뷰어 — 위에 닫기·날짜, 가운데 꽉 찬 사진,
-       아래에 캡션과 수정·삭제 바. (예전처럼 시트 안에서 천천히 내려보는 카드가 아니에요) */
-    var html = '<div class="sheet-hd pv-hd"><div class="pv-hl"><h2>' + esc(p.title || p.album || "사진") + "</h2>" +
-      '<span class="pv-da">' + d.getFullYear() + "년 " + (d.getMonth() + 1) + "월 " + d.getDate() + "일" +
-      (many ? " · " + (i + 1) + "/" + ids.length : "") + "</span></div>" +
-      '<button class="icon-btn pv-x" data-close="1" aria-label="닫기">' + IC.x + "</button></div>" +
-      '<div class="pview" data-pv="1">' + photoImg(p, true) +
-      '<button class="pv-nav prev" type="button" data-act="photoStep" data-step="-1" aria-label="이전 사진"' + (i <= 0 ? " disabled" : "") + ">" + IC.left + "</button>" +
-      '<button class="pv-nav next" type="button" data-act="photoStep" data-step="1" aria-label="다음 사진"' + (i >= ids.length - 1 ? " disabled" : "") + ">" + IC.right + "</button>" +
-      "</div>" +
-      (many ? '<div class="pv-count">' + (i + 1) + " / " + ids.length + " · 옆으로 넘겨 보기</div>" : "") +
-      '<div class="pv-bar"><div class="pv-cap">' + capHtml(p, "pd-cap") + "</div>" +
-      '<div class="photo-tools"><button class="set-btn" data-act="photoEdit" data-id="' + p.id + '">정보 수정</button>' +
-      '<button class="set-btn warn" data-act="photoDelete" data-id="' + p.id + '">삭제</button></div></div>' +
-      '<div class="pv-info">' +
-      '<div style="font-size:13.5px;font-weight:600;letter-spacing:-.02em">' + esc(p.album) + "</div>" +
-      '<div style="font-size:11.5px;color:var(--ink-3);margin-top:3px">' + d.getFullYear() + "." + pad(d.getMonth() + 1) + "." + pad(d.getDate()) + (p.place ? " · " + esc(p.place) : "") + "</div></div>" +
-      (p.memo ? '<p class="pv-memo">' + esc(p.memo) + "</p>" : "") +
-      '<div class="cp"><div class="cp-hd"><span>캡션 바탕색</span><span class="cp-val" data-capval="' + p.id + '">' +
-      (p.capBg ? p.capBg.toUpperCase() : "기본") + "</span></div>" + sw +
-      '<div class="cp-foot"><label class="cp-pick"><input type="color" class="js-cap" data-id="' + p.id + '" value="' + capBg(p) + '"><span>컬러</span></label>' +
-      '<button class="cp-reset' + (p.capBg ? "" : " on") + '" data-act="pickCap" data-id="' + p.id + '" data-color="">기본</button></div>' +
-      '<p class="cp-note">글씨는 어느 색을 골라도 검정으로 유지돼요. 고른 색은 앱을 다시 열어도 그대로 남아 있어요.</p></div>' +
-      '<div style="height:6px"></div>';
-    return html;
+    return '<div class="pview pv40" data-pv="1">' +
+      '<div class="pv40-strip" data-pv="1">' +
+      ps.map(function (x) {
+        return '<div class="pv40-slide" data-id="' + esc(x.id) + '">' + photoImg(x, true) + "</div>";
+      }).join("") +
+      "</div></div>";
   }
+
+  /* 옆으로 넘기면 지금 보고 있는 사진만 조용히 따라가요 (화면에는 아무것도 안 보여요) */
+  function pvSyncIndex() {
+    if (!photoView) return;
+    var strip = document.querySelector("#sheet .pv40-strip");
+    if (!strip) return;
+    var w = strip.clientWidth || 1;
+    var idx = Math.round(strip.scrollLeft / w);
+    photoView.i = Math.max(0, Math.min(photoView.ids.length - 1, idx));
+  }
+  document.addEventListener("scroll", function (ev) {
+    var el = ev.target;
+    if (!el || !el.classList || !el.classList.contains("pv40-strip")) return;
+    pvSyncIndex();
+  }, true);
+
+  /* 사진을 한 번 탭하거나, 아래로 쓸어내리면 닫기 */
+  var pvTap = null;
+  document.addEventListener("pointerdown", function (ev) {
+    var el = ev.target && ev.target.closest ? ev.target.closest("#sheet .pv40-strip") : null;
+    if (!el) { pvTap = null; return; }
+    pvTap = { x: ev.clientX, y: ev.clientY, t: Date.now() };
+  }, true);
+  document.addEventListener("pointermove", function (ev) {
+    if (!pvTap) return;
+    var dy = ev.clientY - pvTap.y, dx = ev.clientX - pvTap.x;
+    if (dy > 90 && Math.abs(dy) > Math.abs(dx) * 1.3) {
+      pvTap = null;
+      closeSheet();
+    }
+  }, true);
+  document.addEventListener("pointerup", function (ev) {
+    var st = pvTap;
+    pvTap = null;
+    if (!st) return;
+    var dx = Math.abs(ev.clientX - st.x), dy = Math.abs(ev.clientY - st.y);
+    if (dx < 9 && dy < 9 && Date.now() - st.t < 420) closeSheet();
+  }, true);
 
   function photoShow(id) {
     var p = S.photos.filter(function (x) { return x.id === id; })[0];
@@ -3225,19 +3587,30 @@
     return true;
   }
 
+  /* v40: 사진 사이는 «옆으로 밀어서» 넘어가요 — 화살표 버튼 대신 스냅 스크롤 */
+  function pvScrollTo(idx, smooth) {
+    var strip = document.querySelector("#sheet .pv40-strip");
+    if (!strip) return;
+    var w = strip.clientWidth || 1;
+    var left = Math.max(0, Math.min(strip.scrollWidth - w, idx * w));
+    try { strip.scrollTo({ left: left, behavior: smooth ? "smooth" : "auto" }); }
+    catch (e) { strip.scrollLeft = left; }
+  }
   function photoStep(step) {
     if (!photoView) return;
     var n = photoView.i + step;
     if (n < 0 || n >= photoView.ids.length) return;
     photoView.i = n;
-    var st = sheet.scrollTop;
-    sheet.innerHTML = '<div class="grab"></div>' + photoViewBody();
-    sheet.scrollTop = st;
+    pvScrollTo(n, true);
   }
 
   function openPhoto(id) {
     if (!photoShow(id)) return;
     openSheet(photoViewBody(), null, { full: true });
+    /* 처음 볼 사진이 바로 보이게 스트립을 그 자리로 */
+    var i0 = photoView ? photoView.i : 0;
+    pvScrollTo(i0, false);
+    requestAnimationFrame(function () { pvScrollTo(i0, false); });
   }
 
   function setCapColor(id, color) {
@@ -3302,6 +3675,8 @@
       var url = "";
       try { url = URL.createObjectURL(f); pendingUrls.push(url); } catch (e) {}
       return '<div class="up-item" data-i="' + i + '">' +
+        /* v40: 노트 카테고리 목록처럼 맨 앞 ≡ 손잡이 — 끌어서 사진 순서를 바꿔요 */
+        '<button type="button" class="up-grip" data-act="upGrip" aria-label="사진 순서 바꾸기 — 끌거나 위·아래 화살표" title="끌어서 위아래로 옮겨요">' + IC.grip + "</button>" +
         (url ? '<img class="up-thumb" src="' + url + '" alt="">' : '<div class="up-thumb"></div>') +
         '<div class="up-name">' + esc(f.name || "사진") + "</div>" +
         '<button type="button" class="up-del" data-act="upDel" data-i="' + i + '" aria-label="이 사진 빼기">삭제</button></div>';
@@ -3320,6 +3695,8 @@
   }
 
   function formAddPhoto(files, dateVal) {
+    upMode = "pending";            /* v40: 새로 담는 사진 순서 모드 */
+    dayEdit = null;
     pendingFiles = files || [];
     var dv = dateVal || pendingPhotoDate || today;
     return sheetHead("사진 추가") +
@@ -3327,15 +3704,121 @@
       '<form class="form" id="sheetForm" data-form="photo">' +
       '<div class="f"><label>날짜</label><input class="field up-date" type="date" name="date" value="' +
       dv + '" required></div>' +
-      '<div class="f"><label>태그</label><input class="field" name="album_tag" value="' + esc(dateTagOf(dv)) +
-      '" placeholder="어디서 · 무슨 날 (예: 경주여행)" autocomplete="off"></div>' +
-      '<div class="f"><label>캡션</label><input class="field" name="title" placeholder="비워 두면 한 장씩 나중에 적을 수 있어요" autocomplete="off"></div>' +
+      /* v40: 태그는 늘 빈 칸에서 시작 — 예전에 올린 태그가 따라 올라오지 않게.
+         (한 번 연 시트에서 「+ 추가」로 더 담을 때는 입력해 둔 값이 그대로 남아요) */
+      '<div class="f"><label>태그</label><input class="field" name="album_tag" value=""' +
+      ' placeholder="어디서 · 무슨 날 (예: 경주여행)" autocomplete="off"></div>' +
+      /* v40: 「캡션」 칸은 없앴어요 — 날짜·태그·고른 사진만 남깁니다 */
       '<div class="up-hd"><span class="up-hd-t">선택한 사진 <b id="upCount">' + pendingFiles.length + '</b>장</span>' +
       '<button type="button" class="up-add" data-act="upAdd">' + IC.plus + " 추가</button></div>" +
       '<div class="up-list" id="upList">' + photoUpRowsHtml() + "</div>" +
       '<div class="up-bar" id="upBar"><i></i></div>' +
       '<button class="btn-primary" id="upBtn" type="submit">' + pendingFiles.length + "장 담기</button></form>" +
       '<div style="height:10px"></div><button class="btn-line" data-close="1">취소</button>';
+  }
+
+  /* ==========================================================================
+     v40: 날짜 사진 편집 시트 — 모아보기 오른쪽 위 «수정» 아이콘에서 열려요.
+     그날 이미 올라간 사진이 목록에 들어 있어
+       · 날짜·태그 수정 · ≡ 로 사진 순서 바꾸기 · 사진 빼기 · + 추가
+     를 한 화면에서 하고 저장해요. (캡션 칸은 없앴어요)
+     ========================================================================== */
+  var dayEdit = null;
+  var dayAddMore = false;
+
+  function dayEditRows() {
+    var h = "";
+    (dayEdit ? dayEdit.items : []).forEach(function (it, i) {
+      var p = it.pid ? S.photos.filter(function (x) { return x.id === it.pid; })[0] : null;
+      var inner = p ? photoImg(p) : (it.url ? '<img src="' + esc(it.url) + '" alt="">' : "");
+      var name = p ? (p.album || "사진") : (it && it.file ? (it.file.name || "사진") : "사진");
+      h += '<div class="up-item" data-i="' + i + '"' + (p ? ' data-pid="' + esc(p.id) + '"' : "") + ">" +
+        '<button type="button" class="up-grip" data-act="upGrip" aria-label="사진 순서 바꾸기" title="끌어서 위아래로 옮겨요">' + IC.grip + "</button>" +
+        '<span class="up-thumb">' + inner + "</span>" +
+        '<div class="up-name">' + esc(name) + "</div>" +
+        '<button type="button" class="up-del" data-act="upDel" data-i="' + i + '" aria-label="이 사진 빼기">삭제</button></div>';
+    });
+    if (!h) h = '<div class="up-empty">이 날짜에 사진이 없어요. 「추가」로 담아 보세요.</div>';
+    return h;
+  }
+  function refreshDayEdit() {
+    var list = document.querySelector("#sheet #upList");
+    if (list) list.innerHTML = dayEditRows();
+    var cnt = document.querySelector("#sheet #upCount");
+    if (cnt) cnt.textContent = String(dayEdit ? dayEdit.items.length : 0);
+  }
+  function formEditPhotoDay(day) {
+    var ids = photoDayItems(day).map(function (p) { return p.id; });
+    dayEdit = { day: day, items: ids.map(function (id) { return { pid: id }; }), origIds: ids.slice() };
+    upMode = "day";
+    return sheetHead("사진 수정") +
+      '<p class="sheet-sub">이 날짜의 사진을 고치고, ≡ 로 순서를 바꿔요.</p>' +
+      '<form class="form" id="sheetForm" data-form="photoDay">' +
+      '<div class="f"><label>날짜</label><input class="field up-date" type="date" name="date" value="' + day + '" required></div>' +
+      '<div class="f"><label>태그</label><input class="field" name="album_tag" value="' + esc(dateTagOf(day)) +
+      '" placeholder="어디서 · 무슨 날 (예: 경주여행)" autocomplete="off"></div>' +
+      '<div class="up-hd"><span class="up-hd-t">사진 <b id="upCount">' + dayEdit.items.length + '</b>장</span>' +
+      '<button type="button" class="up-add" data-act="upAdd">' + IC.plus + " 추가</button></div>" +
+      '<div class="up-list" id="upList">' + dayEditRows() + "</div>" +
+      '<button class="btn-primary" type="submit">저장하기</button></form>' +
+      '<div style="height:10px"></div><button class="btn-line" data-close="1">닫기</button>';
+  }
+  /* 날짜·태그·순서·삭제·추가를 한 번에 저장 */
+  function saveDayEdit(fd) {
+    if (!dayEdit) { closeSheet(); return; }
+    var day = String(fd.get("date") || dayEdit.day).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) day = dayEdit.day;
+    var tag = String(fd.get("album_tag") || "").trim();
+    var albumName = tag || defaultAlbum();
+    var seq = dayEdit.items.slice();
+    var keep = seq.filter(function (x) { return x.pid; }).map(function (x) { return x.pid; });
+    (dayEdit.origIds || []).forEach(function (id) {
+      if (keep.indexOf(id) >= 0) return;
+      var gone = S.photos.filter(function (x) { return x.id === id; })[0];
+      S.photos = S.photos.filter(function (x) { return x.id !== id; });
+      delete PHOTO_URLS[id];
+      if (gone) { try { Store.photos.remove(gone).catch(function () {}); } catch (e) {} }
+    });
+    seq.forEach(function (it) {
+      if (!it.pid) return;
+      var p = S.photos.filter(function (x) { return x.id === it.pid; })[0];
+      if (!p) return;
+      p.date = day;
+      p.album = albumName;
+      if (typeof p.title !== "string") p.title = "";
+    });
+    var chain = Promise.resolve();
+    seq.forEach(function (it) {
+      if (it.pid || !it.file) return;
+      chain = chain.then(function () {
+        return Store.photos.add(it.file, { album: albumName, date: day, title: "" }).then(function (res) {
+          var rec = res.photo;
+          rec.title = "";
+          if (res.url) PHOTO_URLS[rec.id] = res.url;
+          S.photos.push(rec);
+          it.newId = rec.id;
+        }).catch(function () {});
+      });
+    });
+    return chain.then(function () {
+      /* 그날 사진만 보이는 순서대로 다시 세워요 */
+      var order = seq.map(function (it) { return it.pid || it.newId; }).filter(Boolean);
+      var daySet = {};
+      S.photos.forEach(function (p) { if (String(p.date || "").slice(0, 10) === day) daySet[p.id] = p; });
+      var ordered = [];
+      order.forEach(function (id) { if (daySet[id]) { ordered.push(daySet[id]); delete daySet[id]; } });
+      Object.keys(daySet).forEach(function (id) { ordered.push(daySet[id]); });
+      var firstIdx = -1, rest = [];
+      S.photos.forEach(function (p, i) {
+        if (String(p.date || "").slice(0, 10) === day) { if (firstIdx < 0) firstIdx = i; return; }
+        rest.push(p);
+      });
+      if (firstIdx < 0) firstIdx = 0;
+      S.photos = rest.slice(0, firstIdx).concat(ordered, rest.slice(firstIdx));
+      upMode = "pending";
+      dayEdit = null;
+      save(); closeSheet(); renderPhoto(); toast("사진을 저장했어요");
+    });
   }
 
   function addPhotoFiles(files, meta) {
@@ -3351,7 +3834,8 @@
           var rec = res.photo;
           rec.title = String(rec.title || meta.title || fileTitle(f.name) || "").trim();
           if (res.url) PHOTO_URLS[rec.id] = res.url;
-          S.photos.unshift(rec);
+          /* v40: 고른 순서 그대로 — 시트 맨 위(1번째) 사진이 사진첩에서도 맨 앞(대표) */
+          S.photos.splice(done, 0, rec);
           done++;
           setBar();
           save();
@@ -3374,8 +3858,7 @@
   function formEditPhoto(p) {
     return sheetHead("사진 정보") +
       '<form class="form" id="sheetForm" data-form="photoEdit">' +
-      '<div class="f"><label>캡션</label><input class="field" name="title" value="' + esc(p.title || "") + '" placeholder="예) 골목 산책" autocomplete="off">' +
-      '<div class="cap-preview" style="background:' + capBg(p) + '">' + esc(p.title || "캡션 미리보기") + "</div></div>" +
+      /* v40: 「캡션」 칸은 없앴어요 (사진 아래 캡션 줄도 함께 사라짐) */
       '<div class="f"><label>앨범</label><input class="field" name="album" list="albumList" value="' + esc(p.album || "") + '" required autocomplete="off">' +
       '<datalist id="albumList">' + albumDatalist() + "</datalist></div>" +
       '<div class="two"><div class="f"><label>날짜</label><input class="field" type="date" name="date" value="' + p.date + '"></div>' +
@@ -4447,6 +4930,7 @@
       if (nRow && nRow.parentNode) nRow.parentNode.removeChild(nRow);
       var nDelInp = document.querySelector("#sheet #noteDelIds");
       if (nDelInp && nId) nDelInp.value = nDelInp.value ? nDelInp.value + "," + nId : nId;
+      if (document.getElementById("nkPanel")) nkSelectRow(null);   /* v40: 지운 줄의 패널은 접어요 */
       return;
     }
 
@@ -4472,23 +4956,19 @@
        줄을 고르지 않았으면 새 카테고리의 속지를 바꿔요. 「카드」(data-kind="")는 기본 카테고리만. */
     if (act === "nkind") {
       var nk = el.getAttribute("data-kind") || "";
-      var ngrp = el.closest('[data-group="nkind"]');
-      if (!ngrp) return;
+      if (!el.closest('[data-group="nkind"]')) return;
       var nrow = document.querySelector("#sheet #noteOrderList .nord-row.active");
       if (nrow) {
         if (nk === "" && NOTE_BASE.indexOf(nrow.getAttribute("data-key") || "") < 0) return;
         nrow.setAttribute("data-kind", nk);
-        if (LIST_KINDS.indexOf(nk) >= 0) {
-          var nin1 = ngrp.querySelector('input[name="nkind"]');
-          if (nin1) nin1.value = nk;
-        }
-      } else if (nk) {
-        var nin0 = ngrp.querySelector('input[name="nkind"]');
-        if (nin0) nin0.value = nk;
-      } else {
+      } else if (!nk) {
         return;                       /* 새 카테고리는 「카드」가 없어요 */
+      } else {
+        /* 아직 줄을 고르지 않았을 때 — 새 카테고리의 기본 속지로 기억해 둬요 */
+        var ninN = document.querySelector('#sheet input[name="nkind"]');
+        if (ninN) ninN.value = nk;
       }
-      nkPaint();
+      nkPaint();                      /* 패널은 고른 속지에 체크를 다시 그리고, hidden nkind 도 맞춰요 */
       return;
     }
 
@@ -4499,6 +4979,24 @@
         delete S.noteKinds[bkT];
         save(); renderDiary(); toast("카드로 돌아왔어요");
       }
+      return;
+    }
+
+    /* v40: 모눈 메모 시트의 사진 한 장 — 고르기/빼기 */
+    if (act === "memoImgPick") {
+      var mIn = document.getElementById("memoImgIn");
+      if (mIn) mIn.click();
+      return;
+    }
+    if (act === "memoImgClear") {
+      var mHide = document.querySelector('#sheet input[name="img"]');
+      if (mHide) mHide.value = "";
+      var mPrev = document.getElementById("memoImgPrev");
+      if (mPrev) { mPrev.hidden = true; mPrev.removeAttribute("src"); }
+      var mNm = document.getElementById("memoImgName");
+      if (mNm) mNm.textContent = "없음";
+      var mClear = el.parentNode ? el.parentNode.querySelector('[data-act="memoImgClear"]') : null;
+      if (mClear && mClear.parentNode) mClear.parentNode.removeChild(mClear);
       return;
     }
 
@@ -4553,7 +5051,10 @@
         if (isBaseContainer(dl)) S[GROUP_ARR[dl.base]] = dl.items.filter(function (it) { return it.id !== di; });
         else dl.items = dl.items.filter(function (it) { return it.id !== di; });
       }
-      save(); closeSheet(); renderDiary(); return;
+      save();
+      /* v40: 카드 시트 안에서 지울 때는 시트를 닫지 않고 목록만 새로 그려요 */
+      if (inCardSheet(el)) { renderDiary(); toast("지웠어요"); return; }
+      closeSheet(); renderDiary(); return;
     }
 
     if (act === "editListItem") {
@@ -4572,6 +5073,9 @@
           if (!txt && !mbody) { toast("제목이나 본문을 적어 주세요"); return; }
           setItTitle(I2, txt);
           setItBody(I2, mbody);
+          /* v40: 모눈 메모의 사진 한 장 — 비우면 지워요 */
+          var mimg2 = String(fd.get("img") || "");
+          if (mimg2) I2.img = mimg2; else delete I2.img;
         } else if (edKind === "review") {
           if (!txt) { toast("이름을 적어 주세요"); return; }
           setItTitle(I2, txt);
@@ -4605,10 +5109,12 @@
       var dcGid = el.getAttribute("data-gid");
       var dcg = groupOf(dcK, dcGid);
       if (!dcg) return;
-      askConfirm("‘" + esc(dcg.title || GROUP_DEF[dcK]) + "’ 카드를 지울까요? 안에 적은 항목도 함께 사라져요.", "지우기", function () {
+      askConfirm("‘" + esc(groupTitleOf(dcK, dcg)) + "’ 카드를 지울까요? 안에 적은 항목도 함께 사라져요.", "지우기", function () {
         S.groups[dcK] = (S.groups[dcK] || []).filter(function (g) { return g.id !== dcGid; });
-        var dckey = GROUP_ARR[dcK];
-        S[dckey] = (S[dckey] || []).filter(function (x) { return x.gid !== dcGid; });
+        /* v40: 내 카테고리 투두리스트는 항목이 그 리스트(items) 안에 있어요 */
+        var dcl = listOfSeg(dcK);
+        if (GROUP_ARR[dcK]) S[GROUP_ARR[dcK]] = (S[GROUP_ARR[dcK]] || []).filter(function (x) { return x.gid !== dcGid; });
+        else if (dcl) dcl.items = (dcl.items || []).filter(function (x) { return x.gid !== dcGid; });
         openCard = null;
         save(); closeSheet(); renderDiary(); toast("카드를 지웠어요");
       });
@@ -4666,8 +5172,13 @@
         var body0 = String(fd.get("memo") || "").trim();
         if (alKind === "memo") {
           if (!txt0 && !body0) { toast("제목이나 본문을 적어 주세요"); return; }
+          var img0 = String(fd.get("img") || "");
           if (isBaseContainer(L0)) basePush(L0.base, { text: txt0, memo: body0 });
-          else L0.items.push({ id: uid(), text: txt0, memo: body0, done: false, date: today });
+          else {
+            var mit = { id: uid(), text: txt0, memo: body0, done: false, date: today };
+            if (img0) mit.img = img0;
+            L0.items.push(mit);
+          }
         } else if (alKind === "review") {
           if (!txt0) { toast("이름을 적어 주세요"); return; }
           var rate0 = Math.max(0, Math.min(5, Math.round(Number(fd.get("rating")) || 0)));
@@ -5120,21 +5631,95 @@
     /* v38: 사진 추가 시트 — 고른 사진 한 장 빼기 / 목록에 더 담기 */
     if (act === "upDel") {
       var udIdx = Number(el.getAttribute("data-i"));
-      if (isNaN(udIdx) || !pendingFiles[udIdx]) return;
-      pendingFiles.splice(udIdx, 1);
+      var udArr = upArray();
+      if (isNaN(udIdx) || !udArr[udIdx]) return;
+      udArr.splice(udIdx, 1);
+      if (upMode === "day") { refreshDayEdit(); return; }      /* v40: 날짜 편집에서는 줄만 빼요 */
       if (!pendingFiles.length) { closeSheet(); return; }
       refreshAddPhoto();
       return;
     }
     if (act === "upAdd") {
-      photoAddMore = true;
+      dayAddMore = upMode === "day";
+      photoAddMore = !dayAddMore;
       var pai = $("#photoInput");
       if (pai) { pai.value = ""; pai.click(); }
       return;
     }
+    /* v40: 모아보기 오른쪽 위 수정 아이콘 — 그날 사진 편집 시트 */
+    if (act === "editPhotoDay") {
+      var edDay = String(el.getAttribute("data-date") || "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(edDay)) return;
+      openSheet(formEditPhotoDay(edDay), function (fd) { saveDayEdit(fd); });
+      return;
+    }
+
+    /* v40: 모아보기의 사진마다 댓글 — 답글 모드 · 삭제 · ⋯ 메뉴 */
+    if (act === "cmtReply") {
+      var secR = el.closest ? el.closest("[data-pid]") : null;
+      if (!secR) return;
+      var fR = secR.querySelector(".cmt-form");
+      if (!fR) return;
+      var reIn = fR.querySelector('input[name="re"]');
+      if (reIn) reIn.value = el.getAttribute("data-id") || "";
+      var whoName = el.getAttribute("data-name") || "";
+      var tin = fR.querySelector(".cmt-in");
+      if (tin) { tin.setAttribute("placeholder", "@" + whoName + "에게 답글"); tin.focus(); }
+      var cur = fR.querySelector(".cmt-cancel");
+      if (cur) cur.parentNode.removeChild(cur);
+      var cbR = document.createElement("button");
+      cbR.type = "button";
+      cbR.className = "cmt-cancel";
+      cbR.setAttribute("data-act", "cmtReplyCancel");
+      cbR.textContent = "취소";
+      fR.insertBefore(cbR, fR.querySelector(".cmt-send"));
+      if (tin && tin.scrollIntoView) { try { tin.scrollIntoView({ block: "nearest" }); } catch (e) {} }
+      return;
+    }
+    if (act === "cmtReplyCancel") {
+      var secC = el.closest ? el.closest("[data-pid]") : null;
+      var fC = secC ? secC.querySelector(".cmt-form") : null;
+      if (fC) {
+        var reC = fC.querySelector('input[name="re"]');
+        if (reC) reC.value = "";
+        var tC = fC.querySelector(".cmt-in");
+        if (tC) tC.setAttribute("placeholder", "댓글 달기");
+      }
+      var cbC = secC ? secC.querySelector(".cmt-cancel") : null;
+      if (cbC) cbC.parentNode.removeChild(cbC);
+      return;
+    }
+    if (act === "cmtDel") {
+      var secD = el.closest ? el.closest("[data-pid]") : null;
+      var pidD = secD ? secD.getAttribute("data-pid") : "";
+      var pD = S.photos.filter(function (x) { return x.id === pidD; })[0];
+      if (!pD) return;
+      var cidDel = el.getAttribute("data-id");
+      pD.comments = (pD.comments || []).filter(function (c) {
+        if (c.id === cidDel) return false;
+        c.replies = (c.replies || []).filter(function (r) { return r.id !== cidDel; });
+        return true;
+      });
+      save();
+      refreshDayCmt(pD);
+      toast("댓글을 지웠어요");
+      return;
+    }
+    /* ⋯ — 사진 정보 수정 · 삭제 (사진 화면에는 아무 버튼도 두지 않고 여기서만) */
+    if (act === "photoMenu") {
+      var mid = el.getAttribute("data-id");
+      var mp = S.photos.filter(function (x) { return x.id === mid; })[0];
+      if (!mp) return;
+      openSheet('<div class="sheet-hd"><h2>사진</h2><button class="icon-btn" data-close="1" aria-label="닫기">' + IC.x + "</button></div>" +
+        '<p class="sheet-sub">' + esc(mp.title || mp.album || "사진") + "</p>" +
+        '<div class="pv-menu"><button type="button" class="set-btn" data-act="photoEdit" data-id="' + esc(mp.id) + '">정보 수정</button>' +
+        '<button type="button" class="set-btn warn" data-act="photoDelete" data-id="' + esc(mp.id) + '">삭제</button></div>' +
+        '<div style="height:12px"></div><button class="btn-line" data-close="1">닫기</button>');
+      return;
+    }
 
     if (act === "photoEdit") {
-      var pe = S.photos.filter(function (x) { return x.id === el.getAttribute("data-id"); })[0];
+      var pe = S.photos.filter(function (x) { return x.id === el.getAttribute("data-id"); })[0];      var pe = S.photos.filter(function (x) { return x.id === el.getAttribute("data-id"); })[0];
       if (!pe) return;
       var pvKeep = !!photoView;
       openSheet(formEditPhoto(pe), function (fd) {
@@ -5502,6 +6087,42 @@
       return;
     }
 
+    /* v40: 사진 댓글·대댓글 달기 — 작성자 프사·이름과 함께 사진에 담겨요 */
+    if (ev.target.classList && ev.target.classList.contains("cmt-form")) {
+      ev.preventDefault();
+      var cf = ev.target;
+      var cp = S.photos.filter(function (x) { return x.id === cf.getAttribute("data-id"); })[0];
+      if (!cp) return;
+      var cin = cf.querySelector(".cmt-in");
+      var txt = String((cin && cin.value) || "").trim();
+      if (!txt) { if (cin) cin.focus(); return; }
+      var reId = String((cf.querySelector('input[name="re"]') || {}).value || "");
+      cp.comments = Array.isArray(cp.comments) ? cp.comments : [];
+      var at = new Date().toISOString();
+      if (reId) {
+        var par = cp.comments.filter(function (c) { return c.id === reId; })[0];
+        var toName = par ? cmtName(par.who) : "";
+        if (!par) {
+          cp.comments.forEach(function (c) {
+            (c.replies || []).forEach(function (r) {
+              if (r.id === reId) { par = c; toName = cmtName(r.who); }
+            });
+          });
+        }
+        if (par) {
+          par.replies = Array.isArray(par.replies) ? par.replies : [];
+          par.replies.push({ id: uid(), who: "me", text: txt, at: at, to: toName });
+        }
+      } else {
+        cp.comments.push({ id: uid(), who: "me", text: txt, at: at, replies: [] });
+      }
+      save();
+      refreshDayCmt(cp);
+      var nf2 = document.querySelector('#s-photo .dcmt-b[data-pid="' + cp.id + '"] .cmt-in');
+      if (nf2) { try { nf2.focus(); } catch (e) {} }
+      return;
+    }
+
     if (ev.target.id === "noteForm") {
       ev.preventDefault();
       var nf = new FormData(ev.target);
@@ -5644,7 +6265,7 @@
       return;
     }
     if (ev.target.id === "listQuickForm") {
-      /* v38: 줄글 메모 · 별점 리뷰 · 지출·정산의 맨 위 빠른 추가 한 줄 */
+      /* v38: 모눈 메모 · 별점 리뷰 · 지출·정산의 맨 위 빠른 추가 한 줄 */
       ev.preventDefault();
       var qf = ev.target;
       var qid = qf.getAttribute("data-list");
@@ -5715,6 +6336,7 @@
       var lit = { id: uid(), done: false, gid: lgid };
       if (lk === "todo") { lit.text = ltxt; lit.memo = ""; lit.who = "함께"; }
       else if (lk === "bucket") { lit.title = ltxt; lit.cat = "기타"; lit.memo = ""; }
+      else if (isListSeg(lk)) { lit.text = ltxt; lit.memo = ""; }
       else { lit.kind = "movie"; lit.title = ltxt; lit.rating = 4; lit.date = today; lit.review = ""; lit.place = ""; lit.done = true; }
       itemsOf(lk).push(lit);
       save();
@@ -5795,6 +6417,41 @@
     if (ev.target && ev.target.classList && ev.target.classList.contains("js-evtime") && ev.target.value) {
       ev.target.hidden = true;
     }
+    /* v40: 모눈 메모에 붙일 사진 한 장 — 작게 줄여서 메모 항목에 담아요 */
+    if (ev.target && ev.target.id === "memoImgIn") {
+      var mFile = (ev.target.files || [])[0];
+      ev.target.value = "";
+      if (!mFile) return;
+      var mComp = (window.TwoLog && window.TwoLog.compressImage)
+        ? window.TwoLog.compressImage(mFile, 720, 0.6)
+        : Promise.reject(new Error("no_compress"));
+      mComp.then(function (res) {
+        return new Promise(function (resolve, reject) {
+          var fr = new FileReader();
+          fr.onload = function () { resolve(String(fr.result || "")); };
+          fr.onerror = function () { reject(fr.error || new Error("read_failed")); };
+          fr.readAsDataURL(res.blob);
+        });
+      }).then(function (dataUrl) {
+        if (!dataUrl) return;
+        var hide = document.querySelector('#sheet input[name="img"]');
+        if (hide) hide.value = dataUrl;
+        var prev = document.getElementById("memoImgPrev");
+        if (prev) { prev.src = dataUrl; prev.hidden = false; }
+        var nm = document.getElementById("memoImgName");
+        if (nm) nm.textContent = "사진 한 장 붙임";
+        var pick = document.querySelector('#sheet [data-act="memoImgPick"]');
+        if (pick && pick.parentNode && !pick.parentNode.querySelector('[data-act="memoImgClear"]')) {
+          var clr = document.createElement("button");
+          clr.type = "button";
+          clr.className = "btn-line";
+          clr.setAttribute("data-act", "memoImgClear");
+          clr.textContent = "빼기";
+          pick.parentNode.appendChild(clr);
+        }
+      }).catch(function () { toast("사진을 붙이지 못했어요"); });
+      return;
+    }
     if (!ev.target || ev.target.id !== "avatarInput") return;
     var file = (ev.target.files || [])[0];
     if (!file) return;
@@ -5811,6 +6468,17 @@
     var files = Array.prototype.slice.call(ev.target.files || []);
     ev.target.value = "";
     if (!files.length) return;
+    /* v40: 날짜 사진 편집 시트의 「+ 추가」 — 그날 사진 목록에 이어 담아요 */
+    if (dayAddMore && dayEdit) {
+      dayAddMore = false;
+      files.forEach(function (f) {
+        var u = "";
+        try { u = URL.createObjectURL(f); pendingUrls.push(u); } catch (e) {}
+        dayEdit.items.push({ file: f, url: u });
+      });
+      refreshDayEdit();
+      return;
+    }
     /* v38: 목록 위 「추가」로 더 담을 때는 지금 고른 사진에 이어 붙여요 */
     if (photoAddMore && pendingFiles.length) {
       photoAddMore = false;

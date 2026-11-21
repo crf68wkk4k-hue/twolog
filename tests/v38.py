@@ -1,10 +1,10 @@
-"""투로그 v38 확인 — 노트 + 시트 속지 레이아웃 4종 (투두리스트 · 줄글 메모 · 별점 리뷰 · 지출·정산).
+"""투로그 v38 확인 — 노트 + 시트 속지 레이아웃 4종 (투두리스트 · 모눈 메모 · 별점 리뷰 · 지출·정산).
 
-1) 버전: sw.js 캐시 twolog-v39 · APP_VERSION v39 · My 탭 「버전 v39」
+1) 버전: sw.js 캐시 twolog-v40 · APP_VERSION v40 · My 탭 「버전 v40」
 2) + 시트 하단 「속지 레이아웃」
    - 노트 카테고리 목록(#noteOrderList) 아래 · 「저장하기」 버튼 위
    - 카드 4개 · 2×2 (첫 두 장 같은 줄, 셋째 줄에 두 장) · 각진 네모 · 제목 + 한 줄 설명
-   - 이름: 투두리스트 / 줄글 메모 / 별점 리뷰 / 지출·정산
+   - 이름: 투두리스트 / 모눈 메모 / 별점 리뷰 / 지출·정산
    - 기본값 투두리스트(active) · hidden nkind=check
    - 하나를 고르면 그것만 active · hidden nkind 가 따라감
 3) 새 카테고리를 속지별로 만들면 그 속지 화면이 열림
@@ -13,7 +13,7 @@
    - review: 별 5개 · 별을 누르면 그 점수 · 이름·장소·날짜·한줄평
    - expense: 위에 합계 · 항목+금액 Add · 합계 자동(24,000 + 28,000 + 9,500 = 61,500원)
 4) 기존 카테고리·기본 탭은 그대로
-   - 기본 탭 메모·버킷리스트·영화·먹방 동작 · 예전 「메모(kind=memo)」 리스트는 줄글 메모로
+   - 기본 탭 메모·버킷리스트·영화·먹방 동작 · 예전 「메모(kind=memo)」 리스트는 모눈 메모로
    - 예전 체크 리스트는 투두리스트 그대로
 5) 카테고리 수정 시트에서 속지를 바꾸면 그 카테고리 화면이 바뀜 (항목은 그대로)
 6) Supabase 동기화 — notes(kind=list) payload 에 kind 와 항목 rating·place·date·amount 보존
@@ -122,17 +122,20 @@ def open_add_sheet(page):
 
 
 def pick_kind(page, kind):
-    page.locator("#sheet .nk-card[data-kind='%s']" % kind).click()
-    page.wait_for_timeout(140)
+    """v40: 속지 레이아웃은 고른 카테고리 줄 «바로 아래» 패널에서 골라요."""
+    page.locator("#sheet #nkPanel .nk-card[data-kind='%s']" % kind).click()
+    page.wait_for_timeout(160)
 
 
 def create_kind(page, name, kind):
-    """+ 시트에서 이름을 적고 속지를 고른 뒤 저장 → 그 카테고리가 열립니다."""
+    """+ 시트에서 이름을 적고 「추가」로 줄을 붙인 뒤, 그 줄 아래에서 속지를 골라 저장."""
     open_add_sheet(page)
-    pick_kind(page, kind)
     page.fill("#sheet .nord-new", name)
+    page.locator("#sheet .nord-add-btn").click()
+    page.wait_for_timeout(280)
+    pick_kind(page, kind)
     page.locator("#sheet button.btn-primary").click()
-    page.wait_for_timeout(720)
+    page.wait_for_timeout(760)
 
 
 def seg(page):
@@ -183,9 +186,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v39", 'const VERSION = "twolog-v39"' in sw,
+    check("sw.js 캐시 버전 twolog-v40", 'const VERSION = "twolog-v40"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v39", 'var APP_VERSION = "v39"' in app_js,
+    check("app.js 버전 상수 v40", 'var APP_VERSION = "v40"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -198,69 +201,123 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v39」", ver.strip() == "버전 v39", ver)
+    check("My 탭 맨 위에 「버전 v40」", ver.strip() == "버전 v40", ver)
 
     # ==================================================================
-    # 2. + 시트 — 속지 레이아웃 선택 UI
+    # 2. + 시트 — 카테고리 줄 아래로 펼쳐지는 속지 레이아웃 (v40 아코디언)
     # ==================================================================
     note_tab(page)
     open_add_sheet(page)
     ui = page.evaluate("""() => {
-      const sheet = document.querySelector('#sheet');
       const list = document.querySelector('#sheet #noteOrderList');
-      const sec = [...document.querySelectorAll('#sheet .set-lbl')].filter(e => e.textContent.trim() === '속지 레이아웃')[0] || null;
-      const grid = document.querySelector('#sheet .nkind');
+      const panel = document.getElementById('nkPanel');
       const cards = [...document.querySelectorAll('#sheet .nk-card')];
-      const save = document.querySelector('#sheet button.btn-primary');
       const r = e => { if (!e) return null; const b = e.getBoundingClientRect();
         return {top: Math.round(b.top), left: Math.round(b.left), w: Math.round(b.width), h: Math.round(b.height)}; };
-      const cs = grid ? getComputedStyle(grid) : null;
       return {
-        sec: !!sec, secTop: r(sec) ? r(sec).top : null,
-        listBottom: r(list) ? Math.round(r(list).top + r(list).h) : null,
-        saveTop: r(save) ? r(save).top : null,
+        panel: !!panel, panelHidden: panel ? panel.hidden : null, panelH: r(panel) ? r(panel).h : 0,
         count: cards.length,
         kinds: cards.map(c => c.getAttribute('data-kind')),
         names: cards.map(c => (c.querySelector('.nk-n') || {}).textContent || ''),
         descs: cards.map(c => ((c.querySelector('.nk-d') || {}).textContent || '').trim()),
         active: cards.filter(c => c.classList.contains('active')).map(c => c.getAttribute('data-kind')),
-        cols: cs ? cs.gridTemplateColumns : '',
         radius: cards[0] ? getComputedStyle(cards[0]).borderTopLeftRadius : '',
         hidden: (document.querySelector('#sheet input[name="nkind"]') || {}).value,
-        pos: cards.map(c => r(c)),
-        order: [...document.querySelectorAll('#sheet > *')].length
+        belowList: !!(panel && list && panel.getBoundingClientRect().top >= list.getBoundingClientRect().bottom - 2)
       };
     }""")
-    check("+ 시트에 「속지 레이아웃」 칸이 있음", ui["sec"] is True, ui.get("sec"))
-    check("카테고리 목록(#noteOrderList) 아래에 놓임", ui["listBottom"] is not None and ui["secTop"] >= ui["listBottom"], (ui.get("listBottom"), ui.get("secTop")))
-    check("「저장하기」 버튼 위에 놓임", ui["saveTop"] is not None and ui["secTop"] < ui["saveTop"], (ui.get("secTop"), ui.get("saveTop")))
+    check("속지 패널은 처음에 접혀 있음", ui["panel"] and ui["panelHidden"] is True and ui["panelH"] == 0, ui)
     check("속지 카드는 4개", ui["count"] == 4, ui["kinds"])
-    check("속지 이름 — 투두리스트 · 줄글 메모 · 별점 리뷰 · 지출·정산",
-          ui["names"] == ["투두리스트", "줄글 메모", "별점 리뷰", "지출·정산"], ui["names"])
+    check("속지 이름 — 투두리스트 · 모눈 메모 · 별점 리뷰 · 지출·정산",
+          ui["names"] == ["투두리스트", "모눈 메모", "별점 리뷰", "지출·정산"], ui["names"])
     check("속지마다 한 줄 설명", all(len(d) > 3 for d in ui["descs"]), ui["descs"])
-    check("2×2 로 놓임 (두 줄 · 한 줄에 두 장)",
-          ui["pos"][0]["top"] == ui["pos"][1]["top"] and ui["pos"][2]["top"] > ui["pos"][0]["top"]
-          and ui["pos"][2]["top"] == ui["pos"][3]["top"] and ui["pos"][0]["w"] == ui["pos"][1]["w"], ui["pos"])
     check("각진 네모 (모서리 둥글지 않음)", ui["radius"] in ("0px", ""), ui["radius"])
-    check("기본값은 투두리스트", ui["active"] == ["check"] and ui["hidden"] == "check", (ui["active"], ui["hidden"]))
-    rnd = page.evaluate("""() => {
-      const r = s => { const e = document.querySelector(s); return e ? getComputedStyle(e).borderTopLeftRadius : null; };
-      return {row: r('#sheet .nord-row'), add: r('#sheet .nord-add-btn'), card: r('#sheet .nk-card'), save: r('#sheet button.btn-primary')};
+    check("새 카테고리 기본값은 투두리스트", ui["active"] == ["check"] and ui["hidden"] == "check", (ui["active"], ui["hidden"]))
+    check("속지 레이아웃은 목록 맨 아래에 고정돼 있지 않음", ui["belowList"] is False, ui["belowList"])
+
+    # 카테고리 줄을 누르면 그 줄 «바록 아래»로 펼쳐짐
+    page.locator("#sheet #noteOrderList .nord-row").nth(1).locator(".nord-kb").click()
+    page.wait_for_timeout(300)
+    row1 = page.evaluate("""() => {
+      const rows = [...document.querySelectorAll('#sheet #noteOrderList .nord-row')];
+      const row = rows[1], panel = document.getElementById('nkPanel');
+      const rr = row.getBoundingClientRect(), pr = panel.getBoundingClientRect();
+      const cards = [...document.querySelectorAll('#sheet #nkPanel .nk-card')];
+      const pos = cards.map(c => { const b = c.getBoundingClientRect();
+        return {t: Math.round(b.top), l: Math.round(b.left), w: Math.round(b.width), h: Math.round(b.height)}; });
+      return {hidden: panel.hidden, gap: Math.round(pr.top - rr.bottom), name: (row.querySelector('.nord-nm') || {}).value,
+              active: row.classList.contains('active'),
+              label: (document.querySelector('#sheet #nkindLbl') || {}).textContent || '',
+              hint: (document.querySelector('#sheet #nkindHint') || {}).textContent || '',
+              kinds: cards.map(c => c.getAttribute('data-kind')),
+              activeKinds: cards.filter(c => c.classList.contains('active')).map(c => c.getAttribute('data-kind')),
+              pos, saveTop: Math.round(document.querySelector('#sheet button.btn-primary').getBoundingClientRect().top)};
     }""")
-    check("노트 카테고리 줄은 둥근 모서리 (12px)", rnd["row"] in ("12px",), rnd)
-    check("추가·속지 카드·저장하기 버튼은 그대로 각짐",
-          rnd["add"] in (None, "0px") and rnd["card"] in (None, "0px") and rnd["save"] in (None, "0px"), rnd)
-    title_txt = page.evaluate("document.querySelector('#s-diary .note-h1').textContent.trim()")
-    check("노트 제목은 이모지 없이 「노트」", title_txt == "노트" and "📖" not in title_txt, title_txt)
+    check("누른 줄이 선택됨", row1["active"] and row1["name"] == "버킷리스트", row1)
+    check("속지 패널이 그 줄 «바로 아래»에 펼쳐짐", row1["hidden"] is False and 0 <= row1["gap"] <= 16, row1["gap"])
+    check("패널 제목에 고른 카테고리 이름", "속지 레이아웃" in row1["label"] and "버킷리스트" in row1["label"], row1["label"])
+    check("안내 문구도 그 카테고리", "버킷리스트" in row1["hint"], row1["hint"])
+    check("기본 카테고리 패널은 「카드」 + 세 속지", row1["kinds"] == ["", "memo", "review", "expense"], row1["kinds"])
+    check("지금은 「카드」에 체크", row1["activeKinds"] == [""], row1["activeKinds"])
+    check("2×2 로 놓임 (두 줄 · 한 줄에 두 장)",
+          row1["pos"][0]["t"] == row1["pos"][1]["t"] and row1["pos"][2]["t"] > row1["pos"][0]["t"]
+          and row1["pos"][2]["t"] == row1["pos"][3]["t"] and row1["pos"][0]["w"] == row1["pos"][1]["w"], row1["pos"])
+    check("펼쳐도 「저장하기」는 목록 아래에 그대로", row1["saveTop"] > row1["pos"][2]["t"], (row1["saveTop"], row1["pos"][2]["t"]))
 
     pick_kind(page, "expense")
-    one = page.evaluate("""() => ({
-      active: [...document.querySelectorAll('#sheet .nk-card.active')].map(c => c.getAttribute('data-kind')),
-      hidden: (document.querySelector('#sheet input[name="nkind"]') || {}).value,
-      border: getComputedStyle(document.querySelector('#sheet .nk-card.active')).borderTopColor })""")
+    one = page.evaluate("""() => {
+      const row = document.querySelectorAll('#sheet #noteOrderList .nord-row')[1];
+      const cards = [...document.querySelectorAll('#sheet #nkPanel .nk-card')];
+      return {active: cards.filter(c => c.classList.contains('active')).map(c => c.getAttribute('data-kind')),
+              badge: (row.querySelector('.nord-kb') || {}).textContent,
+              dataKind: row.getAttribute('data-kind'),
+              hidden: (document.querySelector('#sheet input[name="nkind"]') || {}).value,
+              border: getComputedStyle(cards.filter(c => c.classList.contains('active'))[0]).borderTopColor};
+    }""")
     check("고른 카드 하나만 active", one["active"] == ["expense"], one)
-    check("고르면 hidden nkind 도 따라감", one["hidden"] == "expense", one["hidden"])
+    check("줄 배지가 바로 그 속지 이름으로", one["badge"] == "지출·정산" and one["dataKind"] == "expense", one)
     check("고른 카드는 진한 테두리", one["border"] not in ("", "rgb(229, 229, 234)"), one["border"])
+
+    # 다른 줄을 누르면 이전 줄은 접히고 새 줄 아래에 펼쳐짐
+    page.locator("#sheet #noteOrderList .nord-row").nth(2).locator(".nord-kb").click()
+    page.wait_for_timeout(300)
+    moved = page.evaluate("""() => {
+      const rows = [...document.querySelectorAll('#sheet #noteOrderList .nord-row')];
+      const panel = document.getElementById('nkPanel');
+      const row = rows[2];
+      return {openRows: rows.filter(r => r.classList.contains('active')).length,
+              named: (row.querySelector('.nord-nm') || {}).value,
+              gap: Math.round(panel.getBoundingClientRect().top - row.getBoundingClientRect().bottom),
+              prevStill: rows[1].classList.contains('active'),
+              kinds: [...document.querySelectorAll('#sheet #nkPanel .nk-card')].map(c => c.getAttribute('data-kind'))};
+    }""")
+    check("다른 줄을 누르면 이전 줄은 접히고 새 줄만 펼쳐짐",
+          moved["openRows"] == 1 and not moved["prevStill"] and moved["named"] == "영화·먹방" and 0 <= moved["gap"] <= 16, moved)
+    check("새로 고른 줄의 패널은 그 카테고리의 속지 (카드 + 3)",
+          moved["kinds"] == ["", "memo", "review", "expense"], moved["kinds"])
+
+    # 같은 줄을 한 번 더 누르면 접힘
+    page.locator("#sheet #noteOrderList .nord-row").nth(2).locator(".nord-kb").click()
+    page.wait_for_timeout(280)
+    closed = page.evaluate("() => ({hidden: document.getElementById('nkPanel').hidden, open: document.querySelectorAll('#sheet #noteOrderList .nord-row.active').length})")
+    check("같은 줄을 한 번 더 누르면 접힘", closed["hidden"] is True and closed["open"] == 0, closed)
+
+    # 「추가」로 새 줄을 붙이면 그 줄 아래에서 바로 고르기
+    page.fill("#sheet .nord-new", "가계부")
+    page.locator("#sheet .nord-add-btn").click()
+    page.wait_for_timeout(320)
+    addrow = page.evaluate("""() => {
+      const rows = [...document.querySelectorAll('#sheet #noteOrderList .nord-row')];
+      const last = rows[rows.length - 1], panel = document.getElementById('nkPanel');
+      return {active: last.classList.contains('active'), name: (last.querySelector('.nord-nm') || {}).value,
+              hidden: panel.hidden, gap: Math.round(panel.getBoundingClientRect().top - last.getBoundingClientRect().bottom),
+              kinds: [...document.querySelectorAll('#sheet #nkPanel .nk-card')].map(c => c.getAttribute('data-kind')),
+              label: (document.querySelector('#sheet #nkindLbl') || {}).textContent || ''};
+    }""")
+    check("「추가」로 붙인 줄 아래에서 속지가 바로 펼쳐짐",
+          addrow["active"] and addrow["name"] == "가계부" and addrow["hidden"] is False and 0 <= addrow["gap"] <= 16, addrow)
+    check("새 카테고리 패널은 투두리스트부터 (「카드」 없음)",
+          addrow["kinds"] == ["check", "memo", "review", "expense"] and "가계부" in addrow["label"], addrow)
 
     page.evaluate("document.querySelector('#sheet').scrollTop = 9999")
     page.wait_for_timeout(260)
@@ -271,30 +328,78 @@ with sync_playwright() as p:
     # ==================================================================
     # 3. 네 가지 속지 — 만들고 화면 확인
     # ==================================================================
-    # 3-1) 투두리스트
+    # 3-1) 투두리스트 — v40: 카드가 없으면 「+ 새 리스트」만, 카드를 만들어 그 안에 항목
     create_kind(page, "여행 준비", "check")
-    page.fill("#s-diary #listAddForm input[name=text]", "충전기")
-    page.locator("#s-diary #listAddForm button").click()
-    page.wait_for_timeout(420)
     ck = page.evaluate("""() => ({
       seg: document.querySelector('#s-diary .lchip.active').textContent.trim(),
       kindTag: (document.querySelector('#s-diary .nh-l .k') || {}).textContent,
+      grid: !!document.querySelector('#s-diary .ngrid'),
+      newCard: !!document.querySelector('#s-diary .ngrid .ncard.new'),
+      cards: document.querySelectorAll('#s-diary .ngrid .ncard:not(.new)').length,
       prog: !!document.querySelector('#s-diary .progress'),
-      forms: document.querySelectorAll('#s-diary #listAddForm').length,
-      circ: document.querySelectorAll('#s-diary .todo-items .trow .circ').length,
       quick: document.querySelectorAll('#s-diary #listQuickForm').length,
-      memoCards: document.querySelectorAll('#s-diary .memo-card').length })""")
+      memoCards: document.querySelectorAll('#s-diary .memo-card').length })
+    """ )
     check("투두리스트 카테고리 — 탭 이름", ck["seg"] == "여행 준비", ck["seg"])
     check("투두리스트 — 속지 이름 표시", ck["kindTag"] == "투두리스트", ck["kindTag"])
-    check("투두리스트 — 진행률 · 체크 동그라미 · Add 그대로",
-          ck["prog"] and ck["forms"] == 1 and ck["circ"] == 1 and ck["quick"] == 0 and ck["memoCards"] == 0, ck)
-    page.locator("#s-diary .todo-items .trow .circ").first.click()
-    page.wait_for_timeout(420)
-    check("투두리스트 — 체크하면 완료 표시",
-          page.evaluate("!!document.querySelector('#s-diary .todo-items .trow.done')") is True)
+    check("투두리스트 — 2열 카드 묶음 + 「+ 새 리스트」로 열림",
+          ck["grid"] and ck["newCard"] and ck["cards"] == 0 and ck["quick"] == 0 and ck["memoCards"] == 0, ck)
+    check("투두리스트 — 예전 한 줄 체크 화면(진행률)은 없음", ck["prog"] is False, ck)
+
+    page.locator("#s-diary .ngrid .ncard.new").click()
+    page.wait_for_timeout(520)
+    page.fill("#sheet input[name=title]", "장보기")
+    page.locator("#sheet button.btn-primary").click()
+    page.wait_for_timeout(620)
+    card = page.evaluate("""() => ({
+      cards: [...document.querySelectorAll('#s-diary .ngrid .ncard:not(.new)')].map(c => c.textContent.trim().replace(/\s+/g, ' ')),
+      groups: (window.__app.state.groups['list:' + (window.__app.state.lists.filter(l => l.title === '여행 준비')[0] || {}).id] || []).length })
+    """ )
+    check("「+ 새 리스트」로 카드가 만들어짐", card["cards"] and card["cards"][0].startswith("장보기") and card["groups"] == 1, card)
     page.screenshot(path=os.path.join(SHOT, "note-v38-todo.png"))
 
-    # 3-2) 줄글 메모
+    # 카드를 눌러 항목 추가 · 체크 · 삭제 · 제목 수정
+    page.locator("#s-diary .ngrid .ncard:not(.new)").first.click()
+    page.wait_for_timeout(560)
+    page.fill("#sheet #listAddForm input[name=text]", "우유")
+    page.locator("#sheet #listAddForm button").click()
+    page.wait_for_timeout(420)
+    page.fill("#sheet #listAddForm input[name=text]", "계란")
+    page.locator("#sheet #listAddForm button").click()
+    page.wait_for_timeout(420)
+    two = page.evaluate("""() => ({open: document.getElementById('sheetWrap').classList.contains('open'),
+      rows: document.querySelectorAll('#sheet .card-items .trow').length})""" )
+    check("카드 시트에서 Add 로 항목이 두 개", two["open"] and two["rows"] == 2, two)
+    page.locator("#sheet .card-items .trow .circ").first.click()
+    page.wait_for_timeout(420)
+    done = page.evaluate("() => document.querySelectorAll('#sheet .card-items .trow.done').length")
+    check("카드 안에서 체크하면 완료 표시 (시트는 그대로)", done == 1)
+    page.locator("#sheet .card-items .trow").last.locator(".x").click()
+    page.wait_for_timeout(420)
+    left = page.evaluate("""() => ({open: document.getElementById('sheetWrap').classList.contains('open'),
+      rows: document.querySelectorAll('#sheet .card-items .trow').length})""" )
+    check("카드 안에서 × 로 항목을 지우면 시트는 그대로, 목록만 줄어듦", left["open"] and left["rows"] == 1, left)
+    page.fill("#sheet input[name=title]", "마트 장보기")
+    page.locator("#sheet button.btn-primary").click()
+    page.wait_for_timeout(600)
+    renamed = page.evaluate("[...document.querySelectorAll('#s-diary .ngrid .ncard:not(.new) .nc-t')].map(t => t.textContent)")
+    check("카드 제목을 고치면 그리드에 바로 반영", "마트 장보기" in renamed, renamed)
+    page.locator("#s-diary .ngrid .ncard:not(.new)").first.click()
+    page.wait_for_timeout(520)
+    page.locator("#sheet button.btn-del").click()
+    page.wait_for_timeout(420)
+    check("카드 삭제를 누르면 한 번 더 물어봄",
+          page.evaluate("(document.querySelector('#sheet h2') || {}).textContent") == "리스트 삭제")
+    page.locator("#sheet button.btn-primary").click()
+    page.wait_for_timeout(560)
+    gone = page.evaluate("""() => ({cards: document.querySelectorAll('#s-diary .ngrid .ncard:not(.new)').length,
+      items: (window.__app.state.lists.filter(l => l.title === '여행 준비')[0] || {}).items.length})""" )
+    check("카드 삭제 확인을 누르면 그 카드와 안의 항목이 사라짐", gone["cards"] == 0 and gone["items"] == 0, gone)
+    page.evaluate("""() => { const c = document.querySelector('#sheet [data-close]');
+      if (c && document.getElementById('sheetWrap').classList.contains('open')) c.click(); }""")
+    page.wait_for_timeout(350)
+
+    # 3-2) 모눈 메모
     create_kind(page, "생각 정리", "memo")
     page.fill("#s-diary #listQuickForm input[name=text]", "11월에 해보고 싶은 것")
     page.locator("#s-diary #listQuickForm button").click()
@@ -307,20 +412,20 @@ with sync_playwright() as p:
       circ: document.querySelectorAll('#s-diary .trow .circ').length,
       prog: !!document.querySelector('#s-diary .progress'),
       date: ((document.querySelector('#s-diary .memo-card .mc-d') || {}).textContent || '').trim() })""")
-    check("줄글 메모 — 속지 이름 표시", mm["kindTag"] == "줄글 메모", mm["kindTag"])
-    check("줄글 메모 — 메모 카드로 보임", mm["cards"] == 1 and mm["title"] == "11월에 해보고 싶은 것", mm)
-    check("줄글 메모 — 체크 동그라미·진행률 없음", mm["circ"] == 0 and mm["prog"] is False, mm)
-    check("줄글 메모 — 카드에 날짜", re.match(r"^\d{4}\.\d{2}\.\d{2}$", mm["date"] or "") is not None, mm["date"])
+    check("모눈 메모 — 속지 이름 표시", mm["kindTag"] == "모눈 메모", mm["kindTag"])
+    check("모눈 메모 — 메모 카드로 보임", mm["cards"] == 1 and mm["title"] == "11월에 해보고 싶은 것", mm)
+    check("모눈 메모 — 체크 동그라미·진행률 없음", mm["circ"] == 0 and mm["prog"] is False, mm)
+    check("모눈 메모 — 카드 맨 위 왼쪽에 날짜 + 요일", re.match(r"^\d{4}\.\d{2}\.\d{2} [일월화수목금토]요일$", mm["date"] or "") is not None, mm["date"])
     page.locator("#s-diary .memo-card").first.click()
     page.wait_for_timeout(480)
-    check("줄글 메모 — 눌러서 본문 쓰기 시트",
+    check("모눈 메모 — 눌러서 본문 쓰기 시트",
           page.evaluate("""() => !!document.querySelector('#sheet textarea[name=memo]') &&
             document.querySelector('#sheet h2').textContent.indexOf('메모') >= 0""") is True)
     page.fill("#sheet textarea[name=memo]", "주말마다 한 번은 산책하기.\n사진도 한 장씩 남기기.")
     page.locator("#sheet button.btn-primary").click()
     page.wait_for_timeout(560)
     body = page.evaluate("(document.querySelector('#s-diary .memo-card .mc-b') || {}).textContent || ''")
-    check("줄글 메모 — 본문이 카드에 그대로", "주말마다 한 번은 산책하기." in body and "사진도 한 장씩" in body, body[:40])
+    check("모눈 메모 — 본문이 카드에 그대로", "주말마다 한 번은 산책하기." in body and "사진도 한 장씩" in body, body[:40])
     page.screenshot(path=os.path.join(SHOT, "note-v38-memo.png"))
 
     # 3-3) 별점 리뷰
@@ -433,14 +538,14 @@ with sync_playwright() as p:
     tabnames = page.evaluate("[...document.querySelectorAll('#s-diary .seg-btn, #s-diary .lchip')].map(b => b.textContent.trim())")
     check("기본 탭 3개 + 내 카테고리 6개가 모두 남아 있음", len(tabnames) == 9, tabnames)
 
-    # 예전 memo 리스트 → 줄글 메모 화면
+    # 예전 memo 리스트 → 모눈 메모 화면
     page.locator("#s-diary .lchip", has_text="주말 데이트").first.click()
     page.wait_for_timeout(520)
     old_memo = page.evaluate("""() => ({
       kindTag: (document.querySelector('#s-diary .nh-l .k') || {}).textContent,
       cards: document.querySelectorAll('#s-diary .memo-card').length,
       items: (window.__app.state.lists.filter(l => l.title === '주말 데이트')[0] || {items: []}).items.length })""")
-    check("예전 메모 리스트는 줄글 메모로 열림", old_memo["kindTag"] == "줄글 메모", old_memo)
+    check("예전 메모 리스트는 모눈 메모로 열림", old_memo["kindTag"] == "모눈 메모", old_memo)
     check("예전 메모 항목이 카드로 보임", old_memo["cards"] == old_memo["items"] and old_memo["items"] > 0, old_memo)
 
     # 기본 탭(메모·버킷리스트·영화·먹방) 그대로
@@ -631,14 +736,18 @@ with sync_playwright() as p:
     }""")
     check("다크 모드에서도 켜진 별은 강조색", dk["on"] not in ("", dk["off"]), dk)
     open_add_sheet(page3)
+    # v40: 속지 패널은 카테고리 줄을 눌러야 펼쳐져요
+    page3.locator("#sheet #noteOrderList .nord-row").nth(1).locator(".nord-kb").click()
+    page3.wait_for_timeout(300)
     page3.evaluate("document.querySelector('#sheet').scrollTop = 9999")
     page3.wait_for_timeout(250)
     dks = page3.evaluate("""() => {
-      const c = document.querySelector('#sheet .nk-card'), a = document.querySelector('#sheet .nk-card.active');
+      const c = document.querySelector('#sheet #nkPanel .nk-card'), a = document.querySelector('#sheet #nkPanel .nk-card.active');
       return { visible: !!c && c.getBoundingClientRect().height > 40,
-               border: a ? getComputedStyle(a).borderTopColor : '' };
+               border: a ? getComputedStyle(a).borderTopColor : '',
+               panel: !document.getElementById('nkPanel').hidden };
     }""")
-    check("다크 모드 + 시트 — 속지 카드가 보임", dks["visible"] is True, dks)
+    check("다크 모드 + 시트 — 고른 줄 아래 속지 카드가 보임", dks["visible"] is True and dks["panel"] is True, dks)
     page3.screenshot(path=os.path.join(SHOT, "note-v38-dark.png"))
     check("브라우저 콘솔/페이지 오류 없음 (다크)", len(errs3) == 0, errs3[:4])
     ctx3.close()
@@ -738,15 +847,17 @@ with sync_playwright() as p:
               year: (document.querySelector('#s-photo .dgal-y') || {}).textContent || '',
               meta: (document.querySelector('#s-photo .dgal-meta') || {}).textContent || '',
               back: !!document.querySelector('#s-photo [data-act="photoDayBack"]'),
-              plus: !!document.querySelector('#s-photo [data-act="addPhotoDay"]'),
-              plusDate: (document.querySelector('#s-photo [data-act="addPhotoDay"]') || {}).getAttribute ? document.querySelector('#s-photo [data-act="addPhotoDay"]').getAttribute('data-date') : '',
+              /* v40: 오른쪽 위는 «수정» 아이콘 (그날 사진 편집 시트) */
+              plus: !!document.querySelector('#s-photo [data-act="editPhotoDay"]'),
+              plusDate: (document.querySelector('#s-photo [data-act="editPhotoDay"]') || {}).getAttribute ? document.querySelector('#s-photo [data-act="editPhotoDay"]').getAttribute('data-date') : '',
               sheet: document.getElementById('sheetWrap').classList.contains('open'),
               hdTop: hd ? Math.round(hd.getBoundingClientRect().top) : -1};
     }""")
     check("사진을 누르면 그날 모아보기가 먼저 (크게 보기 아님)", day["grid"] and day["cells"] == 6 and day["sheet"] is False, day)
     check("그날 사진이 3열 정사각 격자", day["cols"] == 3 and day["gap"] in ("2px", "3px")
           and abs(day["box"][0] - day["box"][1]) <= 1, day)
-    check("위에 ‹ 뒤로 · 날짜 제목 · + 사진 추가", day["back"] and day["plus"] and re.match(r"^\d{1,2}월 \d{1,2}일$", day["title"]) is not None
+    check("위에 ‹ 뒤로 · 날짜 제목 · 수정(연필) 아이콘", day["back"] and day["plus"]
+          and re.match(r"^\d{1,2}월 \d{1,2}일$", day["title"]) is not None
           and "년" in day["year"], (day["title"], day["year"]))
     check("날짜 아래 「총 6장」", "총 6장" in day["meta"], day["meta"])
     page4.screenshot(path=os.path.join(SHOT, "photo-v38-daygrid.png"))
@@ -763,20 +874,20 @@ with sync_playwright() as p:
       return {ok: true, w: Math.round(r.width), h: Math.round(r.height),
               full: document.getElementById('sheetWrap').classList.contains('sheet-full'),
               fit: cs ? cs.objectFit : '',
-              date: (document.querySelector('#sheet .pv-da') || {}).textContent || '',
-              bar: !!document.querySelector('#sheet .pv-bar'),
-              edit: !!document.querySelector('#sheet [data-act="photoEdit"]'),
-              del: !!document.querySelector('#sheet [data-act="photoDelete"]'),
-              close: !!document.querySelector('#sheet .pv-x'),
+              slides: document.querySelectorAll('#sheet .pv40-slide').length,
+              buttons: document.querySelectorAll('#sheet .pv40-btn, #sheet .pv-nav, #sheet .pv-bar, #sheet .sheet-hd').length,
+              text: (document.getElementById('sheet').textContent || '').trim().length,
               vh: window.innerHeight};
     }""")
     check("사진을 누르면 화면을 꽉 채운 크게 보기", big["ok"] and big["full"] and big["w"] == 390, big)
     check("크게 보기는 세로로도 크게 (화면의 60% 이상)", big["h"] >= int(big["vh"] * 0.6), (big["h"], big["vh"]))
     check("사진은 잘리지 않게 contain", big["fit"] == "contain", big["fit"])
-    check("위에 닫기·날짜 / 아래에 캡션·수정·삭제 바", big["close"] and "년" in big["date"] and big["bar"] and big["edit"] and big["del"], big)
+    # v40: 사진만 — 위아래 어떤 글씨·버튼도 없고, 같은 날 사진은 옆으로 밀어 넘겨요
+    check("v40 크게 보기는 사진만 (버튼·글씨 없음) · 사진은 옆으로 이어짐",
+          big["buttons"] == 0 and big["text"] == 0 and big["slides"] == 6, big)
     page4.screenshot(path=os.path.join(SHOT, "photo-v38-viewer.png"))
 
-    page4.locator("#sheet [data-close]").first.click()
+    page4.locator("#sheet .pv40-slide").first.click()
     page4.wait_for_timeout(600)
     back4 = page4.evaluate("""() => ({sheet: document.getElementById('sheetWrap').classList.contains('open'),
       cells: document.querySelectorAll('#s-photo .dg-cell').length,
@@ -818,12 +929,15 @@ with sync_playwright() as p:
     with open(jpg_path, "wb") as f:
         f.write(bytes.fromhex(
             "ffd8ffe000104a46494600010100000100010000ffdb004300080606070605080707070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c1c2837292c30313434341f27393d38323c2e333432ffc0000b080001000101011100ffc4001f0000010501010101010100000000000000000102030405060708090a0bffc400b5100002010303020403050504040000017d01020300041105122131410613516107227114328191a1082342b1c11552d1f02433627282090a161718191a25262728292a3435363738393a434445464748494a535455565758595a636465666768696a737475767778797a838485868788898a92939495969798999aa2a3a4a5a6a7a8a9aab2b3b4b5b6b7b8b9bac2c3c4c5c6c7c8c9cad2d3d4d5d6d7d8d9dae1e2e3e4e5e6e7e8e9eaf1f2f3f4f5f6f7f8f9faffda0008010100003f00fbfcffd9"))
-    page4.locator('#s-photo [data-act="addPhotoDay"]').click()
-    page4.wait_for_timeout(400)
-    page4.set_input_files("#photoInput", [jpg_path])
-    page4.wait_for_timeout(700)
+    # v40: 오른쪽 위 수정 아이콘 → 그날 사진 편집 시트 (날짜가 그 날로 채워져 열림)
+    page4.locator('#s-photo [data-act="editPhotoDay"]').click()
+    page4.wait_for_timeout(600)
     add_date = page4.evaluate("(document.querySelector('#sheet input[name=date]') || {}).value || ''")
-    check("모아보기의 + 는 그 날짜로 사진 추가 시트", add_date == day_date, (add_date, day_date))
+    edit_rows = page4.evaluate("document.querySelectorAll('#sheet .up-item').length")
+    cells_now = page4.evaluate("document.querySelectorAll('#s-photo .dg-cell').length")
+    check("모아보기의 수정 아이콘은 그 날짜 사진 편집 시트",
+          add_date == day_date and edit_rows == cells_now and edit_rows >= 1,
+          (add_date, day_date, edit_rows, cells_now))
     page4.keyboard.press("Escape")
     page4.wait_for_timeout(400)
     check("브라우저 콘솔/페이지 오류 없음 (사진)", len(errs4) == 0, errs4[:4])

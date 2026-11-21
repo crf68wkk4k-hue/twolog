@@ -1,6 +1,6 @@
 """투로그 v37 확인 — 노트 상단 ＋ 테두리 제거 · 사진첩 정사각형 3열 · 사진 달력 정사각 칸·상하 넘김.
 
-1) 버전: sw.js 캐시 twolog-v39 · APP_VERSION v37 · My 탭 「버전 v39」
+1) 버전: sw.js 캐시 twolog-v40 · APP_VERSION v37 · My 탭 「버전 v40」
 2) 노트 맨 윗줄 ＋
    - 동그란 테두리·바탕 없이 ＋ 아이콘만 (border 0 · background 투명 · 모서리 각짐)
    - 터치 영역은 44x44, 아이콘 22px, 오른쪽·높이는 예전 ＋ 자리 그대로
@@ -163,15 +163,15 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check("sw.js 캐시 버전 twolog-v39", 'const VERSION = "twolog-v39"' in sw,
+    check("sw.js 캐시 버전 twolog-v40", 'const VERSION = "twolog-v40"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v37", 'var APP_VERSION = "v39"' in app_js,
+    check("app.js 버전 상수 v37", 'var APP_VERSION = "v40"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v39", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v40", 'const SHELL = "shell-" + VERSION' in sw)
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v39」", ver.strip() == "버전 v39", ver)
+    check("My 탭 맨 위에 「버전 v40」", ver.strip() == "버전 v40", ver)
 
     # ==================================================================
     # 2. 노트 맨 윗줄 ＋ — 테두리 없이 아이콘만
@@ -289,9 +289,10 @@ with sync_playwright() as p:
           ph.get("gaps"))
     check("사진첩 가로 넘침 없음", ph.get("overflow") <= 1, ph.get("overflow"))
     check("사진이 모두 그려짐", ph.get("allImg") is True and ph.get("imgW", 0) > 0, (ph.get("allImg"), ph.get("imgW")))
-    check("캡션은 사진 아래 한 줄", (ph.get("chinText") or "") != "" and 12 <= ph.get("chinH", 0) <= 24,
+    # v40: 사진 아래 «캡션 줄»은 없앴어요 — 사진만 보입니다 (예전 캡션 글씨는 저장돼 있어도 안 보여요)
+    check("사진 아래 캡션 줄 없음 (v40)", (ph.get("chinText") or "") == "" and not ph.get("chinH"),
           (ph.get("chinText"), ph.get("chinH")))
-    check("캡션 색을 고른 사진은 그 색 그대로", ph.get("chinBg") not in (None, "rgba(0, 0, 0, 0)"),
+    check("캡션 색도 사진 아래에 칠해지지 않음", ph.get("chinBg") in (None, "", "rgba(0, 0, 0, 0)"),
           ph.get("chinBg"))
     check("하루 3장·넘치면 +N 그대로", all(d <= 3 for d in ph.get("days", [])) and ph.get("more") == "+3",
           (ph.get("days"), ph.get("more")))
@@ -312,7 +313,9 @@ with sync_playwright() as p:
     check("지난 달 사진도 기본 화면에 함께 보임", any("10월 24일" in h["date"] or "8월 8일" in h["date"]
                                                  for h in scope["heads"]), scope["heads"])
     check("「{월}월의 순간」 제목 없음", scope["moment"] is False, scope["moment"])
-    check("3장을 넘는 날은 「+3장」", any(h["meta"] == "+3장" for h in scope["heads"]), scope["heads"])
+    # v40: 장수는 날짜 줄이 아니라 «마지막 사진 오른쪽 아래» 작은 +N 배지로만
+    check("3장을 넘는 날은 마지막 사진에 작은 +N", ph.get("more") == "+3" and all(h["meta"] is None for h in scope["heads"]),
+          (ph.get("more"), scope["heads"]))
 
     # 날짜 묶음을 여러 날로 늘리고 확인 — 최근 3일치만, 3장 이하 날은 장수 표기 없음
     page.evaluate("""() => {
@@ -340,10 +343,8 @@ with sync_playwright() as p:
     }""")
     check("날짜 묶음은 사진이 있는 날 전부 (3일 제한 없음, v39)", lim["n"] >= 7, lim["n"])
     # v39: 3일 제한이 없어져 3장을 넘는 날도 함께 보입니다 — «그날 전체 3장 이하»인 날만 표기가 비어 있어야
-    check("3장 이하인 날은 장수 표기 없음(비움)",
-          all(h["meta"] is None for h in lim["heads"] if h["total"] <= 3)
-          and any(h["meta"] for h in lim["heads"] if h["total"] > 3),
-          lim["heads"])
+    check("날짜 줄에는 장수 표기가 없음 (v40: 마지막 사진 +N 만)",
+          all(h["meta"] is None for h in lim["heads"]), lim["heads"])
     today_d = time.localtime()
     yday = time.strftime("%Y-%m-%d", time.localtime(time.time() - 86400))
     # v39: 목록은 예전 날짜가 위 · 가장 최근 날짜가 아래 → 마지막 줄이 어제
@@ -370,11 +371,12 @@ with sync_playwright() as p:
     page.locator("#s-photo .dg-cell").first.click()
     page.wait_for_timeout(650)
     pv = page.evaluate("""() => { const v = document.querySelector('#sheet .pview');
-      const c = document.querySelector('#sheet .pv-count');
       return {open: !!v, h: v ? Math.round(v.getBoundingClientRect().height) : 0,
-              img: !!(v && v.querySelector('img, svg')), count: c ? c.textContent.trim() : null}; }""")
+              img: !!(v && v.querySelector('img, svg')),
+              slides: document.querySelectorAll('#sheet .pv40-slide').length}; }""")
     check("정사각 사진을 누르면 크게 보기", pv["open"] and pv["img"] and pv["h"] > 200, pv)
-    check("같은 날 사진 넘기기 표시(/ 6)", "/ 6" in str(pv["count"]), pv["count"])
+    # v40: 크게 보기는 «사진만» — 넘기기는 옆으로 밀기(가로 스냅)로 해요
+    check("같은 날 사진이 옆으로 이어짐 (넘기기)", pv["slides"] == 6, pv["slides"])
     page.keyboard.press("Escape")
     page.wait_for_timeout(400)
     page.locator('#s-photo [data-act="photoDayBack"]').click()   # v38: 모아보기 → 목록
@@ -452,7 +454,7 @@ with sync_playwright() as p:
     day_view = page.evaluate("""() => ({open: document.getElementById('sheetWrap').classList.contains('open'),
       view: !!document.querySelector('#sheet .pview')})""")
     check("모아보기에서 사진을 누르면 크게 보기", day_view["open"] and day_view["view"], day_view)
-    page.locator("#sheet [data-close]").first.click()
+    page.locator("#sheet .pv40-slide").first.click()
     page.wait_for_timeout(400)
     page.locator('#s-photo [data-act="photoDayBack"]').click()
     page.wait_for_timeout(500)

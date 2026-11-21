@@ -120,7 +120,7 @@ with sync_playwright() as p:
 
     # v39: 목록은 예전 날짜가 위 · 최근 날짜가 아래 — 사진이 가장 많은(6장) 최근 날짜를 봅니다
     first = page.locator("#s-photo .pola").last
-    first_title = page.evaluate("document.querySelector('#s-photo .pday:last-child .pola .pola-chin').textContent")
+    first_title = page.evaluate("(window.__app.state.photos[0] || {}).title || ''")   # v40: 목록엔 캡션 줄이 없어요
     first.click()
     page.wait_for_timeout(500)
     # v38: 날짜 모아보기가 먼저 — 사진을 누르면 크게 보기
@@ -130,22 +130,25 @@ with sync_playwright() as p:
     check("사진 크게 보기 열림", page.locator("#sheet .pview").count() == 1)
     img = page.evaluate("(() => { const v = document.querySelector('#sheet .pview img'); const s = document.querySelector('#sheet .pview svg'); return {img: !!v, svg: !!s, h: document.querySelector('#sheet .pview').getBoundingClientRect().height}; })()")
     check("사진이 뷰어에 크게", (img["img"] or img["svg"]) and img["h"] > 200, img)
-    count_txt = page.evaluate("(() => { const c = document.querySelector('#sheet .pv-count'); return c ? c.textContent : null; })()")
-    check("같은 날 사진 넘겨보기 표시", count_txt is not None and "/ 6" in count_txt, count_txt)
+    # v40: 크게 보기는 사진만 — 같은 날 사진은 «옆으로 밀어서» 넘어가요
+    slides = page.evaluate("document.querySelectorAll('#sheet .pv40-slide').length")
+    check("같은 날 사진이 옆으로 이어짐 (넘겨보기)", slides == 6, slides)
     page.screenshot(path=os.path.join(SHOT, "photo-detail-v18.png"))
-    nxt_title_1 = page.evaluate("document.querySelector('#sheet .sheet-hd h2').textContent")
-    page.locator("#sheet .pview .pv-nav.next").click()
-    page.wait_for_timeout(300)
-    nxt_title_2 = page.evaluate("document.querySelector('#sheet .sheet-hd h2').textContent")
-    check("다음 사진으로 넘어감", nxt_title_1 != nxt_title_2, (nxt_title_1, nxt_title_2))
-    cnt2 = page.evaluate("document.querySelector('#sheet .pv-count').textContent")
-    check("순서 표시 2 / 6", cnt2.strip().startswith("2 / 6"), cnt2)
-    page.locator("#sheet .pview .pv-nav.prev").click()
-    page.wait_for_timeout(250)
-    back_title = page.evaluate("document.querySelector('#sheet .sheet-hd h2').textContent")
-    check("이전 사진으로 돌아옴", back_title == nxt_title_1, (back_title, nxt_title_1))
-    cap_sw = page.locator("#sheet .sw-grid .sw").count()
-    check("캡션 색·수정·삭제 도구 유지", cap_sw >= 8 and page.locator("#sheet [data-act='photoEdit']").count() == 1 and page.locator("#sheet [data-act='photoDelete']").count() == 1)
+    page.evaluate("(() => { const s = document.querySelector('#sheet .pv40-strip'); s.scrollBy({ left: s.clientWidth }); })()")
+    page.wait_for_timeout(420)
+    left1 = page.evaluate("Math.round(document.querySelector('#sheet .pv40-strip').scrollLeft)")
+    check("옆으로 밀면 다음 사진으로 넘어감", left1 > 100, left1)
+    page.evaluate("(() => { const s = document.querySelector('#sheet .pv40-strip'); s.scrollBy({ left: -s.clientWidth }); })()")
+    page.wait_for_timeout(420)
+    left2 = page.evaluate("Math.round(document.querySelector('#sheet .pv40-strip').scrollLeft)")
+    check("되돌아오면 첫 사진", left2 <= 4, left2)
+    # 사진 정보 수정은 모아보기의 ⋯ 메뉴에서 (크게 보기에는 아무 버튼도 없어요)
+    page.locator("#sheet .pv40-slide").first.click()
+    page.wait_for_timeout(500)
+    page.locator('#s-photo [data-act="photoMenu"]').first.click()
+    page.wait_for_timeout(500)
+    check("사진 정보 수정·삭제는 ⋯ 메뉴에 그대로",
+          page.locator('#sheet [data-act="photoEdit"]').count() == 1 and page.locator('#sheet [data-act="photoDelete"]').count() == 1)
     page.keyboard.press("Escape")
     page.wait_for_timeout(300)
 
@@ -228,15 +231,20 @@ with sync_playwright() as p:
     else:
         check("순서 바꾸기 (카드 2개 이상 필요)", False, before)
 
-    # 내 리스트 안의 To-do 항목도 꾹 눌러 순서를 바꿀 수 있어요
+    # 내 리스트의 To-do 항목도 꾹 눌러 순서를 바꿀 수 있어요
+    # (v40: 내 카테고리는 2열 카드 묶음 — 카드를 열어 그 안의 항목 순서를 바꿉니다)
     chip = page.locator("#s-diary .lchip").first
     if chip.count():
         chip.click()
-        page.wait_for_timeout(400)
-        rows0 = page.evaluate("Array.from(document.querySelectorAll('#s-diary .todo-items .trow .t')).map(e => e.textContent)")
+        page.wait_for_timeout(420)
+        is_cards = page.evaluate("!!document.querySelector('#s-diary .ngrid .ncard[data-gid]')")
+        if is_cards:
+            page.locator("#s-diary .ngrid .ncard[data-gid]").first.click()
+            page.wait_for_timeout(520)
+        rows0 = page.evaluate("Array.from(document.querySelectorAll('#sheet .card-items .trow .t')).map(e => e.textContent)")
         if len(rows0) >= 2:
-            rb0 = page.locator("#s-diary .todo-items .trow").nth(0).bounding_box()
-            rb1 = page.locator("#s-diary .todo-items .trow").nth(1).bounding_box()
+            rb0 = page.locator("#sheet .card-items .trow").nth(0).bounding_box()
+            rb1 = page.locator("#sheet .card-items .trow").nth(1).bounding_box()
             page.mouse.move(rb0["x"] + 30, rb0["y"] + rb0["height"] / 2)
             page.mouse.down()
             page.wait_for_timeout(520)
@@ -244,12 +252,14 @@ with sync_playwright() as p:
             page.wait_for_timeout(160)
             page.mouse.up()
             page.wait_for_timeout(450)
-            rows1 = page.evaluate("Array.from(document.querySelectorAll('#s-diary .todo-items .trow .t')).map(e => e.textContent)")
-            check("리스트 항목 순서도 바뀜", rows1 != rows0 and sorted(rows1) == sorted(rows0), (rows0, rows1))
-            saved_rows = page.evaluate("(window.__app.state.lists.find(l => l.items.length >= 2) || {items: []}).items.map(i => i.text)")
+            rows1 = page.evaluate("Array.from(document.querySelectorAll('#sheet .card-items .trow .t')).map(e => e.textContent)")
+            check("카드 안 항목 순서도 바뀜", rows1 != rows0 and sorted(rows1) == sorted(rows0), (rows0, rows1))
+            saved_rows = page.evaluate("(window.__app.state.lists.find(l => l.items.length >= 2) || {items: []}).items.map(i => i.text || i.title)")
             check("항목 순서도 저장됨", saved_rows == rows1, (saved_rows, rows1))
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(350)
         else:
-            check("리스트 항목 2개 이상", False, rows0)
+            check("카드 안 항목 2개 이상", False, rows0)
     else:
         check("내 리스트 칩", False)
 

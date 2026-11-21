@@ -88,7 +88,7 @@ with sync_playwright() as p:
     # ---------------- 서비스워커 캐시 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
     # v24: 캐시 버전은 배포마다 올라가므로 v24 으로 (앱 버전 상수와 같은 값)
-    check("sw.js 캐시 버전 twolog-v39", 'const VERSION = "twolog-v39"' in sw,
+    check("sw.js 캐시 버전 twolog-v40", 'const VERSION = "twolog-v40"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장되는 일반 모드로 옮겨요
@@ -167,15 +167,19 @@ with sync_playwright() as p:
               resetOn: reset ? reset.classList.contains('on') : null,
               paletteAbove: cr.bottom <= lr.top + 1,
               paletteAboveInput: cr.bottom <= ir.top + 1,
-              gapTopal: lr.top - cr.bottom};
+              gapTopal: lr.top - cr.bottom,
+              gapInputToPal: cr.top - ir.bottom,
+              titleFont: getComputedStyle(inp).fontSize};
     })()""")
     check("카드 시트에 제목 색 컬러판", pal.get("ok"), pal)
     check("제목 색 = 12색 팔레트", pal.get("sw") == 12, pal.get("sw"))
     check("기존 12색 뮤트 팔레트 그대로", pal.get("colors") == [
         "#F2CFC9", "#DEA2A6", "#DD785B", "#EA994D", "#EFD353", "#C4C66A",
         "#B8CAA5", "#B4D8D4", "#80A4AA", "#D2CBE3", "#A299B8", "#C4B28E"], pal.get("colors"))
-    check("컬러판이 제목 입력칸 «바로 위»", pal.get("paletteAbove") and pal.get("paletteAboveInput")
-          and pal.get("gapTopal", 999) <= 24, (pal.get("paletteAbove"), pal.get("paletteAboveInput"), pal.get("gapTopal")))
+    # v40: 「제목」이 맨 위로 올라가고, 한 칸(18~20px) 띄워 그 아래에 「제목 색」 컬러판
+    check("제목 입력칸 아래 한 칸 띄워 제목 색 컬러판",
+          (not pal.get("paletteAbove")) and (not pal.get("paletteAboveInput"))
+          and 16 <= pal.get("gapInputToPal", -1) <= 26, (pal.get("gapInputToPal"), pal.get("titleFont")))
     # v22: 「기본」이 제목 줄 오른쪽으로 올라가고 색 값(헥스)은 그대로 적지 않아요
     check("컬러판 제목 줄은 「제목 색」 (헥스 코드 없음)", "제목 색" in str(pal.get("hd"))
           and "#" not in str(pal.get("hd")) and pal.get("val") is None, pal)
