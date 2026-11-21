@@ -247,7 +247,10 @@ with sync_playwright() as p:
     page.fill('#sheet #sheetForm input[name="title"]', "주말 장보기")
     page.locator('#sheet button[type="submit"]').click()
     page.wait_for_timeout(600)
-    page.locator("#s-diary .ngrid .ncard:not(.new)", has_text="주말 장보기").first.locator(".nc-t").tap()
+    # v42: 카드 미리보기가 5개까지 보여 「주말 장보기」가 메모 카드 항목으로도 보여요 —
+    #      제목(.nc-t)이 정확히 그 카드인 것을 골라요
+    page.locator("#s-diary .ngrid .ncard:not(.new)").filter(
+        has=page.locator(".nc-t", has_text="주말 장보기")).first.locator(".nc-t").tap()
     page.wait_for_timeout(500)
     page.locator('#sheet .sw-grid[data-sw="cardTitleBg"] .sw[data-color="#B4D8D4"]').click()
     page.wait_for_timeout(500)
@@ -260,7 +263,7 @@ with sync_playwright() as p:
     back = page.evaluate("""(() => {
       const g = window.__app.state.groups.todo.filter(x => x.title === '주말 장보기')[0];
       const c = Array.from(document.querySelectorAll('#s-diary .ngrid .ncard:not(.new)'))
-        .filter(n => n.innerText.indexOf('주말 장보기') >= 0)[0];
+        .filter(n => { const t = n.querySelector('.nc-t'); return t && t.textContent.trim() === '주말 장보기'; })[0];
       const hd = c ? c.querySelector('.nc-hd') : null;
       return {titleBg: g ? (g.titleBg || null) : 'none', cls: hd ? hd.className : null,
               bg: hd ? getComputedStyle(hd).backgroundColor : null};

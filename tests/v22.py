@@ -9,7 +9,7 @@
 
     python3 tests/v22.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
 """
-import functools, http.server, os, socketserver, sys, threading, time
+import functools, http.server, json, os, re, socketserver, sys, threading, time
 
 from playwright.sync_api import sync_playwright
 
@@ -134,9 +134,13 @@ with sync_playwright() as p:
       const t = c.querySelector('.nc-t').innerText;
       const body = c.innerText.split('\\n').slice(1).join(' ');
       return {title: t.trim(), hasPlus: /\\+\\s*\\d+\\s*개/.test(c.innerText),
+              moreTxt: (c.querySelector('.nc-more') || {}).textContent || '',
+              moreOn: !!(c.querySelector('.nc-more')),
               numbers: (c.innerText.match(/(^|\\s)\\d+(개)?(\\s|$)/g) || []).join(',')};
     })()""")
-    check("카드에 「+N개」·개수 숫자 없음", not ct["hasPlus"], ct)
+    check("카드에 개수 숫자 없음 · 넘칠 때만 「+N개 더」 (v42)",
+          ct["numbers"] == "" and (not ct["hasPlus"] or
+                                   (ct["moreOn"] and re.search(r"^\+\d+개 더$", ct["moreTxt"].strip()) is not None)), ct)
 
     # 긴 제목 카드를 하나 더 만들어 «한 줄 + …» 인지 확인 (사용자 예: 이달의장보기·나중에살것)
     page.locator("#s-diary .ncard.new").click()
