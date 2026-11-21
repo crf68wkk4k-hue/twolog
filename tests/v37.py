@@ -1,6 +1,6 @@
 """투로그 v37 확인 — 노트 상단 ＋ 테두리 제거 · 사진첩 정사각형 3열 · 사진 달력 정사각 칸·상하 넘김.
 
-1) 버전: sw.js 캐시 twolog-v41 · APP_VERSION v37 · My 탭 「버전 v41」
+1) 버전: sw.js 캐시 twolog-v42 · APP_VERSION v37 · My 탭 「버전 v42」
 2) 노트 맨 윗줄 ＋
    - 동그란 테두리·바탕 없이 ＋ 아이콘만 (border 0 · background 투명 · 모서리 각짐)
    - 터치 영역은 44x44, 아이콘 22px, 오른쪽·높이는 예전 ＋ 자리 그대로
@@ -163,15 +163,15 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check("sw.js 캐시 버전 twolog-v41", 'const VERSION = "twolog-v41"' in sw,
+    check("sw.js 캐시 버전 twolog-v42", 'const VERSION = "twolog-v42"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v37", 'var APP_VERSION = "v41"' in app_js,
+    check("app.js 버전 상수 v37", 'var APP_VERSION = "v42"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v41", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v42", 'const SHELL = "shell-" + VERSION' in sw)
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v41」", ver.strip() == "버전 v41", ver)
+    check("My 탭 맨 위에 「버전 v42」", ver.strip() == "버전 v42", ver)
 
     # ==================================================================
     # 2. 노트 맨 윗줄 ＋ — 테두리 없이 아이콘만

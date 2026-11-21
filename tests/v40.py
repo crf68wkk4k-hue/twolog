@@ -1,6 +1,6 @@
 """투로그 v40 확인 — 투두리스트 속지의 2열 카드 묶음 + 카테고리 줄 아래 속지 아코디언 + 모눈 메모.
 
-1) 버전: sw.js 캐시 twolog-v41 · APP_VERSION v41 · My 탭 「버전 v41」
+1) 버전: sw.js 캐시 twolog-v42 · APP_VERSION v42 · My 탭 「버전 v42」
 2) + 시트 — 속지 레이아웃이 목록 맨 아래가 아니라 «카테고리 줄 바로 아래»로 펼쳐짐
    - 처음엔 접힘 · 줄을 누르면 그 줄 바로 아래에 2×2 · 다른 줄을 누르면 이전 줄은 접힘
    - 같은 줄을 한 번 더 누르면 접힘 · 「추가」로 붙인 줄은 바로 펼쳐짐
@@ -189,9 +189,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v41", 'const VERSION = "twolog-v41"' in sw,
+    check("sw.js 캐시 버전 twolog-v42", 'const VERSION = "twolog-v42"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v41", 'var APP_VERSION = "v41"' in app_js,
+    check("app.js 버전 상수 v42", 'var APP_VERSION = "v42"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -204,7 +204,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v41」", ver.strip() == "버전 v41", ver)
+    check("My 탭 맨 위에 「버전 v42」", ver.strip() == "버전 v42", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄 아래로 펼쳐지는 속지 레이아웃 (아코디언)
@@ -219,13 +219,12 @@ with sync_playwright() as p:
 
     row1 = page.locator("#sheet #noteOrderList .nord-row").nth(1)
     r1name = page.evaluate("(i) => document.querySelectorAll('#sheet #noteOrderList .nord-row')[i].querySelector('.nord-nm').value", 1)
-    row1.locator(".nord-kb").click()
+    row1.locator(".nord-nm").click()
     page.wait_for_timeout(320)
     pa = panel_state(page)
     check("카테고리 줄을 누르면 그 줄 «바로 아래»로 패널이 펼쳐짐",
           pa["hidden"] is False and pa["row"] == r1name and 0 <= pa["gap"] <= 16, pa)
-    check("패널 제목은 「속지 · 그 카테고리 이름」", "속지" in pa["label"] and "레이아웃" not in pa["label"]
-          and r1name in pa["label"], pa["label"])
+    check("패널 제목은 「속지」만 (v42)", pa["label"].strip() == "속지" and "레이아웃" not in pa["label"], pa["label"])
     check("기본 카테고리 패널은 「투두리스트」 + 세 속지 (2×2)",
           pa["kinds"] == ["", "memo", "review", "expense"] and pa["active"] == [""], pa)
     check("기본 카테고리 패널 첫 칸 이름은 「투두리스트」",
@@ -238,18 +237,18 @@ with sync_playwright() as p:
           and box[2]["t"] == box[3]["t"] and box[0]["w"] == box[1]["w"], box)
 
     # 다른 줄을 누르면 이전 줄은 접히고 새 줄 아래로
-    page.locator("#sheet #noteOrderList .nord-row").nth(2).locator(".nord-kb").click()
+    page.locator("#sheet #noteOrderList .nord-row").nth(2).locator(".nord-nm").click()
     page.wait_for_timeout(300)
     pb = panel_state(page)
     check("다른 줄을 누르면 새 줄 아래로 옮겨가고 이전 줄은 접힘",
           pb["hidden"] is False and pb["gap"] is not None and 0 <= pb["gap"] <= 16
           and page.evaluate("document.querySelectorAll('#sheet #noteOrderList .nord-row.active').length") == 1, pb)
 
-    # 같은 줄을 한 번 더 누르면 접힘
-    page.locator("#sheet #noteOrderList .nord-row").nth(2).locator(".nord-kb").click()
+    # v42: 배지가 없어져 이름칸을 다시 누르면 «이름 고치기»로 이어져요 (패널은 그 줄에 그대로)
+    page.locator("#sheet #noteOrderList .nord-row").nth(2).locator(".nord-nm").click()
     page.wait_for_timeout(280)
     pc = panel_state(page)
-    check("같은 줄을 한 번 더 누르면 접힘", pc["hidden"] is True and pc["row"] is None, pc)
+    check("이름칸을 다시 눌러도 패널은 열린 채 (이름 고치기)", pc["hidden"] is False, pc)
 
     # 「추가」로 붙인 줄 → 그 아래에서 바로 고르기
     page.fill("#sheet .nord-new", "장보기 리스트")
@@ -276,7 +275,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(420)
 
     # 끌고 난 뒤에는 패널이 접혀 있으니, 그 줄을 다시 눌러 펼쳐요
-    row_loc(page, "장보기 리스트").locator(".nord-kb").click()
+    row_loc(page, "장보기 리스트").locator(".nord-nm").click()
     page.wait_for_timeout(300)
     check("끌고 난 뒤 줄을 다시 누르면 패널이 그 줄 아래로 다시 펼쳐짐",
           panel_state(page)["hidden"] is False and panel_state(page)["row"] == "장보기 리스트", panel_state(page))
@@ -459,16 +458,17 @@ with sync_playwright() as p:
           "bucket" not in bk["kinds"] and bk["cards"] > 0 and bk["stats"] == 0, bk)
 
     open_add_sheet(page3)
-    row_loc(page3, "버킷리스트").locator(".nord-kb").click()
+    row_loc(page3, "버킷리스트").locator(".nord-nm").click()
     page3.wait_for_timeout(300)
-    check("기본 카테고리 줄의 배지도 「투두리스트」 (v41 통일)", (row_loc(page3, "버킷리스트").locator(".nord-kb").text_content() or "").strip() == "투두리스트")
+    check("기본 카테고리 줄에는 속지 배지가 없음 (v42 — ≡ · 이름만)",
+          page3.evaluate("!document.querySelector('#sheet #noteOrderList .nord-kb')"))
+    # v42: 글이 있는 카테고리는 속지를 못 바꿔요 — 빈 버킷리스트로 확인
+    page3.evaluate("() => { window.__app.state.bucket = []; window.__app.state.groups.bucket = []; }")
     pick_kind(page3, "memo")
     page3.locator("#sheet button.btn-primary").click()
     page3.wait_for_timeout(760)
-    check("기본 카테고리는 모눈 메모 속지로도 바뀜",
+    check("기본 카테고리는 모눈 메모 속지로도 바뀜 (빈 카테고리)",
           page3.evaluate("(window.__app.state.noteKinds || {}).bucket") == "memo")
-    page3.locator("#s-diary .nh-back").click()
-    page3.wait_for_timeout(500)
 
 
     # ==================================================================
@@ -477,7 +477,7 @@ with sync_playwright() as p:
     page3.locator("#s-diary .seg-btn", has_text="메모").first.click()
     page3.wait_for_timeout(520)
     open_add_sheet(page3)
-    row_loc(page3, "메모").locator(".nord-kb").click()
+    row_loc(page3, "메모").locator(".nord-nm").click()
     page3.wait_for_timeout(300)
     kinds = page3.evaluate("""() => ([...document.querySelectorAll('#sheet #nkPanel .nk-card')].map(c => [
       c.getAttribute('data-kind'), (c.querySelector('.nk-n') || {}).textContent, (c.querySelector('.nk-d') || {}).textContent]))""")
@@ -506,9 +506,11 @@ with sync_playwright() as p:
           memo_sheet["open"] and memo_sheet["full"] and "linear-gradient" in (memo_sheet["paper"] or ""), memo_sheet)
     check("다이어리 아래에 펜 · 글씨 · 사진 도구가 있음",
           memo_sheet["tools"] == ["펜 그리기", "글씨", "사진 넣기"], memo_sheet["tools"])
-    page3.fill("#sheet textarea[name=memo]",
-               "아침에 창문을 열었더니 바람이 차가웠다.\n커피를 천천히 마시며 오늘 할 일을 적었다.\n저녁엔 준영이랑 산책하기로.")
-    page3.wait_for_timeout(160)
+    mbox = page3.locator("#d41Paper").bounding_box()
+    page3.mouse.click(mbox["x"] + 70, mbox["y"] + 200)
+    page3.wait_for_timeout(320)
+    page3.keyboard.type("아침에 창문을 열었더니 바람이 차가웠다.")
+    page3.wait_for_timeout(200)
     page3.locator("#sheet .d41-save").click()
     page3.wait_for_timeout(760)
     memo = page3.evaluate("""() => {
@@ -534,15 +536,10 @@ with sync_playwright() as p:
 
     # 사진 한 장 붙이기 (선택) — 고르면 카드 아래에 함께 보여요
     memo_jpg = "/tmp/v40-memo.jpg"
+    _durl = page3.evaluate("""() => { const c = document.createElement('canvas'); c.width = 300; c.height = 200;
+      const x = c.getContext('2d'); x.fillStyle = '#8FB39B'; x.fillRect(0, 0, 300, 200); return c.toDataURL('image/jpeg', 0.9); }""")
     with open(memo_jpg, "wb") as _f:
-        _f.write(bytes.fromhex(
-            "ffd8ffe000104a46494600010100000100010000ffdb004300080606070605080707070909080a0c140d0c0b0b0c191213"
-            "0f141d1a1f1e1d1a1c1c20242e2720222c231c1c2837292c30313434341f27393d38323c2e333432ffc0000b08000100"
-            "0101011100ffc4001f0000010501010101010100000000000000000102030405060708090a0bffc400b5100002010303"
-            "020403050504040000017d01020300041105122131410613516107227114328191a1082342b1c11552d1f02433627282"
-            "090a161718191a25262728292a3435363738393a434445464748494a535455565758595a636465666768696a73747576"
-            "7778797a838485868788898a92939495969798999aa2a3a4a5a6a7a8a9aab2b3b4b5b6b7b8b9bac2c3c4c5c6c7c8c9"
-            "cad2d3d4d5d6d7d8d9dae1e2e3e4e5e6e7e8e9eaf1f2f3f4f5f6f7f8f9faffda0008010100003f00fbfcffd9"))
+        _f.write(__import__("base64").b64decode(_durl.split(",", 1)[1]))
     page3.locator("#s-diary .d41-card").first.click()
     page3.wait_for_timeout(620)
     page3.set_input_files("#d41ImgIn", [memo_jpg])

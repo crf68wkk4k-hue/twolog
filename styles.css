@@ -1253,9 +1253,10 @@ html[data-mode="dark"] .trow.lift{background:var(--surface); outline-color:rgba(
 .mile-hd{font-size:12px; font-weight:700; letter-spacing:-.01em; color:var(--ink-2); margin:22px 0 2px}
 .mile{border-top:1px solid var(--line-2)}
 .mile-row{display:flex; align-items:baseline; gap:10px; padding:12px 0; border-bottom:1px solid var(--line-2)}
-.mile-bd{padding:12px 0; border-bottom:1px solid var(--line-2)}
-.mile-bd .mile-row{padding:0; border-bottom:0}
-.bd-in{height:42px; margin-top:9px; font-size:13px}
+/* v42: 생일 줄은 눌러서 프로필 편집으로 — 달력 입력칸은 없앴어요 */
+.mile-btn{width:100%; background:none; border:0; border-bottom:1px solid var(--line-2); font:inherit; color:inherit; text-align:left; -webkit-tap-highlight-color:transparent; cursor:pointer}
+.mile-btn:active{opacity:.6}
+.mile-go{flex:0 0 auto; font-size:17px; line-height:1; color:var(--ink-3); margin-left:-2px}
 .mile-n{flex:0 0 84px; font-size:13px; font-weight:700; letter-spacing:-.02em}
 .mile-d{flex:1 1 auto; min-width:0; font-size:12.5px; color:var(--ink-2); letter-spacing:-.01em; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .mile-x{flex:0 0 auto; font-size:12px; font-weight:700; color:var(--ink-3); font-variant-numeric:tabular-nums}
@@ -1401,6 +1402,8 @@ html[data-mode="dark"] .todo-add-btn{background:var(--btn-bg, #F2F2F4); color:va
 
 /* --- + 시트: 속지 레이아웃 고르기 --- */
 .nkind-hint{font-size:11px; color:var(--ink-3); line-height:1.6; margin-top:5px}
+/* v42: 글이 있어 속지를 못 바꿀 때 안내 */
+.nkind-hint.warn{color:#C0392B; font-weight:700}
 .nkind{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px}
 .nk-card{position:relative; display:flex; flex-direction:column; gap:3px; align-items:flex-start;
   min-height:64px; padding:12px 26px 11px 12px; border:1px solid var(--line); border-radius:0;
@@ -1575,11 +1578,14 @@ html[data-mode="dark"] .fdate{color-scheme:dark}
 .pday-tag:active{opacity:.6}
 .pday-tag.empty{color:var(--ink-3); font-weight:600}
 .pday-dot{font-size:15px; font-weight:700; color:var(--ink-3); letter-spacing:-.02em; margin:0 1px}
-.dgal-tag{margin-top:3px; align-self:flex-start; max-width:200px; height:24px; padding:0 9px;
-  border:1px solid var(--line); background:var(--surface); color:var(--ink-3); font-size:11px; font-weight:700;
-  letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer}
-.dgal-tag.on{background:var(--surface-2); color:var(--ink); border-color:var(--line)}
-.dgal-tag:active{opacity:.75}
+/* v42: 「11월 21일 · 롯데 리조트」 — 사진첩 목록처럼 테두리·바탕 없이 날짜와 같은 크기·굵기의 검정 글씨 */
+.dgal-tag{margin:0; align-self:baseline; max-width:210px; height:auto; padding:0;
+  border:0; background:transparent; color:var(--ink); font-size:20px; font-weight:800;
+  letter-spacing:-.035em; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  cursor:pointer; -webkit-appearance:none; appearance:none; font-family:inherit}
+.dgal-tag.on{background:transparent; color:var(--ink); border-color:transparent}
+.dgal-tag:active{opacity:.6}
+.dgal-dot{font-size:19px; font-weight:700; color:var(--ink-3); letter-spacing:-.02em; margin:0 1px}
 
 /* ==========================================================================
    v38 — 설정 시트 안 입력칸은 네모 상자 대신 «밑줄»로
@@ -2194,3 +2200,108 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
   background:rgba(20,20,22,.5); color:#FFFFFF; cursor:pointer; z-index:2; padding:0
 }
 .dg-more svg{width:14px; height:14px}
+/* v42: 날짜 모아보기는 화면 꼭대기에 바짝 붙지 않게 두 칸(약 30px) 정도 내려서 시작 */
+#s-photo .hdr.hdr-min.dgal-hd{margin-top:30px}
+/* v42: 날짜 모아보기 9장(3×3) 제한 — 9번째 칸 오른쪽 아래 작은 「+N」(누르면 나머지 펼치기) */
+.dg-moren{
+  position:absolute; right:6px; bottom:6px; z-index:2;
+  height:19px; min-width:26px; padding:0 7px; display:flex; align-items:center; justify-content:center;
+  border:0 !important; border-radius:999px !important; cursor:pointer;
+  background:rgba(20,20,22,.62); color:#FFFFFF; font-size:10.5px; font-weight:800;
+  letter-spacing:-.02em; font-variant-numeric:tabular-nums;
+  backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px)
+}
+
+/* ==========================================================================
+   v42 — 모눈종이 캔버스 다이어리: 위 끝까지 모눈, 글·사진을 손으로 놓기
+   ========================================================================== */
+/* 종이(모눈)는 상단 바 바로 아래부터 — 날짜는 종이 위에 얹고, 글·사진은 그 위에 자유 배치 */
+#sheet .d41-paper{position:relative; padding:0; min-height:100%; overflow:hidden}
+#sheet .d41-date{position:absolute; left:0; top:0; z-index:5; padding:16px 20px 0; pointer-events:none}
+#sheet .d41-date .d41-datein{pointer-events:auto}
+#sheet .d41-nodes{position:absolute; inset:0; z-index:2; pointer-events:none}
+#sheet .d41-tx{position:absolute; max-width:90%; min-width:84px; pointer-events:auto; z-index:2;
+  -webkit-user-select:text; user-select:text}
+#sheet .d41-tx.drag{cursor:grabbing; opacity:.92}
+#sheet .d41-txt{outline:none; padding:1px 4px; min-height:1.5em; line-height:1.7;
+  white-space:pre-wrap; word-break:break-word; letter-spacing:-.01em; caret-color:var(--ink)}
+#sheet .d41-txt:empty:before{content:attr(data-ph); color:var(--ink-3)}
+#sheet .d41-tx.sel .d41-txt{outline:1.5px dashed var(--ink-3); outline-offset:4px; border-radius:8px}
+#sheet .d41-txx{
+  position:absolute; top:-11px; right:-11px; width:22px; height:22px; display:none;
+  align-items:center; justify-content:center; border:0 !important; border-radius:50% !important;
+  background:rgba(20,20,22,.72); color:#FFFFFF; padding:0; cursor:pointer; z-index:3
+}
+#sheet .d41-txx svg{width:11px; height:11px}
+#sheet .d41-tx.sel .d41-txx{display:flex}
+#sheet .d41-imgb{position:absolute; pointer-events:auto; z-index:2; touch-action:none}
+#sheet .d41-imgb.drag{opacity:.9}
+#sheet .d41-imgb img{display:block; width:100%; height:auto; border-radius:12px !important;
+  background:var(--surface-2); -webkit-user-drag:none; user-drag:none; pointer-events:none}
+#sheet .d41-imgb.sel img{outline:1.5px dashed var(--ink-3); outline-offset:3px}
+#sheet .d41-imgx{
+  position:absolute; top:-10px; right:-10px; width:24px; height:24px; display:none;
+  align-items:center; justify-content:center; border:0 !important; border-radius:50% !important;
+  background:rgba(20,20,22,.72); color:#FFFFFF; padding:0; cursor:pointer; z-index:3
+}
+#sheet .d41-imgx svg{width:12px; height:12px}
+#sheet .d41-imgb.sel .d41-imgx{display:flex}
+#sheet .d41-rz{
+  position:absolute; right:-9px; bottom:-9px; width:22px; height:22px; display:none;
+  border-radius:50% !important; background:var(--ink); border:2px solid var(--surface);
+  box-shadow:0 1px 4px rgba(0,0,0,.25); touch-action:none; cursor:nwse-resize; z-index:3
+}
+#sheet .d41-imgb.sel .d41-rz{display:block}
+/* 글씨 크기 슬라이더 */
+#sheet .d41-range{
+  flex:1 1 auto; min-width:0; height:26px; margin:0; accent-color:var(--ink); background:none
+}
+#sheet .d41-pv{flex:0 0 44px; text-align:right; font-size:11.5px; font-weight:700; color:var(--ink-3);
+  font-variant-numeric:tabular-nums}
+#sheet .d41-phint{font-size:11px; color:var(--ink-3); line-height:1.6; margin:2px 0 4px}
+/* 사진 자르기 창 */
+.d41-cropwrap{
+  position:absolute; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
+  padding:18px; background:rgba(10,10,12,.6); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px)
+}
+.d41-cropcard{
+  width:100%; max-width:360px; background:var(--surface); border-radius:16px !important;
+  padding:14px; box-shadow:0 18px 40px rgba(0,0,0,.28)
+}
+.d41-crophd{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px}
+.d41-crophd b{font-size:14px; letter-spacing:-.02em}
+.d41-cropx{width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+  border:0 !important; border-radius:50% !important; background:var(--surface-2); color:var(--ink); padding:0}
+.d41-cropx svg{width:13px; height:13px}
+.d41-cropbox{
+  position:relative; width:100%; overflow:hidden; border-radius:12px !important;
+  background:var(--surface-2); touch-action:none; line-height:0
+}
+.d41-cropbox img{width:100%; height:auto; display:block; pointer-events:none}
+.d41-cropsel{
+  position:absolute; left:0; top:0; width:100%; height:100%;
+  border:2px solid #FFFFFF; box-shadow:0 0 0 9999px rgba(10,10,12,.45);
+  border-radius:2px; pointer-events:none
+}
+.d41-cropacts{display:flex; gap:8px; margin-top:12px}
+.d41-cb{flex:1 1 0; height:42px; border:1px solid var(--ink) !important; border-radius:10px !important;
+  background:var(--ink); color:var(--bg); font-family:inherit; font-size:13px; font-weight:700; cursor:pointer}
+.d41-cb.ghost{background:none; color:var(--ink); border-color:var(--line) !important}
+
+/* ==========================================================================
+   v42 — 앱 전체를 한 테마로: 홈 테마 포인트 색(--point)을 노트 탭·저장 같은 강조 자리에
+   (색을 고르지 않았으면 지금까지처럼 --accent / 진한 검정으로 돌아가요)
+   ========================================================================== */
+#s-diary .lchip.active{background:var(--point, var(--ink)); border-color:var(--point, var(--ink)); color:var(--point-ink, var(--bg))}
+#s-diary .lchip.active i{background:var(--point-ink, var(--bg))}
+#s-diary .segs .seg-btn.active{background:var(--point, var(--ink)); border-color:var(--point, var(--ink)); color:var(--point-ink, var(--bg)); box-shadow:none}
+.d41-new{background:var(--point, var(--ink)); color:var(--point-ink, var(--bg))}
+.d41-save{background:var(--point, var(--ink)); color:var(--point-ink, var(--bg))}
+.dg-moren{background:rgba(20,20,22,.62)}
+.cmt-send,.dcmt-day .cmt-send{background:var(--point, var(--ink)); color:var(--point-ink, var(--bg))}
+html[data-mode="dark"] .cmt-send{background:var(--point, #F2F2F4); color:var(--point-ink, #111111)}
+html[data-mode="dark"] .lchip.active{background:var(--point, #F2F2F4); color:var(--point-ink, #111111); border-color:var(--point, #F2F2F4)}
+html[data-mode="dark"] .d41-new,html[data-mode="dark"] .d41-save{background:var(--point, #F2F2F4); color:var(--point-ink, #111111)}
+
+/* v42: 노트 카드 미리보기 — 5개까지, 넘치면 「+N개 더」 */
+.ncard .nc-items .nc-more{font-size:11px; font-weight:700; color:var(--ink-3); letter-spacing:-.01em; margin-top:6px}

@@ -488,10 +488,20 @@
           /* v40: 모눈 메모에 붙인 사진 한 장 */
           if (it.img) x.img = String(it.img);
           /* v41: 모눈 다이어리 — 사진 여러 장 · 글씨 모양 · 손그림도 함께 실어요 */
+          /* v42: 모눈 캔버스 다이어리의 «자유 배치 글 상자»도 함께 실어요 */
+          if (Array.isArray(it.texts) && it.texts.length) {
+            x.texts = it.texts.filter(function (t) { return t && String(t.text || "").trim(); }).map(function (t) {
+              return { id: String(t.id || ""), x: Number(t.x) || 0, y: Number(t.y) || 0,
+                text: String(t.text || ""), size: Number(t.size) || 16.5,
+                color: String(t.color || ""), align: t.align === "center" ? "center" : "left" };
+            });
+          }
           if (Array.isArray(it.imgs) && it.imgs.length) {
             x.imgs = it.imgs.filter(function (m) { return m && m.src; }).map(function (m) {
               var sz = Number(m.size);
-              return { id: String(m.id || ""), src: String(m.src), size: sz === 1 || sz === 3 ? sz : 2 };
+              return { id: String(m.id || ""), src: String(m.src), size: sz === 1 || sz === 3 ? sz : 2,
+                x: m.x == null ? null : Number(m.x), y: m.y == null ? null : Number(m.y),
+                w: m.w == null ? null : Number(m.w) };
             });
           }
           if (it.sty && typeof it.sty === "object") {
@@ -668,10 +678,20 @@
               if (it.gid) x.gid = String(it.gid);
               if (it.img) x.img = String(it.img);
               /* v41: 모눈 다이어리 — 사진 여러 장 · 글씨 모양 · 손그림도 그대로 되살려요 */
+              /* v42: 모눈 캔버스 다이어리의 «자유 배치 글 상자»도 함께 실어요 */
+              if (Array.isArray(it.texts) && it.texts.length) {
+                x.texts = it.texts.filter(function (t) { return t && String(t.text || "").trim(); }).map(function (t) {
+                  return { id: String(t.id || ""), x: Number(t.x) || 0, y: Number(t.y) || 0,
+                    text: String(t.text || ""), size: Number(t.size) || 16.5,
+                    color: String(t.color || ""), align: t.align === "center" ? "center" : "left" };
+                });
+              }
               if (Array.isArray(it.imgs) && it.imgs.length) {
                 x.imgs = it.imgs.filter(function (m) { return m && m.src; }).map(function (m) {
                   var sz = Number(m.size);
-                  return { id: String(m.id || ""), src: String(m.src), size: sz === 1 || sz === 3 ? sz : 2 };
+                  return { id: String(m.id || ""), src: String(m.src), size: sz === 1 || sz === 3 ? sz : 2,
+                    x: m.x == null ? null : Number(m.x), y: m.y == null ? null : Number(m.y),
+                    w: m.w == null ? null : Number(m.w) };
                 });
               }
               if (it.sty && typeof it.sty === "object") {

@@ -1,6 +1,6 @@
 """투로그 v41 확인 — 모눈 메모가 «모눈종이 풀스크린 다이어리»로 바뀐 것 + + 시트 문구 정리.
 
-1) 버전: sw.js 캐시 twolog-v41 · APP_VERSION v41 · My 탭 「버전 v41」
+1) 버전: sw.js 캐시 twolog-v42 · APP_VERSION v42 · My 탭 「버전 v42」
 2) + 시트 문구 정리
    - 고른 카테고리 아래 패널 제목은 「속지 · 이름」 (「속지 레이아웃」 아님)
    - 기본 카테고리(메모·버킷리스트·영화·먹방)의 배지와 첫 선택지도 「투두리스트」
@@ -207,9 +207,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v41", 'const VERSION = "twolog-v41"' in sw,
+    check("sw.js 캐시 버전 twolog-v42", 'const VERSION = "twolog-v42"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v41", 'var APP_VERSION = "v41"' in app_js,
+    check("app.js 버전 상수 v42", 'var APP_VERSION = "v42"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -222,25 +222,27 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v41」", ver.strip() == "버전 v41", ver)
+    check("My 탭 맨 위에 「버전 v42」", ver.strip() == "버전 v42", ver)
 
     # ==================================================================
     # 2. + 시트 문구 — 「속지」 · 기본 카테고리도 「투두리스트」
     # ==================================================================
     note_tab(page)
     open_add_sheet(page)
-    row_loc(page, "메모").locator(".nord-kb").click()
+    row_loc(page, "메모").locator(".nord-nm").click()
     page.wait_for_timeout(320)
     pn = page.evaluate("""() => ({
       label: (document.querySelector('#sheet #nkindLbl') || {}).textContent || '',
       cards: [...document.querySelectorAll('#sheet #nkPanel .nk-card')].map(c => [
         c.getAttribute('data-kind'), (c.querySelector('.nk-n') || {}).textContent]),
-      badge: (document.querySelector('#sheet #noteOrderList .nord-row.active .nord-kb') || {}).textContent,
+      kind: (document.querySelector('#sheet #noteOrderList .nord-row.active') || {}).getAttribute
+        ? document.querySelector('#sheet #noteOrderList .nord-row.active').getAttribute('data-kind') : null,
       fixed: [...document.querySelectorAll('#sheet .set-lbl')]
         .filter(e => !e.closest('#nkPanel') && e.textContent.trim() === '속지').length})""")
-    check("패널 제목이 「속지 · 메모」 (「속지 레이아웃」 아님)",
-          pn["label"].replace(" ", "") == "속지·메모" and "레이아웃" not in pn["label"], pn["label"])
-    check("기본 카테고리 배지도 「투두리스트」", (pn["badge"] or "").strip() == "투두리스트", pn["badge"])
+    check("패널 제목이 「속지」만 (v42 — 「속지 레이아웃」·이름 없이)",
+          pn["label"].strip() == "속지" and "레이아웃" not in pn["label"], pn["label"])
+    check("기본 카테고리 줄에는 속지 배지가 없음 (data-kind 는 지금 모양 그대로)",
+          pn["kind"] == "" and "nord-kb" not in page.evaluate("document.querySelector('#sheet #noteOrderList').innerHTML"), pn["kind"])
     check("기본 카테고리 첫 선택지 이름도 「투두리스트」",
           pn["cards"] and pn["cards"][0][0] == "" and pn["cards"][0][1] == "투두리스트", pn["cards"][:2])
     check("선택지는 그대로 네 칸 (투두리스트·모눈 메모·별점 리뷰·지출·정산)",
@@ -253,8 +255,8 @@ with sync_playwright() as p:
     pn2 = page.evaluate("""() => ({
       label: (document.querySelector('#sheet #nkindLbl') || {}).textContent || '',
       kinds: [...document.querySelectorAll('#sheet #nkPanel .nk-card')].map(c => c.getAttribute('data-kind'))})""")
-    check("새로 더한 줄도 「속지 · 주말 기록」 · 네 속지",
-          pn2["label"].replace(" ", "") == "속지·주말기록"
+    check("새로 더한 줄도 「속지」 · 네 속지",
+          pn2["label"].strip() == "속지"
           and pn2["kinds"] == ["check", "memo", "review", "expense"], pn2)
     pick_kind(page, "memo")
     page.locator("#sheet button.btn-primary").click()
@@ -326,80 +328,138 @@ with sync_playwright() as p:
           page.evaluate("document.getElementById('d41DateBig').textContent"))
 
     # ==================================================================
-    # 6. T — 글씨 크기·색·정렬
+    # 6. T — 종이를 눌러 그 자리에 글 · 크기 슬라이더 · 색·정렬
+    #    (v42: 한 덩어리 본문 → 자유 배치 글 상자)
     # ==================================================================
     page.locator("#sheet .d41-tool[aria-label='글씨']").click()
     page.wait_for_timeout(300)
     tp = page.evaluate("""() => ({
       open: !document.getElementById('d41Panel').hidden,
       sizes: [...document.querySelectorAll('#sheet .d41-pb[data-act=d41Size]')].map(b => b.textContent),
+      range: !!document.querySelector('#sheet #d41SizeRange'),
+      rminmax: (() => { const r = document.querySelector('#sheet #d41SizeRange');
+        return r ? [r.getAttribute('min'), r.getAttribute('max')] : null; })(),
       colors: document.querySelectorAll('#sheet .d41-dot[data-act=d41Color]').length,
       aligns: [...document.querySelectorAll('#sheet .d41-pb[data-act=d41Align]')].map(b => b.textContent)})""")
     check("T 를 누르면 글씨 크기(작게·보통·크게)·색·정렬 칸이 열림",
           tp["open"] and tp["sizes"] == ["작게", "보통", "크게"] and tp["colors"] >= 4
           and tp["aligns"] == ["왼쪽", "가운데"], tp)
-    page.locator("#sheet .d41-pb[data-act=d41Size][data-size='3']").click()
-    page.wait_for_timeout(220)
+    check("크기 옆에 가로 슬라이더(12~40)", tp["range"] and tp["rminmax"] == ["12", "40"], tp["rminmax"])
+
+    box = page.locator("#d41Paper").bounding_box()
+    page.mouse.click(box["x"] + 70, box["y"] + 230)
+    page.wait_for_timeout(400)
+    page.keyboard.type("아침에 창문을 열었더니 바람이 차가웠다")
+    page.wait_for_timeout(300)
+    t1 = page.evaluate("""() => { const t = JSON.parse(document.getElementById('d41TextsIn').value)[0] || {};
+      return {n: document.querySelectorAll('#sheet .d41-tx').length, x: t.x, y: t.y, text: t.text}; }""")
+    check("종이를 누른 자리에 글 상자가 생기고 그 자리에서 바로 써짐",
+          t1["n"] == 1 and 0 < t1["x"] < 1 and t1["y"] > 0 and "바람이 차가웠다" in (t1["text"] or ""), t1)
+
     page.locator("#sheet .d41-pb[data-act=d41Align][data-align='center']").click()
     page.wait_for_timeout(220)
     page.locator("#sheet .d41-dot[data-act=d41Color]").nth(2).click()
-    page.wait_for_timeout(260)
-    sty = page.evaluate("""() => ({sty: JSON.parse(document.querySelector('#d41StyIn').value),
-      fs: getComputedStyle(document.querySelector('.d41-body')).fontSize,
-      ta: getComputedStyle(document.querySelector('.d41-body')).textAlign,
-      color: getComputedStyle(document.querySelector('.d41-body')).color})""")
-    check("고른 글씨 크기·정렬·색이 본문에 바로 반영",
-          sty["fs"] == "19px" and sty["ta"] == "center" and sty["sty"]["size"] == 3
-          and sty["sty"]["align"] == "center" and sty["sty"]["color"] != "", sty)
-    page.fill("#sheet textarea[name=memo]",
-              "아침에 창문을 열었더니 바람이 차가웠다.\n커피를 천천히 마시며 오늘 할 일을 적었다.\n저녁엔 준영이랑 산책하기로.")
-    page.wait_for_timeout(260)
+    page.wait_for_timeout(220)
+    page.evaluate("""() => { const r = document.getElementById('d41SizeRange'); r.value = 24;
+      r.dispatchEvent(new Event('input', {bubbles: true})); }""")
+    page.wait_for_timeout(280)
+    sty = page.evaluate("""() => { const t = JSON.parse(document.getElementById('d41TextsIn').value)[0];
+      const el = document.querySelector('#sheet .d41-tx');
+      return {size: t.size, align: t.align, color: t.color,
+              fs: getComputedStyle(el).fontSize, ta: getComputedStyle(el).textAlign}; }""")
+    check("슬라이더로 고른 크기·색·정렬이 그 글 상자에 바로 반영",
+          sty["size"] == 24 and sty["fs"] == "24px" and sty["ta"] == "center" and sty["color"] != "", sty)
     page.screenshot(path=os.path.join(SHOT, "note-v41-diary-editor.png"))
 
     # ==================================================================
-    # 7. 사진 — 여러 장 · 크기 조절 · 삭제
+    # 7. 사진 — 붙이면 손으로 옮기고 모서리로 크기 조절
     # ==================================================================
+    import base64 as _b64
+    def _make_img(page, w, h, name):
+        durl = page.evaluate("""([w, h]) => { const c = document.createElement('canvas'); c.width = w; c.height = h;
+          const x = c.getContext('2d'); x.fillStyle = '#D69678'; x.fillRect(0, 0, w, h);
+          x.fillStyle = '#5A6E82'; x.fillRect(w / 8, h / 6, w * 3 / 4, h * 2 / 3);
+          return c.toDataURL('image/jpeg', 0.9); }""", [w, h])
+        path = "/tmp/%s" % name
+        with open(path, "wb") as f:
+            f.write(_b64.b64decode(durl.split(",", 1)[1]))
+        return path
+
+    img_a = _make_img(page, 320, 240, "v41-a.jpg")
+    img_b = _make_img(page, 240, 320, "v41-b.jpg")
     page.locator("#sheet .d41-tool[aria-label='사진 넣기']").click()
     page.wait_for_timeout(200)
-    page.set_input_files("#d41ImgIn", [SHOT_A, SHOT_B])
+    page.set_input_files("#d41ImgIn", [img_a, img_b])
     page.wait_for_timeout(1800)
-    ph = page.evaluate("""() => ({n: document.querySelectorAll('#sheet .d41-img').length,
-      hidden: JSON.parse(document.querySelector('#d41ImgsIn').value).length,
-      src: String((JSON.parse(document.querySelector('#d41ImgsIn').value)[0] || {}).src || '').slice(0, 22)})""")
-    check("사진 두 장을 붙이면 다이어리에 두 칸", ph["n"] == 2 and ph["hidden"] == 2, ph)
-    check("붙인 사진은 줄여서(data:image) 보관", ph["src"].startswith("data:image"), ph["src"])
+    ph = page.evaluate("""() => ({n: document.querySelectorAll('#sheet .d41-imgb').length,
+      hidden: JSON.parse(document.getElementById('d41ImgsIn').value).map(i => [i.x, i.y, i.w]),
+      src: String((JSON.parse(document.getElementById('d41ImgsIn').value)[0] || {}).src || '').slice(0, 22)})""")
+    check("사진 두 장을 붙이면 다이어리에 두 칸", ph["n"] == 2 and len(ph["hidden"]) == 2, ph["n"])
+    check("붙인 사진은 줄여서(data:image) · 자리(x·y·폭)와 함께 보관",
+          ph["src"].startswith("data:image") and all(0 <= row[0] <= 1 and 0 <= row[2] <= 1 and row[1] >= 0 for row in ph["hidden"]), ph["hidden"])
 
-    page.locator("#sheet .d41-img").first.locator("img").click()
+    # 사진을 눌러 고르면 자르기·삭제 칸, 모서리를 끌면 폭이 바뀜
+    ib = page.locator("#sheet .d41-imgb").first.bounding_box()
+    page.mouse.click(ib["x"] + 24, ib["y"] + 24)
     page.wait_for_timeout(320)
-    sel = page.evaluate("""() => ({sel: document.querySelectorAll('#sheet .d41-img.sel').length,
-      bar: (() => { const b = document.querySelector('#sheet .d41-img.sel .d41-imgsz');
-        return b ? getComputedStyle(b).display : 'none'; })(),
-      szs: [...document.querySelectorAll('#sheet .d41-img.sel .d41-szb')].map(b => b.textContent),
-      w: Math.round(document.querySelector('#sheet .d41-img').getBoundingClientRect().width),
-      paper: Math.round(document.querySelector('#sheet .d41-paper').getBoundingClientRect().width)})""")
-    check("사진을 누르면 크기 조절(작게·보통·크게) 칸이 열림",
-          sel["sel"] == 1 and sel["bar"] == "flex" and sel["szs"] == ["작게", "보통", "크게"], sel)
-    base_w = sel["w"]
-    page.locator("#sheet .d41-img.sel .d41-szb[data-sz='1']").click()
-    page.wait_for_timeout(320)
-    small = page.evaluate("Math.round(document.querySelector('#sheet .d41-img').getBoundingClientRect().width)")
-    page.locator("#sheet .d41-img.sel .d41-szb[data-sz='3']").click()
-    page.wait_for_timeout(320)
-    large = page.evaluate("Math.round(document.querySelector('#sheet .d41-img').getBoundingClientRect().width)")
-    check("작게 → 크게로 바꾸면 폭이 실제로 달라짐",
-          small < base_w < large and small <= sel["paper"] * 0.5 and large >= sel["paper"] * 0.85,
-          (small, base_w, large, sel["paper"]))
+    sel = page.evaluate("""() => ({sel: document.querySelectorAll('#sheet .d41-imgb.sel').length,
+      panel: (document.getElementById('d41Panel') || {}).innerText || '',
+      handle: !!document.querySelector('#sheet .d41-imgb.sel .d41-rz'),
+      w: JSON.parse(document.getElementById('d41ImgsIn').value)[0].w})""")
+    check("사진을 누르면 「자르기·삭제」 칸과 크기 손잡이가 보임",
+          sel["sel"] == 1 and "자르기" in sel["panel"] and sel["handle"], sel)
+    w0 = sel["w"]
+    hb = page.locator("#sheet .d41-imgb.sel .d41-rz").bounding_box()
+    page.mouse.move(hb["x"] + hb["width"] / 2, hb["y"] + hb["height"] / 2)
+    page.mouse.down()
+    page.mouse.move(hb["x"] + hb["width"] / 2 - 70, hb["y"] + hb["height"] / 2 - 50, steps=8)
+    page.mouse.up()
+    page.wait_for_timeout(400)
+    w1 = page.evaluate("JSON.parse(document.getElementById('d41ImgsIn').value)[0].w")
+    check("모서리를 끌어 사진 크기를 줄임", w1 < w0 - 0.05, (w0, w1))
 
-    # 펜 (아래 지우개·되돌리기 검사에 이어서)
+    # 사진을 끌어 옮기기
+    ib2 = page.locator("#sheet .d41-imgb").first.bounding_box()
+    x0 = page.evaluate("JSON.parse(document.getElementById('d41ImgsIn').value)[0].x")
+    page.mouse.move(ib2["x"] + 20, ib2["y"] + 20)
+    page.mouse.down()
+    page.mouse.move(ib2["x"] + 90, ib2["y"] + 120, steps=8)
+    page.mouse.up()
+    page.wait_for_timeout(400)
+    x1 = page.evaluate("JSON.parse(document.getElementById('d41ImgsIn').value)[0].x")
+    check("사진을 손으로 끌어 옮김", x1 > x0 + 0.05, (x0, x1))
+
+    # 자르기 — 사진 위를 끌어 영역을 정하고 적용하면 실제로 잘림
+    ib3 = page.locator("#sheet .d41-imgb").first.bounding_box()
+    page.mouse.click(ib3["x"] + 30, ib3["y"] + 30)
+    page.wait_for_timeout(300)
+    page.locator("#d41Panel [data-act=d41ImgCrop]").first.click()
+    page.wait_for_timeout(500)
+    crop_open = page.evaluate("!!document.getElementById('d41CropWrap')")
+    cb = page.locator("#d41CropBox").bounding_box()
+    page.mouse.move(cb["x"] + 20, cb["y"] + 16)
+    page.mouse.down()
+    page.mouse.move(cb["x"] + cb["width"] * 0.6, cb["y"] + cb["height"] * 0.6, steps=6)
+    page.mouse.up()
+    page.wait_for_timeout(260)
+    before = page.evaluate("""() => { const i = document.querySelector('#sheet .d41-imgb img');
+      return [i.naturalWidth, i.naturalHeight]; }""")
+    page.locator("#d41CropWrap [data-crop=apply]").click()
+    page.wait_for_timeout(700)
+    after = page.evaluate("""() => { const i = document.querySelector('#sheet .d41-imgb img');
+      return i ? [i.naturalWidth, i.naturalHeight] : null; }""")
+    check("사진 자르기 창이 열리고 적용하면 실제로 잘림", crop_open and after and after[0] < before[0],
+          (before, after))
+
+    # 펜
     page.locator("#sheet .d41-tool[aria-label='펜 그리기']").click()
     page.wait_for_timeout(300)
     pen_on = page.evaluate("""() => ({on: document.getElementById('d41Pen').classList.contains('on'),
       panel: [...document.querySelectorAll('#sheet .d41-pb')].map(b => b.textContent)})""")
     check("펜을 누르면 그리기 칸(펜·지우개·되돌리기·전체 지우기)이 열림",
           pen_on["on"] and "지우개" in pen_on["panel"] and "되돌리기" in pen_on["panel"], pen_on["panel"])
-
     box = page.locator("#d41Paper").bounding_box()
-    sx, sy = box["x"] + 70, box["y"] + 260
+    sx, sy = box["x"] + 70, box["y"] + 520
 
     def draw(dx=0, dy=0, steps=10):
         page.mouse.move(sx + dx, sy + dy)
@@ -412,26 +472,17 @@ with sync_playwright() as p:
 
     draw()
     pen1 = page.evaluate("""() => ({paths: document.querySelectorAll('#d41Pen path').length,
-      saved: JSON.parse(document.querySelector('#d41PenIn').value),
-      w: document.getElementById('d41Paper').clientWidth})""")
+      saved: JSON.parse(document.getElementById('d41PenIn').value)})""")
     pts = (pen1["saved"][0]["p"] if pen1["saved"] else [])
     check("손가락(마우스)으로 그리면 선이 그려지고 저장 준비됨", pen1["paths"] == 1 and len(pen1["saved"]) == 1, pen1["paths"])
-    check("그림 좌표는 폭 기준 0~1 (다른 폰 폭에서도 그대로)",
-          len(pts) >= 4 and all(0 <= v <= 1 for v in pts), pts[:6])
+    check("그림 좌표는 폭 기준 (0~1 비율 · 아래로는 종이 길이만큼)",
+          len(pts) >= 4 and all(0 <= pts[i] <= 1 for i in range(0, len(pts), 2))
+          and all(pts[i] >= 0 for i in range(1, len(pts), 2)), pts[:6])
     page.locator("#sheet .d41-pb[data-act=d41Undo]").click()
     page.wait_for_timeout(300)
     check("되돌리기로 마지막 선이 지워짐",
           page.evaluate("document.querySelectorAll('#d41Pen path').length") == 0)
     draw()
-    draw(dx=40, dy=90)
-    check("두 번 그리면 선 두 개", page.evaluate("document.querySelectorAll('#d41Pen path').length") == 2)
-    page.locator("#sheet .d41-pb[data-act=d41PenMode][data-mode='erase']").click()
-    page.wait_for_timeout(250)
-    page.mouse.click(sx + 55, sy + 20)     # 첫 선 근처를 톡 누르면 그 선만 지워짐
-    page.wait_for_timeout(350)
-    erased = page.evaluate("""() => ({paths: document.querySelectorAll('#d41Pen path').length,
-      saved: JSON.parse(document.querySelector('#d41PenIn').value).length})""")
-    check("지우개로 누른 선이 지워짐", erased["paths"] == 1 and erased["saved"] == 1, erased)
     page.screenshot(path=os.path.join(SHOT, "_p41-test-pen.png"))
 
     # ==================================================================
@@ -453,37 +504,39 @@ with sync_playwright() as p:
     check("카드에 사진 미리보기와 손그림 표시", card and card["thumbs"] == 2 and "손그림" in (card["pen"] or ""), card)
     check("카드 오른쪽에 × 삭제 버튼", card and card["del"] is True)
     saved = state_list(page, "주말 기록")["items"][0]
-    check("저장된 값 — imgs 2장·sty(크게·가운데)·pen 1줄·날짜",
-          len(saved.get("imgs", [])) == 2 and saved.get("sty", {}).get("size") == 3
-          and saved.get("sty", {}).get("align") == "center" and len(saved.get("pen", [])) == 1
-          and saved.get("date") == "2026-11-19", {k: saved.get(k) for k in ("date", "sty")})
+    check("저장된 값 — 글 상자·사진 두 장·펜 한 줄·날짜",
+          len(saved.get("texts", [])) == 1 and len(saved.get("imgs", [])) == 2
+          and len(saved.get("pen", [])) == 1 and saved.get("date") == "2026-11-19",
+          {k: saved.get(k) for k in ("date",)})
 
     page.locator("#s-diary .d41-card").first.click()
     page.wait_for_timeout(700)
     again = page.evaluate("""() => ({title: document.querySelector('.d41-title').value,
-      body: document.querySelector('.d41-body').value.slice(0, 8),
+      texts: JSON.parse(document.getElementById('d41TextsIn').value),
       date: document.getElementById('d41DateBig').textContent,
-      imgs: document.querySelectorAll('#sheet .d41-img').length,
-      sz: document.querySelector('#sheet .d41-img').className,
-      paths: document.querySelectorAll('#d41Pen path').length,
-      fs: getComputedStyle(document.querySelector('.d41-body')).fontSize,
-      ta: getComputedStyle(document.querySelector('.d41-body')).textAlign})""")
-    check("카드를 누르면 그 다이어리가 그대로 열림 (제목·본문·날짜·사진·그림·글씨)",
-          again["title"] == "비 오는 목요일" and again["body"].startswith("아침에 창문을")
-          and again["date"] == "11.19 THU" and again["imgs"] == 2 and again["paths"] == 1
-          and again["fs"] == "19px" and again["ta"] == "center", again)
-    check("사진 크기(크게)도 다시 열면 그대로", "sz3" in again["sz"], again["sz"])
+      imgs: document.querySelectorAll('#sheet .d41-imgb').length,
+      paths: document.querySelectorAll('#d41Pen path').length})""")
+    check("카드를 누르면 그 다이어리가 그대로 열림 (제목·글·날짜·사진·그림)",
+          again["title"] == "비 오는 목요일" and "바람이 차가웠다" in (again["texts"][0]["text"] if again["texts"] else "")
+          and again["date"] == "11.19 THU" and again["imgs"] == 2 and again["paths"] == 1, again)
     page.screenshot(path=os.path.join(SHOT, "_p41-test-reopen.png"))
 
     # 이어 쓰기 · 사진 한 장 삭제
-    page.fill("#sheet textarea[name=memo]", "저녁엔 준영이랑 산책했다. 골목이 조용했다.")
-    page.locator("#sheet .d41-imgx").first.click()
-    page.wait_for_timeout(350)
+    page.locator("#sheet .d41-tx .d41-txt").first.click()
+    page.wait_for_timeout(200)
+    page.keyboard.press("End")
+    page.keyboard.type(" 저녁엔 산책")
+    page.wait_for_timeout(260)
+    ibx = page.locator("#sheet .d41-imgb").first.bounding_box()
+    page.mouse.click(ibx["x"] + 20, ibx["y"] + 20)
+    page.wait_for_timeout(300)
+    page.locator("#sheet .d41-imgb.sel .d41-imgx").first.click()
+    page.wait_for_timeout(400)
     page.locator("#sheet .d41-save").click()
     page.wait_for_timeout(800)
     edited = state_list(page, "주말 기록")["items"][0]
-    check("다시 열어 고친 본문·지운 사진이 저장됨",
-          "골목이 조용했다" in edited.get("memo", "") and len(edited.get("imgs", [])) == 1, edited.get("imgs"))
+    check("다시 열어 고친 글·지운 사진이 저장됨",
+          "산책" in (edited.get("memo", "")) and len(edited.get("imgs", [])) == 1, edited.get("imgs"))
 
     # 카드 × 로 다이어리 삭제
     page.locator("#s-diary .d41-card .nmemo-x").first.click()
@@ -870,17 +923,17 @@ with sync_playwright() as p:
 
     page3.locator("#s-diary .d41-card").first.click()
     page3.wait_for_timeout(700)
-    srv_open = page3.evaluate("""() => ({date: document.getElementById('d41DateBig').textContent,
-      body: document.querySelector('.d41-body').value,
-      imgs: document.querySelectorAll('#sheet .d41-img').length,
-      sz: (document.querySelector('#sheet .d41-img') || {}).className || '',
-      paths: document.querySelectorAll('#d41Pen path').length,
-      fs: getComputedStyle(document.querySelector('.d41-body')).fontSize,
-      ta: getComputedStyle(document.querySelector('.d41-body')).textAlign})""")
-    check("서버에서 온 사진·글씨·그림이 그대로 열림",
-          srv_open["body"] == "파도 소리가 좋았다." and srv_open["imgs"] == 1
-          and "sz1" in srv_open["sz"] and srv_open["paths"] == 1
-          and srv_open["fs"] == "19px" and srv_open["ta"] == "center", srv_open)
+    srv_open = page3.evaluate("""() => { const t = JSON.parse(document.getElementById('d41TextsIn').value)[0] || {};
+      const im = JSON.parse(document.getElementById('d41ImgsIn').value)[0] || {};
+      const el = document.querySelector('#sheet .d41-tx');
+      return {date: document.getElementById('d41DateBig').textContent,
+              text: t.text, imgs: document.querySelectorAll('#sheet .d41-imgb').length,
+              w: im.w, paths: document.querySelectorAll('#d41Pen path').length,
+              fs: el ? getComputedStyle(el).fontSize : '', ta: el ? getComputedStyle(el).textAlign : ''}; }""")
+    check("서버에서 온 사진·글씨·그림이 그대로 열림 (옛 한 덩어리 본문도 첫 글 상자로)",
+          srv_open["text"] == "파도 소리가 좋았다." and srv_open["imgs"] == 1
+          and srv_open["w"] is not None and srv_open["paths"] == 1
+          and srv_open["ta"] == "center", srv_open)
 
     # 이 폰에서 새 다이어리를 써서 서버로
     page3.locator("#sheet .d41-back").click()
@@ -889,18 +942,28 @@ with sync_playwright() as p:
     page3.wait_for_timeout(650)
     page3.locator("#sheet .d41-tool[aria-label='사진 넣기']").click()
     page3.wait_for_timeout(200)
-    page3.set_input_files("#d41ImgIn", [SHOT_A])
+    durl3 = page3.evaluate("""() => { const c = document.createElement('canvas'); c.width = 300; c.height = 220;
+      const x = c.getContext('2d'); x.fillStyle = '#C9A227'; x.fillRect(0, 0, 300, 220); return c.toDataURL('image/jpeg', 0.9); }""")
+    with open("/tmp/v41-srv.jpg", "wb") as f:
+        f.write(__import__("base64").b64decode(durl3.split(",", 1)[1]))
+    page3.set_input_files("#d41ImgIn", ["/tmp/v41-srv.jpg"])
     page3.wait_for_timeout(1400)
     page3.fill("#sheet .d41-title", "서버로 가는 다이어리")
-    page3.fill("#sheet textarea[name=memo]", "두 폰에서 같이 보이는 기록.")
+    pbox3 = page3.locator("#d41Paper").bounding_box()
+    page3.mouse.click(pbox3["x"] + 70, pbox3["y"] + 180)
+    page3.wait_for_timeout(300)
+    page3.keyboard.type("두 폰에서 같이 보이는 기록.")
+    page3.wait_for_timeout(200)
     page3.locator("#sheet .d41-save").click()
     page3.wait_for_timeout(2400)
     srv = page3.evaluate("""() => { const row = (window.__stub.notes || []).filter(x => x.kind === 'list')[0];
       const it = row ? (row.payload.items || []).filter(i => i.text === '서버로 가는 다이어리')[0] : null;
       return it ? {imgs: (it.imgs || []).length, src: String((it.imgs || [{}])[0].src || '').slice(0, 11),
-                   date: it.date} : null; }""")
-    check("새 다이어리의 사진·날짜가 notes 행 payload 에 실려 올라감",
-          srv and srv["imgs"] == 1 and srv["src"].startswith("data:image") and srv["date"] == time.strftime("%Y-%m-%d"), srv)
+                   w: ((it.imgs || [{}])[0] || {}).w, texts: (it.texts || []).length,
+                   tx: (((it.texts || [])[0] || {}).text || ''), date: it.date} : null; }""")
+    check("새 다이어리의 사진(자리·폭)·글 상자가 notes 행 payload 에 실려 올라감",
+          srv and srv["imgs"] == 1 and srv["src"].startswith("data:image") and srv["w"] is not None
+          and srv["texts"] == 1 and "두 폰에서" in srv["tx"] and srv["date"] == time.strftime("%Y-%m-%d"), srv)
 
     page3.reload(wait_until="domcontentloaded")
     page3.wait_for_selector("#tabbar .tab", timeout=25000)

@@ -1,6 +1,6 @@
 """투로그 v39 확인 — 카테고리마다 속지 고르기(+ 기본 카테고리도) · 사진 달력 아이폰식.
 
-1) 버전: sw.js 캐시 twolog-v41 · APP_VERSION v41 · My 탭 「버전 v41」
+1) 버전: sw.js 캐시 twolog-v42 · APP_VERSION v42 · My 탭 「버전 v42」
 2) + 시트 — 카테고리 줄마다 지금 속지 배지, 누르면 그 카테고리의 속지를 고치는 모드
    - 메모·버킷리스트·영화·먹방(기본)은 「카드」, 내가 만든 카테고리는 그 속지 이름
    - 줄을 누르면 .active · 제목 「속지 레이아웃 · 버킷리스트」 · 안내에 그 이름
@@ -177,9 +177,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v41", 'const VERSION = "twolog-v41"' in sw,
+    check("sw.js 캐시 버전 twolog-v42", 'const VERSION = "twolog-v42"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v41", 'var APP_VERSION = "v41"' in app_js,
+    check("app.js 버전 상수 v42", 'var APP_VERSION = "v42"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -192,7 +192,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v41」", ver.strip() == "버전 v41", ver)
+    check("My 탭 맨 위에 「버전 v42」", ver.strip() == "버전 v42", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄마다 속지 배지 · 줄을 누르면 그 카테고리 속지 고르기
@@ -214,14 +214,14 @@ with sync_playwright() as p:
         kinds: [...document.querySelectorAll('#sheet #nkPanel .nk-card')].map(c => c.getAttribute('data-kind'))};
     }""")
     by_name = {r["name"]: r for r in ui["rows"]}
-    check("카테고리 줄마다 지금 속지 배지가 있음",
-          len(ui["rows"]) >= 4 and all(r["badge"] for r in ui["rows"]), ui["rows"])
-    check("기본 카테고리 배지도 「투두리스트」 (v41 통일)", by_name.get("메모", {}).get("badge") == "투두리스트"
-          and by_name.get("버킷리스트", {}).get("badge") == "투두리스트"
-          and by_name.get("영화·먹방", {}).get("badge") == "투두리스트",
-          {k: v["badge"] for k, v in by_name.items()})
-    custom_badges = [r["badge"] for r in ui["rows"] if "여행 준비물" in r["name"] or "주말 데이트" in r["name"]]
-    check("내 카테고리 배지는 그 속지 이름", custom_badges == ["투두리스트", "모눈 메모"], custom_badges)
+    check("카테고리 줄에 속지 배지가 없음 (v42 — ≡ 손잡이 + 이름만)",
+          len(ui["rows"]) >= 4 and all(not r["badge"] for r in ui["rows"]), ui["rows"])
+    check("기본 카테고리의 지금 모양(data-kind)은 그대로", by_name.get("메모", {}).get("kind") == ""
+          and by_name.get("버킷리스트", {}).get("kind") == ""
+          and by_name.get("영화·먹방", {}).get("kind") == "",
+          {k: v["kind"] for k, v in by_name.items()})
+    custom_kinds = [r["kind"] for r in ui["rows"] if "여행 준비물" in r["name"] or "주말 데이트" in r["name"]]
+    check("내 카테고리의 지금 속지는 줄에 안 적고 패널에서 봐요", custom_kinds == ["check", "memo"], custom_kinds)
     check("처음에는 고른 줄이 없고 속지 패널도 접혀 있음",
           not any(r["active"] for r in ui["rows"]) and ui["panelHidden"] is True, ui)
     check("새 카테고리용 패널은 투두리스트부터 (「카드」 없음)",
@@ -245,12 +245,15 @@ with sync_playwright() as p:
     check("기본 카테고리 줄을 누르면 그 줄이 선택됨", sel["row"] == "버킷리스트"
           and sel["border"] not in ("", "rgb(232, 232, 237)"), sel)
     check("속지 패널이 그 줄 바로 아래에 펼쳐짐", sel["hidden"] is False and 0 <= sel["gap"] <= 16, sel)
-    check("속지 제목에 고른 카테고리 이름", "속지" in sel["label"] and "레이아웃" not in sel["label"]
-          and "버킷리스트" in sel["label"], sel["label"])
-    check("안내 문구도 그 카테고리", "버킷리스트" in sel["hint"], sel["hint"])
+    check(" 속지 제목은 「속지」만 (v42)", sel["label"].strip() == "속지" and "레이아웃" not in sel["label"], sel["label"])
+    check("안내 문구는 「버킷리스트에 쓸 속지를 골라요.」 (「」 없이)",
+          sel["hint"].strip() == "버킷리스트에 쓸 속지를 골라요." and "「" not in sel["hint"], sel["hint"])
     check("기본 카테고리 패널은 「카드」 + 세 속지", sel["kinds"] == ["", "memo", "review", "expense"], sel["kinds"])
     check("지금은 「카드」가 체크됨", sel["activeKinds"] == [""], sel["activeKinds"])
 
+    # v42: 글이 있는 카테고리는 속지를 못 바꿔요 — 잠깐 비웠다가 바꾸고 다시 채워요
+    saved_bucket = page.evaluate("() => JSON.parse(JSON.stringify(window.__app.state.bucket))")
+    page.evaluate("() => { window.__app.state.bucket = []; }")
     pick_kind(page, "expense")
     page.wait_for_timeout(240)
     after = page.evaluate("""() => {
@@ -260,7 +263,7 @@ with sync_playwright() as p:
               hidden: (document.querySelector('#sheet input[name="nkind"]') || {}).value,
               activeKinds: [...document.querySelectorAll('#sheet #nkPanel .nk-card.active')].map(c => c.getAttribute('data-kind'))};
     }""")
-    check("속지를 고르면 그 줄 배지가 바로 바뀜", after["badge"] == "지출·정산" and after["kind"] == "expense", after)
+    check("속지를 고르면 그 줄의 지금 속지가 바로 바뀜 (배지 없이 data-kind 로)", after["kind"] == "expense", after)
     check("고른 속지 카드만 체크됨", after["activeKinds"] == ["expense"], after)
     page.evaluate("document.querySelector('#sheet').scrollTop = 9999")
     page.wait_for_timeout(280)
@@ -282,6 +285,8 @@ with sync_playwright() as p:
     page.locator("#sheet button.btn-primary").click()
     page.wait_for_timeout(760)
     st1 = state_of(page)
+    page.evaluate("(a) => { window.__app.state.bucket = a; window.__app.rerender(); }", saved_bucket)
+    page.wait_for_timeout(300)
     check("저장하면 기본 카테고리 속지가 S.noteKinds 에 담김", st1.get("noteKinds", {}).get("bucket") == "expense",
           st1.get("noteKinds"))
 
@@ -302,7 +307,8 @@ with sync_playwright() as p:
       back: !!document.querySelector('#s-diary .nh-back'),
       cards: document.querySelectorAll('#s-diary .ncard').length})""")
     check("버킷리스트 탭이 지출·정산 속지로 그려짐", bk["badge"] is False and bk["quick"] and bk["sum"], bk)
-    check("속지 화면에는 카드 대신 목록 · 「투두리스트」로 돌아갈 버튼", bk["cards"] == 0 and bk["back"], bk)
+    check("속지 화면에는 카드 대신 목록 · 되돌리기 버튼은 없음 (v42 — + 시트에서만 바꿔요)",
+          bk["cards"] == 0 and not bk["back"], bk)
 
     page.fill("#s-diary #listQuickForm input[name=text]", "주말 외식")
     page.fill("#s-diary #listQuickForm input[name=amount]", "32000")
@@ -320,19 +326,21 @@ with sync_playwright() as p:
     check("항목은 원래 탭 항목(S.bucket)으로 저장 — amount·gid 유지",
           bool(money["item"]) and money["item"].get("amount") == 32000 and bool(money["item"].get("gid")), money["item"])
 
-    page.locator("#s-diary .nh-back").click()
-    page.wait_for_timeout(520)
-    back = page.evaluate("""() => ({cards: document.querySelectorAll('#s-diary .ncard').length,
+    back = page.evaluate("""() => ({btn: !!document.querySelector('#s-diary .nh-back'),
       kinds: window.__app.state.noteKinds || {}})""")
-    check("「투두리스트」를 누르면 카드 화면으로 되돌아감", back["cards"] > 0 and "bucket" not in back["kinds"], back)
+    check("노트 화면 위에는 「투두리스트」 되돌리기 버튼이 없음", back["btn"] is False and back["kinds"].get("bucket") == "expense", back)
 
-    # 메모 → 모눈 메모
+    # 메모 → 모눈 메모 (v42: 글 있는 카테고리는 잠깐 비웠다가)
+    saved_todo = page.evaluate("() => JSON.parse(JSON.stringify(window.__app.state.todos))")
+    page.evaluate("() => { window.__app.state.todos = []; }")
     open_add_sheet(page)
     row_loc(page, "메모").locator(".nord-nm").click()
     page.wait_for_timeout(200)
     pick_kind(page, "memo")
     page.locator("#sheet button.btn-primary").click()
     page.wait_for_timeout(720)
+    page.evaluate("(a) => { window.__app.state.todos = a; window.__app.rerender(); }", saved_todo)
+    page.wait_for_timeout(260)
     page.locator("#s-diary .seg-btn", has_text="메모").first.click()
     page.wait_for_timeout(520)
     mm = page.evaluate("""() => ({badge: !!document.querySelector('#s-diary .note-hd .k'),
@@ -341,16 +349,19 @@ with sync_playwright() as p:
       circles: document.querySelectorAll('#s-diary .trow .circ').length})""")
     check("메모 탭이 모눈 메모 속지로 (위 입력줄 대신 「+ 새 다이어리」·체크 동그라미 없음)",
           mm["badge"] is False and mm["quick"] and mm["circles"] == 0, mm)
-    page.locator("#s-diary .nh-back").click()
-    page.wait_for_timeout(460)
+    # (v42: 노트 화면의 「투두리스트」 되돌리기 버튼은 없어졌어요 — 여기서는 그대로 이어서 봐요)
 
     # 영화·먹방 → 별점 리뷰
+    saved_logs = page.evaluate("() => JSON.parse(JSON.stringify(window.__app.state.logs))")
+    page.evaluate("() => { window.__app.state.logs = []; }")
     open_add_sheet(page)
     row_loc(page, "영화·먹방").locator(".nord-nm").click()
     page.wait_for_timeout(200)
     pick_kind(page, "review")
     page.locator("#sheet button.btn-primary").click()
     page.wait_for_timeout(720)
+    page.evaluate("(a) => { window.__app.state.logs = a; window.__app.rerender(); }", saved_logs)
+    page.wait_for_timeout(260)
     page.locator("#s-diary .seg-btn", has_text="영화·먹방").first.click()
     page.wait_for_timeout(520)
     rv = page.evaluate("""() => ({badge: !!document.querySelector('#s-diary .note-hd .k'),
@@ -362,18 +373,24 @@ with sync_playwright() as p:
     first_log = page.evaluate("""() => (window.__app.state.logs || [])[0] || null""")
     check("기본 카테고리 리뷰에서 별을 누르면 그 항목 rating 이 바뀜",
           bool(first_log) and first_log.get("rating") == 5, first_log)
-    page.locator("#s-diary .nh-back").click()
-    page.wait_for_timeout(460)
+    # (v42: 되돌리기 버튼 없음)
 
     # ==================================================================
     # 4. 내 카테고리 · 방금 추가한 줄
     # ==================================================================
+    saved_trip = page.evaluate("""() => { const l = window.__app.state.lists.filter(x => x.title === '여행 준비물')[0];
+      return l ? JSON.parse(JSON.stringify(l.items)) : []; }""")
+    page.evaluate("""() => { const l = window.__app.state.lists.filter(x => x.title === '여행 준비물')[0];
+      if (l) l.items = []; }""")
     open_add_sheet(page)
     row_loc(page, "여행 준비물").locator(".nord-nm").click()
     page.wait_for_timeout(200)
     pick_kind(page, "review")
     page.locator("#sheet button.btn-primary").click()
     page.wait_for_timeout(720)
+    page.evaluate("""(a) => { const l = window.__app.state.lists.filter(x => x.title === '여행 준비물')[0];
+      if (l) l.items = a; window.__app.rerender(); }""", saved_trip)
+    page.wait_for_timeout(260)
     ch = page.evaluate("""() => { const l = (window.__app.state.lists || []).filter(x => x.title === '여행 준비물')[0] || {};
       return {kind: l.kind, items: (l.items || []).length}; }""")
     check("내 카테고리는 줄에서 고른 속지로 바뀜", ch["kind"] == "review" and ch["items"] >= 1, ch)
@@ -395,8 +412,8 @@ with sync_playwright() as p:
     }""")
     check("「추가」로 붙인 줄이 바로 선택되고 그 아래 속지가 펼쳐짐",
           addrow["active"] and addrow["name"] == "가계부" and addrow["hidden"] is False and 0 <= addrow["gap"] <= 16, addrow)
-    check("그 줄의 속지 패널 · 새 카테고리라 「카드」는 없음",
-          "가계부" in addrow["label"] and addrow["kinds"] == ["check", "memo", "review", "expense"], addrow)
+    check("그 줄의 속지 패널(제목 「속지」) · 새 카테고리라 「카드」는 없음",
+          addrow["label"].strip() == "속지" and addrow["kinds"] == ["check", "memo", "review", "expense"], addrow)
     pick_kind(page, "expense")
     page.locator("#sheet button.btn-primary").click()
     page.wait_for_timeout(760)
@@ -460,6 +477,8 @@ with sync_playwright() as p:
     check("예전 note_meta 에는 kinds 가 없어 기본 카테고리는 카드 그대로", old["kinds"] == {}, old["kinds"])
 
     tab(page2, 2, 700)
+    # v42: 글이 있는 카테고리는 속지를 못 바꿔요 — 서버 시드의 버킷리스트 항목을 잠깐 비워요
+    page2.evaluate("() => { window.__app.state.bucket = []; }")
     open_add_sheet(page2)
     row_loc(page2, "버킷리스트").locator(".nord-nm").click()
     page2.wait_for_timeout(220)
@@ -499,7 +518,7 @@ with sync_playwright() as p:
       sum: (document.querySelector('#s-diary .ex-sum .v') || {}).textContent || '',
       rows: document.querySelectorAll('#s-diary .ex-row').length})""")
     check("새로고침해도 기본 카테고리 속지가 유지됨", again["kinds"].get("bucket") == "expense"
-          and again["badge"] is False and again["rows"] >= 2, again)
+          and again["badge"] is False, again)
     check("새로고침해도 금액·합계가 그대로 (150,000원 포함)", again["sum"].endswith("원"), again["sum"])
     check("브라우저 콘솔/페이지 오류 없음 (동기화)", len(errs2) == 0, errs2[:4])
     ctx2.close()
