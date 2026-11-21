@@ -4,7 +4,7 @@
 2) 한 날/한 주에 일정이 2개 이상이면 막대가 세로·가로로 떨어져 또렷하게 보임 (세 줄까지 펼침)
 3) 일정 추가 시트 — 큰 날짜와 시간 글씨 크기가 «완전히 같고», 물결(~)은 더 큼
 4) 노트 카드 제목 — 얇게(400) · 가운데 정렬
-5) My 탭 맨 윗줄 「버전 v36」 · sw.js 캐시 twolog-v36
+5) My 탭 맨 윗줄 「버전 v37」 · sw.js 캐시 twolog-v37
 
     python3 tests/v23.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
 """
@@ -83,11 +83,11 @@ with sync_playwright() as p:
 
     # ---------------- 0. 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
-    check("sw.js 캐시 버전 twolog-v36", 'const VERSION = "twolog-v36"' in sw,
+    check("sw.js 캐시 버전 twolog-v37", 'const VERSION = "twolog-v37"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
     app_js = page.request.get(URL + "app.js").text()
-    check("app.js 버전 상수 v36", 'var APP_VERSION = "v36"' in app_js)
-    check("캐시 목록이 새 버전(shell-twolog-v36)", "shell-" in sw)
+    check("app.js 버전 상수 v36", 'var APP_VERSION = "v37"' in app_js)
+    check("캐시 목록이 새 버전(shell-twolog-v37)", "shell-" in sw)
 
     # 예시 데이터로 상태를 만들고 일반 모드로
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -342,7 +342,7 @@ with sync_playwright() as p:
       return {ok: !!v, txt: v ? v.textContent.trim() : null,
               right: v ? window.innerWidth - v.getBoundingClientRect().right : null};
     })()""")
-    check("My 탭에 버전 v36 표시", my.get("ok") and "v36" in str(my.get("txt")), my.get("txt"))
+    check("My 탭에 버전 v37 표시", my.get("ok") and "v37" in str(my.get("txt")), my.get("txt"))
     page.wait_for_timeout(400)
     page.screenshot(path=os.path.join(SHOT, "my-v23.png"))
 
@@ -495,20 +495,20 @@ with sync_playwright() as p:
     page.locator('#s-photo [data-act="pcalNext"]').click()
     page.wait_for_timeout(450)
 
-    # 좌우로 밀어서 달 넘기기
+    # v37: 위아래로 밀어서 달 넘기기 (위로 밀면 다음 달)
     sw = page.evaluate("""(() => {
-      const g = document.querySelector('#s-photo .pcal-grid');
+      const g = document.querySelector('#s-photo .pcal');
       const before = document.querySelector('#s-photo .pcal-ym').textContent.trim();
-      const t = (x) => new Touch({identifier: 1, target: g, clientX: x, clientY: 400});
+      const t = (y) => new Touch({identifier: 1, target: g, clientX: 200, clientY: y});
       g.dispatchEvent(new TouchEvent('touchstart', {bubbles: true, cancelable: true,
-        touches: [t(320)], changedTouches: [t(320)]}));
+        touches: [t(560)], changedTouches: [t(560)]}));
       g.dispatchEvent(new TouchEvent('touchend', {bubbles: true, cancelable: true,
-        touches: [], changedTouches: [t(150)]}));
+        touches: [], changedTouches: [t(380)]}));
       return before;
     })()""")
     page.wait_for_timeout(500)
     after_sw = page.evaluate("document.querySelector('#s-photo .pcal-ym').textContent.trim()")
-    check("손가락으로 밀어 다음 달", after_sw != sw, (sw, after_sw))
+    check("손가락으로 위로 밀어 다음 달", after_sw != sw, (sw, after_sw))
     page.locator('#s-photo [data-act="pcalPrev"]').click()
     page.wait_for_timeout(450)
 

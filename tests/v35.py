@@ -1,6 +1,6 @@
 """투로그 v35 확인 — 화면 모드·컬러·폰트는 각자 폰에서만 (커플 동기화에서 분리).
 
-1) 버전: sw.js 캐시 twolog-v36 · APP_VERSION v35 · My 탭 「버전 v36」
+1) 버전: sw.js 캐시 twolog-v37 · APP_VERSION v35 · My 탭 「버전 v37」
 2) 내 폰에서 다크 모드 · 페이지 캡션 색 · 홈 제목 색 · 일정 색 · 폰트를 바꾸면
    - 바로 화면에 적용되고, `twolog:v1:localTheme` 에 저장되고,
    - 새로고침(앱을 다시 열어도)해도 그대로 유지됨
@@ -178,11 +178,11 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     sync_js = page.request.get(URL + "sync.js").text()
-    check("sw.js 캐시 버전 twolog-v36", 'const VERSION = "twolog-v36"' in sw,
+    check("sw.js 캐시 버전 twolog-v37", 'const VERSION = "twolog-v37"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v36", 'var APP_VERSION = "v36"' in app_js,
+    check("app.js 버전 상수 v36", 'var APP_VERSION = "v37"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v36", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v37", 'const SHELL = "shell-" + VERSION' in sw)
     check("sync.js 는 테마(theme) 행을 올리지 않음",
           'key: "theme"' not in sync_js, [l.strip() for l in sync_js.splitlines() if 'key: "theme"' in l][:2])
 
@@ -253,7 +253,7 @@ with sync_playwright() as p:
     # ==================================================================
     tab(page, 4, 550)
     ver = page.evaluate("((document.querySelector('#s-set .app-ver') || {}).textContent || '').trim()")
-    check("My 탭 맨 위에 「버전 v36」", ver == "버전 v36", ver)
+    check("My 탭 맨 위에 「버전 v37」", ver == "버전 v37", ver)
     my_txt = page.locator("#s-set").inner_text()
     check("My 꾸미기 아래에 이 폰에만 저장 안내", "이 폰에만 저장돼요" in my_txt,
           [l for l in my_txt.split("\n") if "폰" in l][:3])

@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v36";
+  var APP_VERSION = "v37";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -51,6 +51,9 @@
     pencil: svg('<path d="M4.5 19.5h3.6l9.7-9.7-3.6-3.6-9.7 9.7z"/><path d="M15.1 4.7l2.3-2.3 3.6 3.6-2.3 2.3"/>', 15),
     left: svg('<path d="M14.5 6l-6 6 6 6"/>', 18),
     right: svg('<path d="M9.5 6l6 6-6 6"/>', 18),
+    /* v37: 사진첩 달력은 달을 위아래로 넘겨요 — 위로 밀면 다음 달, 아래로 밀면 지난 달 */
+    up: svg('<path d="M6 14.5l6-6 6 6"/>', 18),
+    down: svg('<path d="M6 9.5l6 6 6-6"/>', 18),
     check: svg('<path d="M5 12.6l4.2 4.2L19 7"/>', 13),
     palette: svg('<path d="M12 3.4a8.6 8.6 0 1 0 0 17.2c1.1 0 1.9-.8 1.9-1.8 0-.9-.6-1.4-.6-2.1 0-.8.7-1.4 1.5-1.4h1.4a4.3 4.3 0 0 0 4.3-4.3c0-4.2-3.7-7.6-8.5-7.6z"/><circle cx="8.3" cy="9.8" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.8" r="1" fill="currentColor" stroke="none"/><circle cx="15.7" cy="9.7" r="1" fill="currentColor" stroke="none"/>', 17),
     gear: svg('<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="1.9"/><circle cx="9" cy="12" r="1.9"/><circle cx="17.5" cy="17" r="1.9"/>', 21),
@@ -1422,11 +1425,12 @@
     S.ui.seg = seg;
 
     var html = "";
-    /* v29: 맨 윗줄 오른쪽의 네모 설정 버튼을 지우고, 그 자리에 새 카테고리 탭 추가 + (동그란) 를 둡니다.
+    /* v29: 맨 윗줄 오른쪽의 네모 설정 버튼을 지우고, 그 자리에 새 카테고리 탭 추가 + 를 둡니다.
+       v37: 동그란 점선 테두리를 걷어내고 ＋ 하나만 — 터치 영역은 44px 그대로.
        탭 이름 바꾸기(노트 설정)는 「📖 노트」 제목을 꾹 눌러 엽니다. */
     html += '<header class="hdr' + capCls("diary") + '"' + capStyle("diary") + ' data-pg="diary"><div>' +
       '<h1 class="note-h1" title="꾹 누르면 탭 이름을 바꿀 수 있어요"><span class="eh">📖</span> 노트</h1></div>' +
-      '<div class="hdr-acts"><button type="button" class="round-btn note-add" data-act="newList" aria-label="새 카테고리 탭 추가" title="새 카테고리 탭 추가">' + IC.plus + "</button></div></header>";
+      '<div class="hdr-acts"><button type="button" class="note-add" data-act="newList" aria-label="새 카테고리 탭 추가" title="새 카테고리 탭 추가">' + IC.plus + "</button></div></header>";
     html += '<div class="segs note-segs">';
     /* v34: 기본 탭과 내가 만든 카테고리를 저장된 순서 그대로 한 줄에 — ≡ 로 옮긴 순서가 여기 그대로 보입니다 */
     noteOrderList().forEach(function (k) {
@@ -1778,9 +1782,8 @@
     return '<span class="' + cls + '" data-capid="' + p.id + '" style="background:' + capBg(p) + '">' + esc(p.title || "") + "</span>";
   }
 
-  /* 사진첩 v17: 날짜별(최신순) 묶음 + 살짝 기운 폴라로이드 프레임 — IMG_4511 레이아웃 */
-  var POLA_TILT = ["-3deg", "2deg", "-1.5deg", "3deg"];
-  var PHOTOS_PER_DAY = 3;   /* v18: 하루에 보이는 폴라로이드는 3개까지 */
+  /* 사진첩 v17: 날짜별(최신순) 묶음 · v37: 날짜마다 정사각형 사진 3열 (폴라로이드 틀은 걷어냈습니다) */
+  var PHOTOS_PER_DAY = 3;   /* v18: 하루에 보이는 사진은 3장까지 */
   function photoDayLabel(day) {
     var d = parse(day);
     if (day === today) return '<span class="d acc">오늘</span>';
@@ -1789,8 +1792,9 @@
       '<span class="w">· ' + WD[d.getDay()] + '요일</span>';
   }
 
-  /* v23: 사진첩 달력 보기 — 한 달만 보이고 화살표·좌우 밀기로 달을 넘깁니다.
-     날짜 칸은 그날 대표 사진으로 가득 차고, 왼쪽 위 날짜 · 오른쪽 아래 장수가 붙어요. */
+  /* v23: 사진첩 달력 보기 — 한 달만 보이고 화살표·밀어서 달을 넘깁니다.
+     날짜 칸은 그날 대표 사진으로 가득 차고, 왼쪽 위 날짜 · 오른쪽 아래 장수가 붙어요.
+     v37: 칸은 정사각형, 달은 위아래로 넘깁니다(위로 밀면 다음 달 · 아래로 밀면 지난 달). */
   function photoMonthYM() {
     var ym = String((S.ui && S.ui.photoMonth) || "");
     return /^\d{4}-\d{2}$/.test(ym) ? ym : today.slice(0, 7);
@@ -1819,8 +1823,8 @@
     var h = '<div class="pcal"><div class="pcal-hd">' +
       '<div class="pcal-ym" aria-label="' + y + "년 " + m + '월">' + y + "년 " + m + '월</div>' +
       '<div class="pcal-nav">' +
-      '<button type="button" class="cal-arrow" data-act="pcalPrev" aria-label="이전 달">' + IC.left + "</button>" +
-      '<button type="button" class="cal-arrow" data-act="pcalNext" aria-label="다음 달">' + IC.right + "</button>" +
+      '<button type="button" class="cal-arrow" data-act="pcalPrev" aria-label="지난 달" title="지난 달">' + IC.down + "</button>" +
+      '<button type="button" class="cal-arrow" data-act="pcalNext" aria-label="다음 달" title="다음 달">' + IC.up + "</button>" +
       "</div></div>" +
       '<div class="pcal-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>' +
       '<div class="pcal-grid" data-pcal="1" data-rows="' + (cells.length / 7) + '">';
@@ -1844,30 +1848,8 @@
     return h;
   }
 
-  /* v24: 사진 달력 칸 높이 — 화면의 세로 여유를 재서 5주·6주 달력이 탭바 바로 위까지 차도록 잡아요.
-     폭보다 세로로 길게(폭의 최대 2배) 키우되, 그 이상은 사진이 길쭉해져서 멈춥니다. */
-  function fitPhotoCal() {
-    var scr = $("#s-photo");
-    if (!scr) return;
-    var grid = scr.querySelector(".pcal-grid");
-    if (!grid || grid.children.length < 7) return;
-    var host = $("#screens");
-    var rows = Math.round(grid.children.length / 7);
-    var gBox = grid.getBoundingClientRect();
-    var hostBox = host ? host.getBoundingClientRect() : null;
-    var top = gBox.top - (hostBox ? hostBox.top : 0) + (host ? host.scrollTop : 0);
-    var room = (host ? host.clientHeight : window.innerHeight) - top - 12;
-    var gap = parseFloat(getComputedStyle(grid).rowGap) || 4;
-    var colW = grid.children[0] ? grid.children[0].getBoundingClientRect().width : 0;
-    var byRoom = (room - gap * (rows - 1)) / rows;
-    var h = Math.round(Math.min(Math.max(byRoom, 76), Math.max(82, colW * 2)));
-    /* 사진이 하나도 없는 달은 칸을 조금만 키워 「이 달에 담은 사진이 없어요」가 화면 안에 보이게 */
-    if (scr.querySelector(".pcal-empty")) h = Math.min(h, 76);
-    grid.style.setProperty("--pcell-h", h + "px");
-  }
-  window.addEventListener("resize", function () {
-    if (current === "photo") fitPhotoCal();
-  });
+  /* v37: 사진 달력 칸은 정사각형(aspect-ratio) — 예전처럼 화면 세로 여유를 재서 높이를 잡지 않습니다.
+     폭에 맞춰 칸이 스스로 정사각형이 되므로 따로 계산할 것이 없어요. */
 
   function renderPhoto() {
     /* v21: 사진첩은 제목·「N장의 순간」 없이 오른쪽 + 버튼만 — 상단 여백도 군더더기 없이 */
@@ -1882,41 +1864,51 @@
     if (pcOn) {
       h += photoCalHtml();
       $("#s-photo").innerHTML = h;
-      fitPhotoCal();
       return;
     }
-    /* 앨범 대신 날짜로 묶어요 — 하루에 담은 순간이 한 줄에 모입니다 */
+    /* 앨범 대신 날짜로 묶어요 — 하루에 담은 순간이 한 줄에 모입니다
+       v37: 기본 사진첩은 «이번 달» 사진 중 가장 최근 날짜부터 3일치만.
+       지난 달 사진은 오른쪽 위 달력 아이콘으로 달력을 열어 위아래로 넘겨 봅니다. */
+    var thisYm = today.slice(0, 7);
     var groups = [];
     var map = {};
     S.photos.slice().sort(byDateDesc).forEach(function (p) {
       var k = String(p.date || "").slice(0, 10);
+      if (k.slice(0, 7) !== thisYm) return;
       if (!map[k]) { map[k] = { date: k, items: [] }; groups.push(map[k]); }
       map[k].items.push(p);
     });
+    groups = groups.slice(0, 3);   /* v37: 가장 최근 사진 날짜부터 3일치만 */
+    var daysHtml = "";
     groups.forEach(function (g) {
-      /* 그날 사진이 모두 한 앨범이면 오른쪽에 앨범 이름을 함께 적어요 */
-      var albums = [];
-      g.items.forEach(function (p) { var a = String(p.album || "").trim(); if (a && albums.indexOf(a) < 0) albums.push(a); });
-      var meta = g.items.length + "장" + (albums.length === 1 ? " · " + esc(albums[0]) : "");
-      /* v18: 하루는 폴라로이드 3개까지 — 넘치면 세 번째에 +N, 눌러서 그날 사진을 모두 봐요 */
+      /* v37: 날짜 옆에는 장수를 매번 적지 않고, 3장을 넘길 때만 「+N장」 */
+      var rest = g.items.length - PHOTOS_PER_DAY;
+      var meta = rest > 0 ? "+" + rest + "장" : "";
+      /* v18: 하루는 사진 3장까지 — 넘치면 세 번째에 +N, 눌러서 그날 사진을 모두 봐요 */
       var shown = g.items.slice(0, PHOTOS_PER_DAY);
-      var rest = g.items.length - shown.length;
-      h += '<div class="pday"><div class="pday-hd">' + photoDayLabel(g.date) +
-        '<span class="c">' + meta + "</span></div>" +
+      daysHtml += '<div class="pday"><div class="pday-hd">' + photoDayLabel(g.date) +
+        (meta ? '<span class="c">' + meta + "</span>" : "") + "</div>" +
         '<div class="polas">' +
         shown.map(function (p, i) {
           var more = (rest > 0 && i === shown.length - 1) ? '<span class="pola-more">+' + rest + "</span>" : "";
-          return '<button class="pola" style="--tilt:' + POLA_TILT[i % POLA_TILT.length] + '" data-act="openPhoto" data-id="' + p.id +
+          /* v37: 흰 틀·기울기 없이 사진만 꽉 채운 정사각형 칸 — 캡션이 있으면 사진 아래 한 줄 */
+          return '<button class="pola" data-act="openPhoto" data-id="' + p.id +
             '" aria-label="' + esc(p.title || p.album || "사진") + ' 열기">' +
             '<span class="pola-pic">' + photoImg(p) + more + "</span>" +
-            '<span class="pola-chin' + (p.capBg ? " tinted" : "") + '"' + (p.capBg ? ' style="background:' + esc(p.capBg) + '"' : "") + ">" +
-            esc(p.title || "") + "</span></button>";
+            (p.title ? '<span class="pola-chin' + (p.capBg ? " tinted" : "") + '"' +
+              (p.capBg ? ' style="background:' + esc(p.capBg) + '"' : "") + ">" +
+              esc(p.title) + "</span>" : "") + "</button>";
         }).join("") + "</div></div>";
     });
-    if (!S.photos.length) {
-      h += '<div class="album"><div class="list" style="margin:0"><div class="empty">아직 사진이 없어요.<br>오른쪽 위 <b>+</b> 로 이 순간을 담아 보세요.</div></div></div>';
+    if (!groups.length) {
+      daysHtml += '<div class="album"><div class="list" style="margin:0"><div class="empty">' +
+        (S.photos.length
+          ? "이번 달에 담은 사진이 없어요.<br>지난 사진은 오른쪽 위 달력에서 볼 수 있어요."
+          : "아직 사진이 없어요.<br>오른쪽 위 <b>+</b> 로 이 순간을 담아 보세요.") +
+        "</div></div></div>";
     }
-    h += '<div style="height:24px"></div>';
+    /* v37: 사진이 적을 때는 화면 가운데, 많아 화면을 넘기면 위에서부터 자연스럽게 스크롤 */
+    h += '<div class="pbody"><div class="pdays">' + daysHtml + "</div></div>";
     $("#s-photo").innerHTML = h;
   }
 
@@ -1957,6 +1949,7 @@
   function closeSheet() {
     personSheetWho = null;
     openCard = null;
+    photoView = null;   /* v37: 사진 크게 보기를 닫으면 보던 목록도 끝 — 달력 밀기·사진 넘기기가 남아 있지 않게 */
     sheetWrap.classList.remove("sheet-center");
     sheet.style.maxHeight = "";
     sheetWrap.classList.remove("open");
@@ -3657,6 +3650,9 @@
     /* v34: 노트 탭으로 들어올 때는 늘 「메모」부터 — 다른 탭에서 고른 노트 탭은
        노트 화면에 머무는 동안만 유지돼요 (v28 캘린더와 같은 방식). */
     if (name === "diary" && current !== "diary" && !(opts && opts.keepSeg)) S.ui.seg = "todo";
+    /* v37: 사진첩으로 들어올 때는 늘 기본 사진 화면부터 — 달력 보기는 달력 아이콘을
+       눌렀을 때만 열리고, 다른 탭에 갔다 오거나 앱을 다시 켜면 다시 목록으로 돌아와요. */
+    if (name === "photo" && current !== "photo") S.ui.photoCal = false;
     current = name;
     showScreen(name);
     $("#screens").scrollTop = 0;
@@ -4666,12 +4662,13 @@
     if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) photoStep(dx < 0 ? 1 : -1);
   }, { passive: true });
 
-  /* v23: 사진첩 달력에서도 손가락으로 좌우로 밀면 이전/다음 달 */
+  /* v23: 사진첩 달력에서도 손가락으로 밀면 달을 넘깁니다 (v37: 좌우 → 위아래)
+     위로 밀면 다음 달, 아래로 밀면 지난 달. 탭(날짜 열기)·가로 움직임은 그대로 둡니다. */
   var pcalSwipe = null, pcalSwiped = false;
   document.addEventListener("touchstart", function (ev) {
     pcalSwipe = null;
     if (current !== "photo" || photoView || !(S.ui && S.ui.photoCal)) return;
-    var g = ev.target.closest && ev.target.closest("#s-photo .pcal-grid");
+    var g = ev.target.closest && ev.target.closest("#s-photo .pcal");
     if (!g || !ev.touches || !ev.touches.length) return;
     pcalSwipe = { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
   }, { passive: true });
@@ -4680,10 +4677,10 @@
     var t = ev.changedTouches[0];
     var dx = t.clientX - pcalSwipe.x, dy = t.clientY - pcalSwipe.y;
     pcalSwipe = null;
-    if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
+    if (Math.abs(dy) < 45 || Math.abs(dy) < Math.abs(dx) * 1.3) return;
     pcalSwiped = true;
     setTimeout(function () { pcalSwiped = false; }, 400);
-    S.ui.photoMonth = shiftYm(photoMonthYM(), dx < 0 ? 1 : -1);
+    S.ui.photoMonth = shiftYm(photoMonthYM(), dy < 0 ? 1 : -1);
     save(); renderPhoto();
   }, { passive: true });
   /* 밀어서 달을 넘긴 직후의 click 은 날짜 열기로 이어지지 않게 */

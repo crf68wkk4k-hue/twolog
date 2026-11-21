@@ -1,6 +1,6 @@
 """투로그 v28 확인 — 캘린더는 열 때 이번 달 · 일정 시트 날짜+요일 · 하단 일정 수정 · 노트 + 탭 추가.
 
-1) 버전: sw.js 캐시 twolog-v36 · APP_VERSION v36
+1) 버전: sw.js 캐시 twolog-v37 · APP_VERSION v36
 2) 앱을 새로 켜면(새로고침) 저장해 둔 지난달 대신 이번 달로
 3) 탭에서 캘린더로 들어오면 이번 달 + 오늘 날짜 (다른 달 → 다른 탭 → 돌아오면 이번 달)
 4) 달 안에서 화살표·손가락 밀기로 넘기는 이동은 그대로 (그 달에 머무는 동안 유지)
@@ -170,11 +170,11 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v36", 'const VERSION = "twolog-v36"' in sw,
+    check("sw.js 캐시 버전 twolog-v37", 'const VERSION = "twolog-v37"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v36", 'var APP_VERSION = "v36"' in app_js,
+    check("app.js 버전 상수 v36", 'var APP_VERSION = "v37"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v36", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v37", 'const SHELL = "shell-" + VERSION' in sw)
 
     # ==================================================================
     # 2. 앱을 새로 켜면 이번 달 (저장된 지난달은 무시)
@@ -511,10 +511,13 @@ with sync_playwright() as p:
               pillsTrunc: Array.from(document.querySelectorAll('#s-diary .segs .seg-btn'))
                 .some(e => e.scrollWidth > e.clientWidth + 1)};
     }""")
-    check("노트에 동그란 + 버튼이 있음", nb["ok"] and nb["act"] == "newList", nb)
-    check("+ 버튼이 완전한 동그라미(50%)", "50%" in str(nb["radius"]), nb["radius"])
+    check("노트에 + 버튼이 있음", nb["ok"] and nb["act"] == "newList", nb)
+    # v37: 동그란 점선 테두리를 걷어내고 ＋ 아이콘만
+    check("+ 버튼은 테두리·동그라미 없이 (v37)", nb["radius"] in ("0px", "0") and nb["border"] in ("none", ""),
+          (nb["radius"], nb["border"]))
     # v29: + 는 알약 탭 아래가 아니라 맨 윗줄(📖 노트) 오른쪽 — 예전 네모 설정 버튼 자리
-    check("+ 버튼은 알약 탭 위 맨 윗줄 오른쪽", nb["abovePills"] and nb["sameRow"] and abs(nb["right"] - 20) <= 1,
+    # v37: 터치 영역을 44px로 넓히며 바깥 상자 오른쪽 끝이 17px (＋ 아이콘은 28px)
+    check("+ 버튼은 알약 탭 위 맨 윗줄 오른쪽", nb["abovePills"] and nb["sameRow"] and abs(nb["right"] - 17) <= 1,
           (nb["abovePills"], nb["sameRow"], nb["right"]))
     check("네모 설정 버튼은 사라짐", nb["gear"] is False, nb["gear"])
     check("+ 버튼 아이콘은 목록+ 모양", nb["svg"])
