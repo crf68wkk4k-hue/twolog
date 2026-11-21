@@ -529,6 +529,29 @@ with sync_playwright() as p:
     check("메모 목록 바탕에 모눈 격자(linear-gradient)", "linear-gradient" in (memo["bg"] or ""), (memo["bg"] or "")[:60])
     page3.screenshot(path=os.path.join(SHOT, "note-v40-grid-memo.png"))
 
+    # 사진 한 장 붙이기 (선택) — 고르면 카드 아래에 함께 보여요
+    memo_jpg = "/tmp/v40-memo.jpg"
+    with open(memo_jpg, "wb") as _f:
+        _f.write(bytes.fromhex(
+            "ffd8ffe000104a46494600010100000100010000ffdb004300080606070605080707070909080a0c140d0c0b0b0c191213"
+            "0f141d1a1f1e1d1a1c1c20242e2720222c231c1c2837292c30313434341f27393d38323c2e333432ffc0000b08000100"
+            "0101011100ffc4001f0000010501010101010100000000000000000102030405060708090a0bffc400b5100002010303"
+            "020403050504040000017d01020300041105122131410613516107227114328191a1082342b1c11552d1f02433627282"
+            "090a161718191a25262728292a3435363738393a434445464748494a535455565758595a636465666768696a73747576"
+            "7778797a838485868788898a92939495969798999aa2a3a4a5a6a7a8a9aab2b3b4b5b6b7b8b9bac2c3c4c5c6c7c8c9"
+            "cad2d3d4d5d6d7d8d9dae1e2e3e4e5e6e7e8e9eaf1f2f3f4f5f6f7f8f9faffda0008010100003f00fbfcffd9"))
+    page3.locator("#s-diary .nmemo-card").first.click()
+    page3.wait_for_timeout(560)
+    page3.set_input_files("#memoImgIn", [memo_jpg])
+    page3.wait_for_timeout(900)
+    page3.locator("#sheet button.btn-primary").click()
+    page3.wait_for_timeout(750)
+    pimg = page3.evaluate("""() => { const l = window.__app.state.lists.filter(x => x.title === '오늘의 기록')[0] || {items: []};
+      return {img: String((l.items[0] || {}).img || '').slice(0, 20),
+              shown: document.querySelectorAll('#s-diary .nmemo-photo').length}; }""")
+    check("모눈 메모에 사진 한 장을 붙이면 카드 아래에 보임",
+          pimg["img"].startswith("data:image") and pimg["shown"] == 1, pimg)
+
     # 다크 모드에서도 모눈 결이 보임
     page3.evaluate("document.documentElement.setAttribute('data-mode', 'dark')")
     page3.wait_for_timeout(350)
