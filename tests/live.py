@@ -50,7 +50,7 @@ with sync_playwright() as p:
     sw = page.request.get(LIVE + "sw.js").text()
     check("라이브 sw.js 가 twolog-v37", 'const VERSION = "twolog-v37"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:1])
-    check("라이브 app.js 가 v36", 'var APP_VERSION = "v37"' in page.request.get(LIVE + "app.js").text())
+    check("라이브 app.js 가 v37", 'var APP_VERSION = "v37"' in page.request.get(LIVE + "app.js").text())
 
     page.goto(LIVE, wait_until="domcontentloaded")
     page.wait_for_selector("#s-login .login", timeout=25000)
