@@ -1,6 +1,6 @@
 """투로그 v29 확인 — 노트 맨 윗줄의 네모 설정 버튼을 지우고 그 자리에 동그란 +, 알약 탭은 조금 작게.
 
-1) 버전: sw.js 캐시 twolog-v37 · APP_VERSION v36
+1) 버전: sw.js 캐시 twolog-v38 · APP_VERSION v38
 2) 노트 맨 윗줄(📖 노트) 오른쪽에 동그란 점선 + 가 있고, 누르면 「새 카테고리」 시트가 열림
 3) 예전 네모 설정 버튼(톱니 아이콘)은 사라짐 — 알약 탭 아래 칩 줄에도 + 는 없음
 4) 알약 탭(메모·버킷리스트·영화·먹방)이 조금 작아짐: 높이 40px · 글씨 14px · 글씨 잘림 없음
@@ -184,11 +184,11 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check("sw.js 캐시 버전 twolog-v37", 'const VERSION = "twolog-v37"' in sw,
+    check("sw.js 캐시 버전 twolog-v38", 'const VERSION = "twolog-v38"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v36", 'var APP_VERSION = "v37"' in app_js,
+    check("app.js 버전 상수 v38", 'var APP_VERSION = "v38"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v37", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v38", 'const SHELL = "shell-" + VERSION' in sw)
     check("예전 칩 줄 + 스타일(.lst-new)은 남아 있지 않음", ".lst-new" not in css)
 
     # ==================================================================
@@ -222,11 +222,15 @@ with sync_playwright() as p:
     check("알약 탭 3개 그대로", pl["n"] == 3, pl["labels"])
     check("알약 탭 높이 40px (v28 44px)", pl["h"] == 40, pl["h"])
     check("알약 탭 글씨 14px (v28 15.5px)", pl["fs"] == "14px", pl["fs"])
-    check("알약 탭 좌우 여백 7px (v28 8px)", pl["pad"] == "7px", pl["pad"])
+    # v38: 탭은 글자 수에 맞춰 너비가 정해져 좌우 여백이 넉넉해짐
+    check("알약 탭 좌우 여백 16px (v38 글자 수 맞춤)", pl["pad"] == "16px", pl["pad"])
     check("알약 탭 사이 간격 8px 그대로", pl["gap"] == "8px", pl["gap"])
     check("메모·버킷리스트·영화·먹방 글씨가 잘리지 않음", pl["trunc"] is False, pl["labels"])
-    check("알약 탭 세 칸이 화면 폭을 고르게 나눔",
-          abs(pl["w"] * 3 + 8 * 2 + 40 - 390) <= 3, pl["w"])
+    # v38: 화면 폭을 똑같이 나누지 않고 글자 수에 맞춰 너비가 정해짐(최소 72px)
+    widths = page.evaluate("() => [...document.querySelectorAll('#s-diary .note-segs .seg-btn')].map(b => Math.round(b.getBoundingClientRect().width))")
+    check("알약 탭은 글자 수에 맞춰 너비가 정해짐",
+          len(set(widths)) >= 2 and min(widths) >= 70
+          and widths[1] > widths[0], widths)
 
     # ==================================================================
     # 4. + 를 누르면 새 카테고리 탭 시트

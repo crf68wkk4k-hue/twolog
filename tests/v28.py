@@ -1,6 +1,6 @@
 """투로그 v28 확인 — 캘린더는 열 때 이번 달 · 일정 시트 날짜+요일 · 하단 일정 수정 · 노트 + 탭 추가.
 
-1) 버전: sw.js 캐시 twolog-v37 · APP_VERSION v36
+1) 버전: sw.js 캐시 twolog-v38 · APP_VERSION v38
 2) 앱을 새로 켜면(새로고침) 저장해 둔 지난달 대신 이번 달로
 3) 탭에서 캘린더로 들어오면 이번 달 + 오늘 날짜 (다른 달 → 다른 탭 → 돌아오면 이번 달)
 4) 달 안에서 화살표·손가락 밀기로 넘기는 이동은 그대로 (그 달에 머무는 동안 유지)
@@ -170,11 +170,11 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v37", 'const VERSION = "twolog-v37"' in sw,
+    check("sw.js 캐시 버전 twolog-v38", 'const VERSION = "twolog-v38"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v36", 'var APP_VERSION = "v37"' in app_js,
+    check("app.js 버전 상수 v38", 'var APP_VERSION = "v38"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v37", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v38", 'const SHELL = "shell-" + VERSION' in sw)
 
     # ==================================================================
     # 2. 앱을 새로 켜면 이번 달 (저장된 지난달은 무시)
@@ -320,10 +320,18 @@ with sync_playwright() as p:
     }""")
     check("사진첩 달력 보기를 열면 이번 달",
           pcal["grid"] and pcal["ym"] == time.strftime("%Y년 ") + str(int(time.strftime("%m"))) + "월", pcal)
-    page.locator('#s-photo [data-act="pcalNext"]').click()
-    page.wait_for_timeout(450)
-    nxt = page.evaluate("() => document.querySelector('#s-photo .pcal-ym').textContent.trim()")
-    check("사진첩 달력도 화살표로 달 넘김", nxt != pcal["ym"], (pcal["ym"], nxt))
+    # v38: 달력은 세로로 이어진 달력 — 이번 달이 가운데쯤 오도록 스크롤돼 열림
+    stacked = page.evaluate("""() => { const ms = [...document.querySelectorAll('#s-photo .pcal-m')];
+      const box = document.getElementById('screens');
+      const cur = document.querySelector('#s-photo .pcal-m[data-ym="%s"]');
+      const r = cur ? cur.getBoundingClientRect() : null, b = box.getBoundingClientRect();
+      return {months: ms.length, above: ms.filter(m => m.getAttribute('data-ym') < '%s').length,
+              top: r ? Math.round(r.top - b.top) : null, h: Math.round(b.height),
+              nav: document.querySelectorAll('#s-photo .pcal-nav').length}; }""" % (time.strftime("%Y-%m"), time.strftime("%Y-%m")))
+    check("사진첩 달력도 여러 달이 이어지고 이번 달이 가운데쯤",
+          stacked["months"] >= 2 and stacked["nav"] == 0 and stacked["top"] is not None
+          and stacked["top"] <= stacked["h"] * 0.62
+          and (stacked["above"] == 0 or stacked["top"] >= stacked["h"] * 0.18), stacked)
     page.locator('#s-photo [data-act="togglePhotoCal"]').click()
     page.wait_for_timeout(400)
     page.locator('#s-photo [data-act="togglePhotoCal"]').click()

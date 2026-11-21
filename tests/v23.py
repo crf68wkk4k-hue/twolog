@@ -4,7 +4,7 @@
 2) 한 날/한 주에 일정이 2개 이상이면 막대가 세로·가로로 떨어져 또렷하게 보임 (세 줄까지 펼침)
 3) 일정 추가 시트 — 큰 날짜와 시간 글씨 크기가 «완전히 같고», 물결(~)은 더 큼
 4) 노트 카드 제목 — 얇게(400) · 가운데 정렬
-5) My 탭 맨 윗줄 「버전 v37」 · sw.js 캐시 twolog-v37
+5) My 탭 맨 윗줄 「버전 v38」 · sw.js 캐시 twolog-v38
 
     python3 tests/v23.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
 """
@@ -83,11 +83,11 @@ with sync_playwright() as p:
 
     # ---------------- 0. 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
-    check("sw.js 캐시 버전 twolog-v37", 'const VERSION = "twolog-v37"' in sw,
+    check("sw.js 캐시 버전 twolog-v38", 'const VERSION = "twolog-v38"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
     app_js = page.request.get(URL + "app.js").text()
-    check("app.js 버전 상수 v36", 'var APP_VERSION = "v37"' in app_js)
-    check("캐시 목록이 새 버전(shell-twolog-v37)", "shell-" in sw)
+    check("app.js 버전 상수 v38", 'var APP_VERSION = "v38"' in app_js)
+    check("캐시 목록이 새 버전(shell-twolog-v38)", "shell-" in sw)
 
     # 예시 데이터로 상태를 만들고 일반 모드로
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -342,7 +342,7 @@ with sync_playwright() as p:
       return {ok: !!v, txt: v ? v.textContent.trim() : null,
               right: v ? window.innerWidth - v.getBoundingClientRect().right : null};
     })()""")
-    check("My 탭에 버전 v37 표시", my.get("ok") and "v37" in str(my.get("txt")), my.get("txt"))
+    check("My 탭에 버전 v37 표시", my.get("ok") and "v38" in str(my.get("txt")), my.get("txt"))
     page.wait_for_timeout(400)
     page.screenshot(path=os.path.join(SHOT, "my-v23.png"))
 
@@ -430,8 +430,9 @@ with sync_playwright() as p:
       return bs.map(b => { const r = b.getBoundingClientRect();
         return {act: b.getAttribute('data-act'), x: r.left, y: r.top, svg: !!b.querySelector('svg')}; });
     })()""")
-    check("사진첩 + 옆에 달력 아이콘 버튼", len(acts) == 2 and acts[0]["act"] == "togglePhotoCal"
-          and acts[1]["act"] == "addPhoto" and acts[0]["x"] < acts[1]["x"] and abs(acts[0]["y"] - acts[1]["y"]) <= 1,
+    check("사진첩 + 옆에 검색·달력 아이콘 버튼", len(acts) == 3 and acts[0]["act"] == "photoSearch"
+          and acts[1]["act"] == "togglePhotoCal" and acts[2]["act"] == "addPhoto"
+          and acts[0]["x"] < acts[1]["x"] < acts[2]["x"] and abs(acts[0]["y"] - acts[1]["y"]) <= 1,
           acts)
     check("달력 아이콘 버튼에 아이콘 있음", all(a["svg"] for a in acts), acts)
     page.locator('#s-photo [data-act="togglePhotoCal"]').click()
@@ -464,7 +465,8 @@ with sync_playwright() as p:
               nav: !!document.querySelector('#s-photo [data-act="pcalPrev"]') && !!document.querySelector('#s-photo [data-act="pcalNext"]')};
     })()""")
     this_month = time.strftime("%Y년 %-m월")
-    check("사진 달력이 이번 달 한 달만", pc["ym"] == this_month, (pc["ym"], this_month))
+    ym_now = page.evaluate("document.querySelector('#s-photo .pcal-m[data-ym=\"%s\"] .pcal-ym').textContent.trim()" % time.strftime("%Y-%m"))
+    check("이어진 달력 안에 이번 달이 있음", ym_now == this_month, (ym_now, this_month))
     check("달력은 7칸·이번 달 날짜 수만큼", pc["gridCols"] == 7 and pc["cells"] >= 28, (pc["gridCols"], pc["cells"]))
     check("사진 있는 날은 대표 사진이 채워짐", pc["has"] >= 1 and pc["imgs"] == pc["has"],
           (pc["has"], pc["imgs"]))
@@ -476,53 +478,33 @@ with sync_playwright() as p:
           and pc["badgeBR"]["bottom"] <= 8, pc["badgeBR"])
     check("사진 없는 날은 날짜 숫자만", pc["nonPhotoNumsOnly"] == pc["nonPhotoCount"],
           (pc["nonPhotoNumsOnly"], pc["nonPhotoCount"]))
-    check("좌우 화살표 있음", pc["nav"])
+    # v38: 사진 달력은 세로로 이어진 달력 — 화살표 없이 이어서 스크롤
+    check("여러 달이 세로로 이어짐", page.evaluate("document.querySelectorAll('#s-photo .pcal-m').length") >= 2,
+          page.evaluate("document.querySelectorAll('#s-photo .pcal-m').length"))
+    check("위·아래 화살표는 없음", page.evaluate("document.querySelectorAll('#s-photo .pcal-nav, #s-photo .cal-arrow').length") == 0)
     page.wait_for_timeout(400)
     page.screenshot(path=os.path.join(SHOT, "photo-cal-v23.png"))
 
-    # 화살표로 달 넘기기
-    page.locator('#s-photo [data-act="pcalNext"]').click()
-    page.wait_for_timeout(450)
-    nxt = page.evaluate("document.querySelector('#s-photo .pcal-ym').textContent.trim()")
-    check("다으다 달로 넘어감", nxt != this_month and nxt.endswith("월"), nxt)
-    page.locator('#s-photo [data-act="pcalPrev"]').click()
-    page.wait_for_timeout(450)
-    back = page.evaluate("document.querySelector('#s-photo .pcal-ym').textContent.trim()")
-    check("이전 달로 돌아옴", back == this_month, back)
-    page.locator('#s-photo [data-act="pcalPrev"]').click()
-    page.wait_for_timeout(450)
-    page.screenshot(path=os.path.join(SHOT, "photo-cal-v23-prev.png"))
-    page.locator('#s-photo [data-act="pcalNext"]').click()
-    page.wait_for_timeout(450)
-
-    # v37: 위아래로 밀어서 달 넘기기 (위로 밀면 다음 달)
-    sw = page.evaluate("""(() => {
-      const g = document.querySelector('#s-photo .pcal');
-      const before = document.querySelector('#s-photo .pcal-ym').textContent.trim();
-      const t = (y) => new Touch({identifier: 1, target: g, clientX: 200, clientY: y});
-      g.dispatchEvent(new TouchEvent('touchstart', {bubbles: true, cancelable: true,
-        touches: [t(560)], changedTouches: [t(560)]}));
-      g.dispatchEvent(new TouchEvent('touchend', {bubbles: true, cancelable: true,
-        touches: [], changedTouches: [t(380)]}));
-      return before;
-    })()""")
-    page.wait_for_timeout(500)
-    after_sw = page.evaluate("document.querySelector('#s-photo .pcal-ym').textContent.trim()")
-    check("손가락으로 위로 밀어 다음 달", after_sw != sw, (sw, after_sw))
-    page.locator('#s-photo [data-act="pcalPrev"]').click()
-    page.wait_for_timeout(450)
-
     # 날짜 칸을 누르면 그날 사진 크게 보기
     page.locator('#s-photo .pcell.has').first.click()
+    page.wait_for_timeout(600)
+    # v38: 날짜 칸 → 그날 모아보기 → 사진 → 크게 보기
+    dayg = page.evaluate("""(() => ({cells: document.querySelectorAll('#s-photo .dg-cell').length,
+      grid: !!document.querySelector('#s-photo .dgrid')}))()""")
+    check("사진 있는 날을 누르면 그날 모아보기가 열림", dayg["grid"] and dayg["cells"] >= 1, dayg)
+    page.locator("#s-photo .dg-cell").first.click()
     page.wait_for_timeout(600)
     pv = page.evaluate("""(() => {
       const pv = document.querySelector('#sheet .pview');
       return {open: document.getElementById('sheetWrap').classList.contains('open'),
               hasView: !!pv, count: (document.querySelector('#sheet .pv-count') || {}).textContent || null};
     })()""")
-    check("사진 있는 날을 누르면 그날 사진이 열림", pv["open"] and pv["hasView"], pv)
+    check("모아보기에서 사진을 누르면 크게 보기", pv["open"] and pv["hasView"], pv)
     page.locator("#sheet [data-close]").first.click()
     page.wait_for_timeout(400)
+    page.locator('#s-photo [data-act="photoDayBack"]').click()
+    page.wait_for_timeout(500)
+    check("모아보기에서 뒤로 가면 달력으로", page.evaluate("!!document.querySelector('#s-photo .pcal')") is True)
 
     # 목록 보기로 돌아가기
     page.locator('#s-photo [data-act="togglePhotoCal"]').click()

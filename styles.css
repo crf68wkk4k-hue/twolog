@@ -82,7 +82,7 @@ h1,h2,h3,p{margin:0}
 /* v21: 사진첩처럼 제목이 없는 화면의 머리줄 — + 버튼만 남기고 높이를 줄여요 */
 .hdr.hdr-min{align-items:center; padding:8px 20px 0; min-height:40px}
 .hdr.hdr-min .hdr-acts{margin-left:auto}
-/* v37: 사진첩 머리줄은 조금 더 내려서 — 달력·+ 버튼이 화면 꼭대기에 붙지 않게 */
+/* v37: 사진첩 머리줄은 조금 더 내려서 — 달럭·+ 버튼이 화면 꼭대기에 붙지 않게 */
 #s-photo .hdr.hdr-min{padding-top:20px}
 
 /* ---------- header ---------- */
@@ -449,7 +449,7 @@ html[data-mode="dark"] .segs .seg-btn.active{background:var(--ink); border-color
 .pday-hd .c{margin-left:auto; font-size:11px; letter-spacing:-.01em; color:var(--ink-3);
   max-width:54%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 /* 사진 한 줄 — v37: 폴라로이드 틀(흰 프레임·기울기·그림자) 없이, 날짜마다 정사각형 사진 3장.
-   갤러리처럼 사진 사이는 3px만 띄우고, 좌우는 날짜 머리글과 같은 20px */
+   갤러리처럼 사진 사이는 3px만 띄우고, 좌우는 날짜 머리굴과 같은 20px */
 .polas{display:grid; grid-template-columns:repeat(3,1fr); gap:3px; padding:0 20px}
 .pola{position:relative; display:block; padding:0; margin:0; border:0; background:none;
   cursor:pointer; text-align:left; box-shadow:none; border-radius:0; transition:opacity .14s ease}
@@ -886,7 +886,7 @@ html[data-mode="dark"] .lchip.active i{background:#111}
 html[data-mode="dark"] .av{color:#141416}
 html[data-mode="dark"] .hol-badge{color:#EDA491}
 html[data-mode="dark"] .pola .pola-pic svg,html[data-mode="dark"] .pdetail svg{filter:brightness(.88) saturate(.96)}
-/* 캡션 바탕색을 고른 사진은 캡션 줄에 그 색을 깝니다 — 글씨는 늘 진하게 */
+/* 캡션 바탕색을 고른 사진은 캡션 줄에 그 색을 깖니다 — 글씨는 늘 진하게 */
 .pola .pola-chin.tinted{display:inline-block; max-width:100%; padding:2px 6px; color:#111111}
 html[data-mode="dark"] .pola .pola-chin.tinted{color:#111111}
 html[data-mode="dark"] .btag.doing{color:#EDA491}
@@ -1210,7 +1210,7 @@ html[data-mode="dark"] .ncard:active{box-shadow:0 1px 5px rgba(0,0,0,.45), 0 0 0
 /* v21: 카드 위쪽은 꽉 찬 제목 띠 (색을 고르면 그 색, 기본이면 은은한 회색) */
 .nc-hd{display:flex; align-items:center; justify-content:space-between; gap:6px; min-width:0;
   background:var(--surface-2); padding:10px 12px}
-.nc-hd.tint .nc-t{color:#111111}
+.nc-hd .nc-t,.nc-hd.tint .nc-t{color:#111111}   /* v38: 띠 색과 상관없이 검정 제목 */
 /* v22: 카드 제목은 한 단계 작게, 언제나 «한 줄» (길면 …) */
 /* v23: 카드 제목을 얇게(700 → 400) · 가운데 정렬 */
 .nc-t{font-size:13.5px; font-weight:400; letter-spacing:-.02em; line-height:1.3; margin-top:0;
@@ -1393,3 +1393,209 @@ html[data-mode="dark"] .todo-add-btn{background:var(--btn-bg, #F2F2F4); color:va
 .dp-memo{width:100%; border:0; border-bottom:1px solid var(--line-2); background:none; font:inherit; text-align:left; cursor:pointer; color:var(--ink)}
 .dp-memo:active{opacity:.7}
 .dp-memo .dp-n{flex:0 0 auto; font-size:11px; color:var(--ink-3); letter-spacing:-.01em}
+
+/* ==========================================================================
+   v38 — 노트 속지 레이아웃 4종
+   투두리스트 · 줄글 메모 · 별점 리뷰 · 지출·정산
+   + 시트에서는 2×2 미니멀 카드로 고르고, 고른 속지가 그 카테고리 화면이 됩니다.
+   ========================================================================== */
+
+/* --- + 시트: 속지 레이아웃 고르기 --- */
+.nkind-hint{font-size:11px; color:var(--ink-3); line-height:1.6; margin-top:5px}
+.nkind{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px}
+.nk-card{position:relative; display:flex; flex-direction:column; gap:3px; align-items:flex-start;
+  min-height:64px; padding:12px 26px 11px 12px; border:1px solid var(--line); border-radius:0;
+  background:var(--surface); color:var(--ink); text-align:left; cursor:pointer;
+  -webkit-appearance:none; appearance:none; font:inherit}
+.nk-card:active{background:var(--surface-2)}
+.nk-card .nk-n{font-size:13px; font-weight:700; letter-spacing:-.02em; line-height:1.3}
+.nk-card .nk-d{font-size:10.5px; color:var(--ink-3); letter-spacing:-.01em; line-height:1.45; word-break:keep-all}
+.nk-card .nk-ck{position:absolute; top:10px; right:10px; display:flex; color:var(--ink); opacity:0; transition:opacity .12s ease}
+.nk-card .nk-ck svg{width:12px; height:12px}
+.nk-card.active{border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink)}
+.nk-card.active .nk-ck{opacity:1}
+html[data-mode="dark"] .nk-card.active{border-color:#F2F2F4; box-shadow:inset 0 0 0 1px #F2F2F4}
+html[data-mode="dark"] .nk-card .nk-ck{color:#F2F2F4}
+
+/* --- 속지 공통: 맨 위 빠른 추가 한 줄 --- */
+.qadd-list{padding-top:2px}
+.qadd-list .todo-in{padding:10px 0}
+
+/* --- 2) 줄글 메모 --- */
+.memo-list{display:flex; flex-direction:column; gap:8px; margin-top:14px}
+.memo-card{position:relative; padding:13px 14px 9px; border:1px solid var(--line); background:var(--surface); cursor:pointer}
+.memo-card:active{background:var(--surface-2)}
+.memo-card .mc-t{font-size:14.5px; font-weight:700; letter-spacing:-.022em; line-height:1.4; word-break:break-word}
+.memo-card .mc-b{margin-top:5px; font-size:13px; color:var(--ink-2); line-height:1.65;
+  white-space:pre-wrap; word-break:break-word; letter-spacing:-.01em}
+.memo-card .mc-f{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; min-height:20px}
+.memo-card .mc-d{font-size:10.5px; color:var(--ink-3); font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+.memo-card .x,.rv-card .x,.ex-row .x{flex:0 0 24px; width:24px; height:24px; display:flex; align-items:center;
+  justify-content:center; padding:0; border:0; background:none; color:var(--ink-3); opacity:.5; cursor:pointer}
+.memo-card .x:active,.rv-card .x:active,.ex-row .x:active{opacity:1}
+
+/* --- 3) 별점 리뷰 --- */
+.rv-list{display:flex; flex-direction:column; gap:8px; margin-top:14px}
+.rv-card{padding:13px 14px; border:1px solid var(--line); background:var(--surface)}
+.rv-hd{display:flex; align-items:flex-start; gap:8px}
+.rv-t{flex:1 1 auto; min-width:0; font-size:14.5px; font-weight:700; letter-spacing:-.022em;
+  line-height:1.4; word-break:break-word; cursor:pointer}
+.rv-hd .x{margin-top:-2px}
+.rv-stars{display:flex; align-items:center; gap:2px; margin:6px 0 0 -3px}
+.rvs{width:24px; height:24px; display:flex; align-items:center; justify-content:center; padding:0;
+  border:0; background:none; color:var(--line); cursor:pointer; -webkit-appearance:none; appearance:none}
+.rvs svg{width:15px; height:15px}
+.rvs.on{color:var(--accent)}
+.rvs:active{transform:scale(.92)}
+.rv-meta{margin-top:5px; font-size:11.5px; color:var(--ink-3); letter-spacing:0; line-height:1.5; cursor:pointer; font-variant-numeric:tabular-nums}
+.rv-note{margin-top:5px; font-size:12.5px; color:var(--ink-2); line-height:1.6; white-space:pre-wrap;
+  word-break:break-word; letter-spacing:-.01em; cursor:pointer}
+html[data-mode="dark"] .rvs:not(.on){color:#3A3A3E}
+
+/* 별점 고르기 (리뷰 시트) */
+.fstars{display:flex; align-items:center; gap:4px; margin:-2px 0 -2px -4px}
+.fstar{width:34px; height:34px; display:flex; align-items:center; justify-content:center; padding:0;
+  border:0; background:none; color:var(--line); cursor:pointer; -webkit-appearance:none; appearance:none}
+.fstar svg{width:24px; height:24px}
+.fstar.on{color:var(--accent)}
+.fstar:active{transform:scale(.94)}
+html[data-mode="dark"] .fstar:not(.on){color:#3A3A3E}
+.fdate{color-scheme:light}
+html[data-mode="dark"] .fdate{color-scheme:dark}
+
+/* --- 4) 지출·정산 --- */
+.ex-sum{display:flex; align-items:baseline; gap:8px; margin:2px 20px 14px; padding-bottom:12px; border-bottom:1px solid var(--line)}
+.ex-sum .k{font-size:var(--lbl-fs); font-weight:var(--lbl-fw); letter-spacing:-.01em; color:var(--ink-2)}
+.ex-sum .v{font-size:21px; font-weight:800; letter-spacing:-.035em; font-variant-numeric:tabular-nums}
+.ex-sum .c{margin-left:auto; font-size:11px; color:var(--ink-3); font-variant-numeric:tabular-nums}
+.ex-in{flex:0 0 82px; text-align:right; font-variant-numeric:tabular-nums}
+.ex-list{display:flex; flex-direction:column; margin-top:10px}
+.ex-row{display:flex; align-items:center; gap:10px; padding:13px 0; border-bottom:1px solid var(--line-2)}
+.ex-row:last-child{border-bottom:0}
+.ex-b{flex:1 1 auto; min-width:0; cursor:pointer}
+.ex-t{display:block; font-size:14.5px; font-weight:500; letter-spacing:-.015em; word-break:break-word}
+.ex-m{display:block; margin-top:2px; font-size:11.5px; color:var(--ink-3); letter-spacing:-.01em; word-break:break-word}
+.ex-a{flex:0 0 auto; font-size:14px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums}
+
+/* ==========================================================================
+   v38 — 사진 날짜 모아보기(3열) · 화면을 꽉 채우는 크게 보기
+   ========================================================================== */
+
+/* --- 날짜 모아보기 머리줄: ‹ · 날짜 · + --- */
+.dgal-hd{gap:6px}
+.dgal-l{display:flex; align-items:center; gap:4px; min-width:0}
+.dgal-back{width:36px; height:36px; flex:0 0 36px; display:flex; align-items:center; justify-content:center;
+  padding:0; border:0; background:none; color:var(--ink); cursor:pointer; margin-left:-8px}
+.dgal-back:active{opacity:.55}
+.dgal-tt{display:flex; flex-direction:column; gap:1px; min-width:0}
+.dgal-tt h1{font-size:19px; font-weight:800; letter-spacing:-.035em; line-height:1.2;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.dgal-y{font-size:11px; color:var(--ink-3); letter-spacing:-.01em; font-variant-numeric:tabular-nums}
+
+/* --- 총 N장 + 3열 정사각 격자 (사이 2px, 좌우 여백 없이 꽉 차게) --- */
+.dgal{padding:0}
+.dgal-meta{margin:6px 20px 10px; font-size:11.5px; font-weight:600; color:var(--ink-2);
+  letter-spacing:-.01em; font-variant-numeric:tabular-nums}
+.dgrid{display:grid; grid-template-columns:repeat(3, 1fr); gap:2px; width:100%}
+.dg-cell{position:relative; display:block; width:100%; aspect-ratio:1 / 1; padding:0; border:0;
+  background:var(--surface-2); overflow:hidden; cursor:pointer; -webkit-appearance:none; appearance:none}
+.dg-cell img,.dg-cell svg{width:100%; height:100%; display:block; object-fit:cover}
+.dg-cell:active{opacity:.82}
+
+/* --- 크게 보기: 화면을 꽉 채우는 풀스크린 사진 뷰어 --- */
+.sheet-wrap.sheet-full{padding:0}
+.sheet-wrap.sheet-full .backdrop{display:none}
+.sheet-wrap.sheet-full .sheet{top:0; bottom:0; height:100%; max-height:100%; padding:0 0 10px;
+  display:flex; flex-direction:column; border-radius:0}
+.sheet-full .grab{display:none}
+.sheet-full .sheet-hd{padding:12px 16px 8px; gap:12px}
+.sheet-full .sheet-hd h2{font-size:15.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.pv-hl{display:flex; flex-direction:column; gap:2px; min-width:0; flex:1 1 auto}
+.pv-da{font-size:11px; color:var(--ink-3); letter-spacing:-.01em; font-variant-numeric:tabular-nums}
+.sheet-full .pv-x{flex:0 0 auto; width:34px; height:34px; border:0; background:none; color:var(--ink);
+  display:flex; align-items:center; justify-content:center; cursor:pointer}
+.sheet-full .pview{flex:0 0 auto; height:calc(100vh - 232px); min-height:240px; margin:0;
+  background:#0D0D0F; border-radius:0}
+.sheet-full .pview img,.sheet-full .pview svg{width:100%; height:100%; object-fit:contain}
+.sheet-full .pv-count{margin:9px 16px 0}
+.sheet-full .pv-cap{margin:0}
+.pv-bar{display:flex; align-items:center; gap:10px; padding:10px 16px 0; min-height:44px}
+.pv-bar .pv-cap{flex:1 1 auto; min-width:0}
+.pv-bar .photo-tools{flex:0 0 auto; display:flex; gap:6px; margin:0}
+.sheet-full .photo-tools .set-btn{height:36px; padding:0 13px; white-space:nowrap}
+.pv-info{padding:12px 16px 0}
+.pv-memo{margin:10px 16px 0; font-size:12.5px; color:var(--ink-2); line-height:1.65}
+.sheet-full .cp{margin:14px 16px 0}
+.sheet-full .sheet-hd .pv-hl h2{letter-spacing:-.03em}
+
+/* ==========================================================================
+   v38 — 새 카테고리(+ 시트): 「노트 카테고리」 줄만 둥근 모서리(12px)로
+   (추가·속지 카드·저장하기 버튼은 각진 모양 그대로)
+   ========================================================================== */
+.nord-row{border-radius:12px !important}
+
+/* ==========================================================================
+   v38 — 노트 화면 위아래 숨통: 제목 ↔ 카테고리 탭 ↔ 목록 사이를 조금 더 띄움
+   ========================================================================== */
+#s-diary .note-segs{margin-top:20px}     /* 노트 제목(.hdr) 아래 12 → 20px */
+#s-diary .dbody{margin-top:22px}         /* 카테고리 탭 아래 14 → 22px */
+
+/* v38: 노트 탭 줄 — 버튼이 화면 폭을 똑같이 나누지 않고 «글자 수»에 맞춰 너비가 정해져요.
+   글씨는 잘리지 않고(nowrap), 기본 탭은 최소 72px, 넘치면 탭 줄을 옆으로 넘겨 봅니다. */
+#s-diary .note-segs .seg-btn{
+  flex:0 0 auto; width:auto; min-width:72px; padding:0 16px;
+  white-space:nowrap; overflow:visible; text-overflow:clip
+}
+#s-diary .note-segs .lchip{flex:0 0 auto; width:auto; max-width:none; padding:0 14px}
+
+/* ==========================================================================
+   v38 — 사진 추가 시트: 날짜가 맨 위·폭에 맞춤, 고른 사진 줄은 이름 + 「삭제」,
+   목록 위 「추가」로 더 담기 (파일 용량 글씨는 줄에서 뺐어요)
+   ========================================================================== */
+#sheet .up-date{width:100%; box-sizing:border-box; max-width:100%}
+.up-hd{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:4px}
+.up-hd-t{font-size:12px; font-weight:700; color:var(--ink-2); letter-spacing:-.01em}
+.up-hd-t b{font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums}
+.up-add{display:flex; align-items:center; gap:4px; height:32px; padding:0 12px; border:1px solid var(--line);
+  background:var(--surface); color:var(--ink); font-size:12px; font-weight:700; letter-spacing:-.01em; cursor:pointer}
+.up-add svg{width:13px; height:13px}
+.up-add:active{background:var(--surface-2)}
+.up-del{flex:0 0 auto; height:30px; padding:0 10px; border:1px solid var(--line); background:var(--surface);
+  color:var(--accent-deep); font-size:11.5px; font-weight:700; letter-spacing:-.01em; cursor:pointer}
+.up-del:active{background:var(--surface-2)}
+
+/* ==========================================================================
+   v38 — 사진 날짜 태그 + 사진첩 검색
+   ========================================================================== */
+.photo-search svg{width:19px; height:19px}
+.pday-tag{margin-left:6px; height:22px; padding:0 8px; border:1px solid var(--line); background:var(--surface-2);
+  color:var(--ink-2); font-size:10.5px; font-weight:700; letter-spacing:-.01em; cursor:pointer}
+.pday-tag:active{background:var(--surface)}
+.dgal-tag{margin-top:3px; align-self:flex-start; max-width:200px; height:24px; padding:0 9px;
+  border:1px solid var(--line); background:var(--surface); color:var(--ink-3); font-size:11px; font-weight:700;
+  letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer}
+.dgal-tag.on{background:var(--surface-2); color:var(--ink); border-color:var(--line)}
+.dgal-tag:active{opacity:.75}
+
+/* ==========================================================================
+   v38 — 설정 시트 안 입력칸은 네모 상자 대신 «밑줄»로
+   (노트 카테고리 줄 .nord-row 는 둥근 네모 그대로, 그 안 이름칸도 조용히)
+   ========================================================================== */
+#sheet .field{
+  border:0; border-bottom:1px solid var(--line); border-radius:0;
+  background:transparent; height:44px; padding:0 2px
+}
+#sheet .field:focus{border-bottom-color:var(--ink)}
+#sheet textarea.field{height:auto; min-height:76px; padding:10px 2px; line-height:1.55}
+#sheet select.field{border-bottom:1px solid var(--line); background-color:transparent; padding-left:2px}
+#sheet .nord-row .nord-nm{border-bottom:0; height:38px; padding:0 2px}
+#sheet .nt-nm{padding:0 2px}
+
+/* ==========================================================================
+   v38 — 사진첩 달력: 세로로 이어진 달력 (이번 달이 가운데쯤, 위아래로 쭉)
+   ========================================================================== */
+.pcal.pcal-stack{margin:6px 8px 0}
+.pcal-stack .pcal-m{margin-bottom:20px}
+.pcal-stack .pcal-ym{text-align:center; font-size:19px; font-weight:800; letter-spacing:-.03em;
+  padding:6px 0 10px; color:var(--ink); font-variant-numeric:tabular-nums}
+.pcal-stack .pcal-week{padding-bottom:6px}

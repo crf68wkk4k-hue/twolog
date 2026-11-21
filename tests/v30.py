@@ -1,6 +1,6 @@
 """투로그 v30 확인 — 사진첩 폴라로이드를 더 작고 아담하게.
 
-1) 버전: sw.js 캐시 twolog-v37 · APP_VERSION v36
+1) 버전: sw.js 캐시 twolog-v38 · APP_VERSION v38
 2) 사진첩 목록의 폴라로이드 카드가 v29보다 확실히 작아짐
    - 사진 한 칸(정사각) 118.7px → 93.3px, 카드 130.7 → 103.3px, 카드 높이 142.7 → 113.3px
    - 흰 프레임 위·옆 5px, 아래 턱 15px (v29 6px·18px), 캡션 글씨 9px (v29 9.5px)
@@ -139,11 +139,11 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check("sw.js 캐시 버전 twolog-v37", 'const VERSION = "twolog-v37"' in sw,
+    check("sw.js 캐시 버전 twolog-v38", 'const VERSION = "twolog-v38"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v37", 'var APP_VERSION = "v37"' in app_js,
+    check("app.js 버전 상수 v37", 'var APP_VERSION = "v38"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v37", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v38", 'const SHELL = "shell-" + VERSION' in sw)
     check("달력 칸(pcell)은 정사각(aspect-ratio)", "aspect-ratio:1/1" in css.replace(" ", "") and ".pcal-grid" in css)
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장이 되는 일반 모드로 옮겨요
@@ -188,6 +188,8 @@ with sync_playwright() as p:
     first_title = page.evaluate("(document.querySelector('#s-photo .pola .pola-chin') || {}).textContent || ''")
     page.locator("#s-photo .pola").first.click()
     page.wait_for_timeout(500)
+    page.locator("#s-photo .dg-cell").first.click()   # v38: 날짜 모아보기를 거쳐 크게 보기
+    page.wait_for_timeout(500)
     pv = page.evaluate("""() => { const v = document.querySelector('#sheet .pview');
       const im = v ? v.querySelector('img, svg') : null;
       const c = document.querySelector('#sheet .pv-count');
@@ -203,6 +205,8 @@ with sync_playwright() as p:
     check("다음 사진으로 넘어감", cnt2.strip().startswith("2 / 6"), cnt2)
     page.keyboard.press("Escape")
     page.wait_for_timeout(350)
+    page.locator('#s-photo [data-act="photoDayBack"]').click()   # v38: 모아보기에서 목록으로
+    page.wait_for_timeout(450)
 
     # ==================================================================
     # 4. 사진첩 달력 보기(photo-cal)는 손대지 않음 — v24 크기 그대로
@@ -231,7 +235,7 @@ with sync_playwright() as p:
                            " return !!el && el.classList.contains('active') && el.innerText.trim().length > 0; }", sid)
         check("%s 화면이 정상으로 뜸" % name, bool(ok), sid)
     ver = page.inner_text("#s-set .app-ver")
-    check("My 맨 위 버전 표시가 v36", "v37" in ver, ver)
+    check("My 맨 위 버전 표시가 v36", "v38" in ver, ver)
     check("여기까지 페이지 오류 없음", len(errs) == 0, errs[:4])
 
     ctx.close()

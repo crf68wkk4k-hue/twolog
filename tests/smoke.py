@@ -147,7 +147,10 @@ with sync_playwright() as p:
     check("사진 파일 렌더", str(src).startswith("blob:"), src)
 
     page.locator("#s-photo .pola").first.click()
-    page.wait_for_timeout(250)
+    page.wait_for_timeout(300)
+    check("사진 날짜 모아보기", page.locator("#s-photo .dgrid").count() == 1)
+    page.locator("#s-photo .dg-cell").first.click()
+    page.wait_for_timeout(350)
     check("사진 상세", page.locator(".pview").count() == 1)
     page.keyboard.press("Escape")
     page.wait_for_timeout(200)

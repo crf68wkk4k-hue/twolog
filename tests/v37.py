@@ -1,6 +1,6 @@
 """투로그 v37 확인 — 노트 상단 ＋ 테두리 제거 · 사진첩 정사각형 3열 · 사진 달력 정사각 칸·상하 넘김.
 
-1) 버전: sw.js 캐시 twolog-v37 · APP_VERSION v37 · My 탭 「버전 v37」
+1) 버전: sw.js 캐시 twolog-v38 · APP_VERSION v37 · My 탭 「버전 v38」
 2) 노트 맨 윗줄 ＋
    - 동그란 테두리·바탕 없이 ＋ 아이콘만 (border 0 · background 투명 · 모서리 각짐)
    - 터치 영역은 44x44, 아이콘 22px, 오른쪽·높이는 예전 ＋ 자리 그대로
@@ -163,15 +163,15 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check("sw.js 캐시 버전 twolog-v37", 'const VERSION = "twolog-v37"' in sw,
+    check("sw.js 캐시 버전 twolog-v38", 'const VERSION = "twolog-v38"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v37", 'var APP_VERSION = "v37"' in app_js,
+    check("app.js 버전 상수 v37", 'var APP_VERSION = "v38"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v37", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v38", 'const SHELL = "shell-" + VERSION' in sw)
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v37」", ver.strip() == "버전 v37", ver)
+    check("My 탭 맨 위에 「버전 v38」", ver.strip() == "버전 v38", ver)
 
     # ==================================================================
     # 2. 노트 맨 윗줄 ＋ — 테두리 없이 아이콘만
@@ -233,8 +233,8 @@ with sync_playwright() as p:
       return {act: b.getAttribute('data-act'), bw: cs.borderTopWidth, radius: cs.borderTopLeftRadius,
               w: Math.round(r.width), h: Math.round(r.height)};
     })""")
-    check("사진첩 ＋·달력 버튼은 예전 그대로(테두리 1px·38px)",
-          len(others) == 2 and all(o["bw"] == "1px" and o["w"] == 38 and o["h"] == 38 for o in others), others)
+    check("사진첩 검색·달력·＋ 버튼은 예전 그대로(테두리 1px·38px)",
+          len(others) == 3 and all(o["bw"] == "1px" and o["w"] == 38 and o["h"] == 38 for o in others), others)
 
     # ==================================================================
     # 3. 사진첩 기본 화면 — 날짜마다 정사각형 사진 3열
@@ -357,6 +357,9 @@ with sync_playwright() as p:
     first_title = page.evaluate("(document.querySelector('#s-photo .pola .pola-chin') || {}).textContent || ''")
     page.locator("#s-photo .pola").first.click()
     page.wait_for_timeout(650)
+    # v38: 날짜 모아보기가 먼저 → 사진을 누르면 크게 보기
+    page.locator("#s-photo .dg-cell").first.click()
+    page.wait_for_timeout(650)
     pv = page.evaluate("""() => { const v = document.querySelector('#sheet .pview');
       const c = document.querySelector('#sheet .pv-count');
       return {open: !!v, h: v ? Math.round(v.getBoundingClientRect().height) : 0,
@@ -365,12 +368,14 @@ with sync_playwright() as p:
     check("같은 날 사진 넘기기 표시(/ 6)", "/ 6" in str(pv["count"]), pv["count"])
     page.keyboard.press("Escape")
     page.wait_for_timeout(400)
+    page.locator('#s-photo [data-act="photoDayBack"]').click()   # v38: 모아보기 → 목록
+    page.wait_for_timeout(450)
 
     # ==================================================================
-    # 4. 사진 달력 — 정사각 칸 + 위아래로 달 넘기기
+    # 4. 사진 달력 — 세로로 이어진 달력 + 정사각 칸 (v38)
     # ==================================================================
     page.locator('#s-photo [data-act="togglePhotoCal"]').click()
-    page.wait_for_timeout(700)
+    page.wait_for_timeout(800)
     cal = page.evaluate("""() => {
       const g = document.querySelector('#s-photo .pcal-grid');
       if (!g) return {ok: false};
@@ -380,16 +385,25 @@ with sync_playwright() as p:
       const one = has[0] || days[0];
       const r = one.getBoundingClientRect();
       const img = one.querySelector('img, svg');
-      const arrows = Array.from(document.querySelectorAll('#s-photo .pcal-nav .cal-arrow'));
+      const ms = [...document.querySelectorAll('#s-photo .pcal-m')];
+      const box = document.getElementById('screens');
+      const cur = document.querySelector('#s-photo .pcal-m[data-ym="2026-11"]');
+      const cr = cur ? cur.getBoundingClientRect() : null;
+      const br = box.getBoundingClientRect();
+      const ym = document.querySelector('#s-photo .pcal-ym');
       return {ok: true, cols: getComputedStyle(g).gridTemplateColumns.split(' ').length,
         rows: Number(g.getAttribute('data-rows')),
         cellW: r.width, cellH: r.height,
         imgW: img ? img.getBoundingClientRect().width : 0,
         imgH: img ? img.getBoundingClientRect().height : 0,
         hasN: has.length,
-        arrows: arrows.map(a => ({act: a.getAttribute('data-act'),
-          d: (a.querySelector('path') || {}).getAttribute ? a.querySelector('path').getAttribute('d') : '',
-          label: a.getAttribute('aria-label')})),
+        months: ms.length,
+        monthsAbove: ms.filter(m => m.getAttribute('data-ym') < '2026-11').length,
+        monthsBelow: ms.filter(m => m.getAttribute('data-ym') > '2026-11').length,
+        curTop: cr ? Math.round(cr.top - br.top) : null,
+        boxH: Math.round(br.height),
+        nav: document.querySelectorAll('#s-photo .pcal-nav, #s-photo .cal-arrow').length,
+        ymCenter: ym ? Math.abs((ym.getBoundingClientRect().left + ym.getBoundingClientRect().right) / 2 - 195) < 6 : false,
         gridRight: Math.round(window.innerWidth - g.getBoundingClientRect().right)};
     }""")
     check("달력 보기로 전환", cal.get("ok") and cal.get("cols") == 7, cal.get("cols"))
@@ -398,43 +412,39 @@ with sync_playwright() as p:
     check("칸 안 사진도 정사각으로 꽉 참", abs(cal.get("imgW", 0) - cal.get("imgH", 0)) <= 0.6
           and abs(cal.get("imgW", 0) - cal.get("cellW", 0)) <= 0.8,
           (cal.get("imgW"), cal.get("imgH"), cal.get("cellW")))
-    check("화살표는 위·아래 두 개", len(cal.get("arrows", [])) == 2
-          and [a["act"] for a in cal.get("arrows", [])] == ["pcalPrev", "pcalNext"],
-          cal.get("arrows"))
-    check("아래 화살표=지난 달 · 위 화살표=다음 달",
-          "M6 9.5l6 6 6-6" in cal["arrows"][0]["d"] and "M6 14.5l6-6 6 6" in cal["arrows"][1]["d"]
-          and "지난" in (cal["arrows"][0]["label"] or "") and "다음" in (cal["arrows"][1]["label"] or ""),
-          cal.get("arrows"))
+    check("달력은 여러 달이 세로로 이어짐", cal.get("months", 0) >= 2
+          and cal.get("monthsAbove", 0) >= 1 and cal.get("monthsBelow", 0) >= 1,
+          (cal.get("months"), cal.get("monthsAbove"), cal.get("monthsBelow")))
+    check("이번 달이 화면 가운데쯤에 맞춰 열림",
+          cal.get("curTop") is not None and cal["boxH"] * 0.18 <= cal["curTop"] <= cal["boxH"] * 0.62,
+          (cal.get("curTop"), cal.get("boxH")))
+    check("위·아래 화살표는 없음", cal.get("nav") == 0, cal.get("nav"))
+    check("달 제목은 가운데", cal.get("ymCenter") is True)
     page.screenshot(path=os.path.join(SHOT, "photo-cal-v37.png"))
 
-    this_month = month_text(page)
-    page.locator('#s-photo [data-act="pcalNext"]').click()
-    page.wait_for_timeout(500)
-    nxt = month_text(page)
-    check("위 화살표를 누르면 다음 달", nxt != this_month and nxt.endswith("월"), (this_month, nxt))
-    page.locator('#s-photo [data-act="pcalPrev"]').click()
-    page.wait_for_timeout(500)
-    check("아래 화살표를 누르면 이번 달로", month_text(page) == this_month, month_text(page))
-
-    # 위로 밀면 다음 달
-    swipe(page, "#s-photo .pcal", 560, 380)
-    up = month_text(page)
-    check("위로 밀면 다음 달", up != this_month, (this_month, up))
-    # 아래로 밀면 지난 달
-    swipe(page, "#s-photo .pcal", 380, 560)
-    down = month_text(page)
-    check("아래로 밀면 지난 달", down == this_month, (up, down))
-    # 좌우로 밀면 달이 바뀌지 않음
-    swipe_h(page, "#s-photo .pcal", 320, 120)
-    check("좌우로 밀어도 달은 그대로", month_text(page) == this_month, (this_month, month_text(page)))
+    # 위로 스크롤하면 다음 달이 이어서 보임
+    page.evaluate("document.getElementById('screens').scrollTop += 420")
+    page.wait_for_timeout(450)
+    moved = page.evaluate("""() => { const box = document.getElementById('screens');
+      const cur = document.querySelector('#s-photo .pcal-m[data-ym="2026-11"]');
+      return {top: Math.round(cur.getBoundingClientRect().top - box.getBoundingClientRect().top)}; }""")
+    check("위로 밀면 다음 달이 이어서 보임", moved["top"] < cal["curTop"] - 200, (cal["curTop"], moved["top"]))
 
     page.locator("#s-photo .pcell.has").first.click()
     page.wait_for_timeout(650)
+    # v38: 날짜 칸 → 그날 모아보기 → 사진 → 크게 보기
     day_open = page.evaluate("""() => ({open: document.getElementById('sheetWrap').classList.contains('open'),
+      grid: !!document.querySelector('#s-photo .dgrid')})""")
+    check("날짜를 누르면 그날 모아보기가 열림", day_open["grid"] and not day_open["open"], day_open)
+    page.locator("#s-photo .dg-cell").first.click()
+    page.wait_for_timeout(600)
+    day_view = page.evaluate("""() => ({open: document.getElementById('sheetWrap').classList.contains('open'),
       view: !!document.querySelector('#sheet .pview')})""")
-    check("날짜를 누르면 그날 사진 크게 보기", day_open["open"] and day_open["view"], day_open)
+    check("모아보기에서 사진을 누르면 크게 보기", day_view["open"] and day_view["view"], day_view)
     page.locator("#sheet [data-close]").first.click()
     page.wait_for_timeout(400)
+    page.locator('#s-photo [data-act="photoDayBack"]').click()
+    page.wait_for_timeout(500)
 
     # ==================================================================
     # 5. 사진첩에 들어올 때는 늘 기본 사진 화면

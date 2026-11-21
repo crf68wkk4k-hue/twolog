@@ -122,6 +122,10 @@ with sync_playwright() as p:
     first_title = page.evaluate("document.querySelector('#s-photo .pday .pola .pola-chin').textContent")
     first.click()
     page.wait_for_timeout(500)
+    # v38: 날짜 모아보기가 먼저 — 사진을 누르면 크게 보기
+    check("폴라로이드를 누르면 그날 모아보기", page.locator("#s-photo .dgrid").count() == 1)
+    page.locator("#s-photo .dg-cell").first.click()
+    page.wait_for_timeout(450)
     check("사진 크게 보기 열림", page.locator("#sheet .pview").count() == 1)
     img = page.evaluate("(() => { const v = document.querySelector('#sheet .pview img'); const s = document.querySelector('#sheet .pview svg'); return {img: !!v, svg: !!s, h: document.querySelector('#sheet .pview').getBoundingClientRect().height}; })()")
     check("사진이 뷰어에 크게", (img["img"] or img["svg"]) and img["h"] > 200, img)
