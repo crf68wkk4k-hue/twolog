@@ -1,6 +1,6 @@
 """투로그 v28 확인 — 캘린더는 열 때 이번 달 · 일정 시트 날짜+요일 · 하단 일정 수정 · 노트 + 탭 추가.
 
-1) 버전: sw.js 캐시 twolog-v38 · APP_VERSION v38
+1) 버전: sw.js 캐시 twolog-v39 · APP_VERSION v39
 2) 앱을 새로 켜면(새로고침) 저장해 둔 지난달 대신 이번 달로
 3) 탭에서 캘린더로 들어오면 이번 달 + 오늘 날짜 (다른 달 → 다른 탭 → 돌아오면 이번 달)
 4) 달 안에서 화살표·손가락 밀기로 넘기는 이동은 그대로 (그 달에 머무는 동안 유지)
@@ -170,11 +170,11 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v38", 'const VERSION = "twolog-v38"' in sw,
+    check("sw.js 캐시 버전 twolog-v39", 'const VERSION = "twolog-v39"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v38", 'var APP_VERSION = "v38"' in app_js,
+    check("app.js 버전 상수 v39", 'var APP_VERSION = "v39"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v38", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v39", 'const SHELL = "shell-" + VERSION' in sw)
 
     # ==================================================================
     # 2. 앱을 새로 켜면 이번 달 (저장된 지난달은 무시)
@@ -313,7 +313,10 @@ with sync_playwright() as p:
     page.locator('#s-photo [data-act="togglePhotoCal"]').click()
     page.wait_for_timeout(600)
     pcal = page.evaluate("""() => {
-      const el = document.querySelector('#s-photo .pcal-ym');
+      /* v39: 앞뒤 12개월이 이어져 첫 달이 이번 달이 아니므로 «이번 달 블록»을 봅니다 */
+      const d = new Date();
+      const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      const el = document.querySelector('#s-photo .pcal-m[data-ym="' + ym + '"] .pcal-ym');
       return {ym: el ? el.textContent.trim() : null,
               month: (window.__app.state.ui || {}).photoMonth || null,
               grid: !!document.querySelector('#s-photo .pcal-grid')};
@@ -336,7 +339,10 @@ with sync_playwright() as p:
     page.wait_for_timeout(400)
     page.locator('#s-photo [data-act="togglePhotoCal"]').click()
     page.wait_for_timeout(600)
-    reopen = page.evaluate("() => document.querySelector('#s-photo .pcal-ym').textContent.trim()")
+    reopen = page.evaluate("""() => { const d = new Date();
+      const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      const el = document.querySelector('#s-photo .pcal-m[data-ym="' + ym + '"] .pcal-ym');
+      return el ? el.textContent.trim() : null; }""")
     check("사진첩 달력을 다시 열면 이번 달", reopen == pcal["ym"], (pcal["ym"], reopen))
     page.screenshot(path=os.path.join(SHOT, "photo-cal-v28.png"))
 

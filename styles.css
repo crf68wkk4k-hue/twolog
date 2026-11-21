@@ -442,10 +442,9 @@ html[data-mode="dark"] .segs .seg-btn.active{background:var(--ink); border-color
 .album-hd .c{font-size:11px; color:var(--ink-3)}
 /* 사진첩 날짜 머리글 */
 .pday{margin:0}
-.pday-hd{display:flex; align-items:baseline; gap:7px; padding:0 20px; margin-bottom:10px}
+.pday-hd{display:flex; align-items:baseline; gap:5px; padding:0 20px; margin-bottom:10px}
 .pday-hd .d{font-size:15px; font-weight:800; letter-spacing:-.03em; color:var(--ink)}
 .pday-hd .d.acc{color:var(--accent)}
-.pday-hd .w{font-size:11.5px; font-weight:500; letter-spacing:-.01em; color:var(--ink-3)}
 .pday-hd .c{margin-left:auto; font-size:11px; letter-spacing:-.01em; color:var(--ink-3);
   max-width:54%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 /* 사진 한 줄 — v37: 폴라로이드 틀(흰 프레임·기울기·그림자) 없이, 날짜마다 정사각형 사진 3장.
@@ -1568,9 +1567,14 @@ html[data-mode="dark"] .fdate{color-scheme:dark}
    v38 — 사진 날짜 태그 + 사진첩 검색
    ========================================================================== */
 .photo-search svg{width:19px; height:19px}
-.pday-tag{margin-left:6px; height:22px; padding:0 8px; border:1px solid var(--line); background:var(--surface-2);
-  color:var(--ink-2); font-size:10.5px; font-weight:700; letter-spacing:-.01em; cursor:pointer}
-.pday-tag:active{background:var(--surface)}
+/* v39: 목록 날짜 옆 태그는 상자 없이 «날짜와 같은 크기의 글씨» — 가운데 점(·)으로 이어 붙임 */
+.pday-tag{margin:0; height:auto; padding:0; border:0; background:transparent;
+  color:var(--ink); font-size:15px; font-weight:700; letter-spacing:-.03em; line-height:1.2; cursor:pointer;
+  -webkit-appearance:none; appearance:none; font-family:inherit; white-space:nowrap; max-width:44vw;
+  overflow:hidden; text-overflow:ellipsis}
+.pday-tag:active{opacity:.6}
+.pday-tag.empty{color:var(--ink-3); font-weight:600}
+.pday-dot{font-size:15px; font-weight:700; color:var(--ink-3); letter-spacing:-.02em; margin:0 1px}
 .dgal-tag{margin-top:3px; align-self:flex-start; max-width:200px; height:24px; padding:0 9px;
   border:1px solid var(--line); background:var(--surface); color:var(--ink-3); font-size:11px; font-weight:700;
   letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer}
@@ -1599,3 +1603,75 @@ html[data-mode="dark"] .fdate{color-scheme:dark}
 .pcal-stack .pcal-ym{text-align:center; font-size:19px; font-weight:800; letter-spacing:-.03em;
   padding:6px 0 10px; color:var(--ink); font-variant-numeric:tabular-nums}
 .pcal-stack .pcal-week{padding-bottom:6px}
+
+/* ==========================================================================
+   v39 — + 시트: 카테고리 줄을 누르면 그 카테고리의 속지를 고르기
+   (줄에 지금 속지 배지 · 고른 줄은 진한 테두리 · 기본 카테고리는 「카드」로 되돌리기)
+   ========================================================================== */
+/* --- 카테고리 줄의 속지 배지 --- */
+.nord-row .nord-kb{
+  flex:0 0 auto; display:flex; align-items:center; height:22px; padding:0 7px;
+  border:1px solid var(--line); border-radius:6px; background:var(--surface-2);
+  color:var(--ink-2); font-size:10.5px; font-weight:700; letter-spacing:-.01em;
+  white-space:nowrap; max-width:96px; overflow:hidden; text-overflow:ellipsis
+}
+.nord-row .nord-nm{flex:1 1 auto; min-width:0}
+/* 고른 줄 — 지금 2×2 카드가 이 카테고리의 속지를 고치는 중 */
+.nord-row.active{
+  border-color:var(--ink); background:var(--surface-2);
+  box-shadow:inset 0 0 0 1px var(--ink)
+}
+.nord-row.active .nord-kb{border-color:var(--ink); background:var(--surface); color:var(--ink)}
+html[data-mode="dark"] .nord-row .nord-kb{border-color:rgba(255,255,255,.16); background:#26262A; color:#C9C9CF}
+html[data-mode="dark"] .nord-row.active{border-color:#F2F2F4; background:#26262A; box-shadow:inset 0 0 0 1px #F2F2F4}
+html[data-mode="dark"] .nord-row.active .nord-kb{border-color:#F2F2F4; background:#1D1D20; color:#F2F2F4}
+
+/* --- 「카드」 — 기본 카테고리의 지금 모양으로 되돌리기 (두 칸을 다 쓰는 줄) --- */
+.nk-cards{
+  position:relative; grid-column:1 / -1; display:none; align-items:baseline; gap:7px;
+  min-height:44px; padding:11px 26px 10px 12px; border:1px solid var(--line); border-radius:0;
+  background:var(--surface); color:var(--ink); text-align:left; cursor:pointer;
+  -webkit-appearance:none; appearance:none; font:inherit
+}
+.nk-cards.on{display:flex}
+.nk-cards:active{background:var(--surface-2)}
+.nk-cards .nk-n{font-size:13px; font-weight:700; letter-spacing:-.02em; line-height:1.3}
+.nk-cards .nk-d{font-size:10.5px; color:var(--ink-3); letter-spacing:-.01em; line-height:1.45; word-break:keep-all}
+.nk-cards .nk-ck{position:absolute; top:11px; right:10px; display:flex; color:var(--ink); opacity:0; transition:opacity .12s ease}
+.nk-cards .nk-ck svg{width:12px; height:12px}
+.nk-cards.active{border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink)}
+.nk-cards.active .nk-ck{opacity:1}
+html[data-mode="dark"] .nk-cards.active{border-color:#F2F2F4; box-shadow:inset 0 0 0 1px #F2F2F4}
+html[data-mode="dark"] .nk-cards .nk-ck{color:#F2F2F4}
+
+/* --- 기본 카테고리를 속지로 볼 때 머리의 「카드」 버튼 --- */
+.note-hd .nh-back{
+  flex:0 0 auto; height:26px; padding:0 10px; border:1px solid var(--line); border-radius:6px;
+  background:var(--surface); color:var(--ink-2); font-size:11px; font-weight:700;
+  letter-spacing:-.01em; white-space:nowrap
+}
+.note-hd .nh-back:active{background:var(--surface-2)}
+html[data-mode="dark"] .note-hd .nh-back{border-color:rgba(255,255,255,.16); color:#C9C9CF}
+
+/* ==========================================================================
+   v39 — 사진첩 달력: 아이폰 캘린더처럼
+   요일 한 줄은 위에 고정(sticky) · 앞뒤 12개월이 촘촘히 이어짐 · 오늘은 숫자 아래 점
+   ========================================================================== */
+.pcal-stack .pcal-stick{
+  position:sticky; top:0; z-index:4;
+  display:grid; grid-template-columns:repeat(7,1fr);
+  padding:7px 0 7px; margin:0 0 4px;
+  background:var(--bg); border-bottom:1px solid var(--line-2)
+}
+.pcal-stack .pcal-stick span{text-align:center; font-size:12px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em}
+.pcal-stack .pcal-stick span:first-child{color:var(--hol)}
+.pcal-stack .pcal-stick span:last-child{color:#8FA0A8}
+/* 달 사이는 촘촘하게 — 제목 바로 아래로 주(週) 줄이 이어집니다 */
+.pcal-stack .pcal-m{margin-bottom:4px}
+.pcal-stack .pcal-ym{font-size:19px; padding:8px 0 4px}
+/* 오늘 날짜 점 — 사진이 없는 날은 숫자 바로 아래, 사진이 있는 날은 숫자 아래 흰 점 */
+.pcell .pdot{position:absolute; z-index:2; width:5px; height:5px; border-radius:999px !important; background:var(--accent)}
+.pcell:not(.has) .pdot{left:50%; top:calc(50% + 11px); transform:translateX(-50%)}
+.pcell.has .pdot{left:8px; top:22px; background:#FFFFFF;
+  box-shadow:0 0 0 1.5px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.55)}
+html[data-mode="dark"] .pcal-stack .pcal-stick{background:var(--bg); border-bottom-color:rgba(255,255,255,.12)}

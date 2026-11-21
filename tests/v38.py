@@ -1,6 +1,6 @@
 """투로그 v38 확인 — 노트 + 시트 속지 레이아웃 4종 (투두리스트 · 줄글 메모 · 별점 리뷰 · 지출·정산).
 
-1) 버전: sw.js 캐시 twolog-v38 · APP_VERSION v38 · My 탭 「버전 v38」
+1) 버전: sw.js 캐시 twolog-v39 · APP_VERSION v39 · My 탭 「버전 v39」
 2) + 시트 하단 「속지 레이아웃」
    - 노트 카테고리 목록(#noteOrderList) 아래 · 「저장하기」 버튼 위
    - 카드 4개 · 2×2 (첫 두 장 같은 줄, 셋째 줄에 두 장) · 각진 네모 · 제목 + 한 줄 설명
@@ -183,9 +183,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v38", 'const VERSION = "twolog-v38"' in sw,
+    check("sw.js 캐시 버전 twolog-v39", 'const VERSION = "twolog-v39"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v38", 'var APP_VERSION = "v38"' in app_js,
+    check("app.js 버전 상수 v39", 'var APP_VERSION = "v39"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -198,7 +198,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v38」", ver.strip() == "버전 v38", ver)
+    check("My 탭 맨 위에 「버전 v39」", ver.strip() == "버전 v39", ver)
 
     # ==================================================================
     # 2. + 시트 — 속지 레이아웃 선택 UI
@@ -721,7 +721,8 @@ with sync_playwright() as p:
 
     list_shots = page4.evaluate("document.querySelectorAll('#s-photo .pola').length")
     check("기본 사진첩은 최근 날짜 3장까지 미리보기 그대로", list_shots >= 1, list_shots)
-    page4.locator("#s-photo .pola").first.click()
+    # v39: 목록은 예전 → 최근 순 — 사진이 가장 많은 «최근 날짜»(맨 아래)를 봅니다
+    page4.locator("#s-photo .pola").last.click()
     page4.wait_for_timeout(700)
     day = page4.evaluate("""() => {
       const g = document.querySelector('#s-photo .dgrid');
@@ -785,7 +786,7 @@ with sync_playwright() as p:
     # 날짜 줄을 눌러도 모아보기
     page4.locator('#s-photo [data-act="photoDayBack"]').click()
     page4.wait_for_timeout(500)
-    page4.locator("#s-photo .pday-hd .d").first.click()   # 날짜 글씨(태그가 아닌 곳)를 누름
+    page4.locator("#s-photo .pday-hd .d").last.click()   # 날짜 글씨(태그가 아닌 곳)를 누름 — 최근 날짜
     page4.wait_for_timeout(600)
     check("날짜 줄을 눌러도 그날 모아보기", page4.evaluate("document.querySelectorAll('#s-photo .dg-cell').length") == 6,
           page4.evaluate("document.querySelectorAll('#s-photo .dg-cell').length"))

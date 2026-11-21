@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v38";
+  var APP_VERSION = "v39";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -201,6 +201,12 @@
   /* v34: 노트 카테고리(탭) 순서 — 기본 탭 3개와 내가 만든 카테고리를 한 줄에 섞어 놓을 수 있어요.
      예) ["todo", "list:ab12", "bucket", "log"] / 없던 값은 아래 noteOrderList() 가 정리합니다. */
   if (!Array.isArray(S.noteOrder)) S.noteOrder = [];
+  /* v39: 기본 카테고리(메모·버킷리스트·영화·먹방)가 고른 속지 — 값이 없으면 지금 모양(카드) 그대로예요.
+     예) S.noteKinds = { bucket: "expense" } → 버킷리스트 탭이 지출·정산 속지로 그려집니다. */
+  if (!S.noteKinds || typeof S.noteKinds !== "object") S.noteKinds = {};
+  ["todo", "bucket", "log"].forEach(function (k) {
+    if (["check", "memo", "review", "expense"].indexOf(S.noteKinds[k]) < 0) delete S.noteKinds[k];
+  });
   if (S.couple.fmt !== "Y") S.couple.fmt = "D";
   if (typeof S.couple.phrase !== "string" || !S.couple.phrase.trim()) S.couple.phrase = defaultPhrase();
   if (!S.mig.phrase) {
@@ -284,6 +290,11 @@
     if (!Array.isArray(l.items)) l.items = [];
   });
   S.lists = S.lists.filter(function (l) { return l && typeof l === "object"; });
+  /* v39: 기본 카테고리에도 속지(투두·메모·리뷰·지출)를 고를 수 있어, 항목의 «제목/본문» 자리를
+     탭마다 다른 이름(text·title / memo·review)으로 쓰던 것을 한 가지로 읽고 쓸 수 있게 맞춥니다. */
+  (S.todos || []).forEach(function (t) { if (t && typeof t.memo !== "string") t.memo = ""; });
+  (S.bucket || []).forEach(function (b) { if (b && typeof b.memo !== "string") b.memo = ""; });
+  (S.logs || []).forEach(function (l) { if (l && typeof l.review !== "string") l.review = ""; });
   return S;
   }
 
@@ -1446,7 +1457,9 @@
     });
     html += "</div>";
     var body;
-    if (seg === "todo") body = viewTodo();
+    /* v39: 기본 카테고리에 속지를 골랐으면 그 속지로 그립니다(고르지 않았으면 지금까지처럼 카드) */
+    if (NOTE_BASE.indexOf(seg) >= 0 && noteBaseKind(seg)) body = viewBasePage(seg);
+    else if (seg === "todo") body = viewTodo();
     else if (seg === "bucket") body = viewBucket();
     else if (seg === "log") body = viewLog();
     else body = viewList(curList());
@@ -1747,6 +1760,74 @@
     var k = l && l.kind;
     return LIST_KIND_DEF[k] ? k : "check";
   }
+
+  /* ==========================================================================
+     v39: 카테고리마다 속지 고르기 — 기본 카테고리(메모·버킷리스트·영화·먹방)도
+     --------------------------------------------------------------------------
+     v38 은 «내가 만든 카테고리»만 속지를 골랐어요. v39 부터는 + 시트의 카테고리 줄을
+     누르면 그 카테고리의 속지를 그 자리에서 바꿀 수 있고, 기본 카테고리도 같은 네 속지로
+     그려집니다(고르지 않으면 지금 모양 그대로 = 카드).
+       · S.noteKinds = { todo|bucket|log: "check"|"memo"|"review"|"expense" }
+       · 기본 카테고리를 속지로 보면 그 탭의 항목(S.todos·S.bucket·S.logs)이 한 장에 펼쳐져요.
+         항목은 그대로라 「카드」로 되돌리면 원래 카드가 다시 보입니다.
+     ========================================================================== */
+  var BASE_SEG = "base:";                 /* 기본 카테고리 속지 화면의 가상 리스트 id */
+  function noteBaseKind(k) { return (S.noteKinds || {})[k] || ""; }
+  function baseContainer(k) {
+    return { id: BASE_SEG + k, base: k, kind: noteBaseKind(k) || "check", items: itemsOf(k) };
+  }
+  function isBaseContainer(c) { return !!(c && c.base); }
+  /* 화면의 data-list 값 → 진짜 리스트(내 카테고리) 또는 기본 카테고리의 속지 화면 */
+  function containerOf(id) {
+    id = String(id == null ? "" : id);
+    if (id.indexOf(BASE_SEG) === 0 && NOTE_BASE.indexOf(id.slice(BASE_SEG.length)) >= 0) {
+      return baseContainer(id.slice(BASE_SEG.length));
+    }
+    return findList(id);
+  }
+  /* 속지 화면이 항목의 «제목·본문»을 읽고 쓰는 자리 — 기본 카테고리는 탭마다 이름이 달라요
+     (메모 text / 버킷·영화·먹방 title, 메모·버킷 memo / 영화·먹방 review) */
+  function itTitle(it) {
+    if (!it) return "";
+    if (it.text != null && it.text !== "") return String(it.text);
+    return String(it.title == null ? "" : it.title);
+  }
+  function itBody(it) {
+    if (!it) return "";
+    if (it.memo != null && it.memo !== "") return String(it.memo);
+    return String(it.review == null ? "" : it.review);
+  }
+  function setItTitle(it, v) {
+    if (!it) return;
+    if (it.text === undefined) it.title = v; else it.text = v;
+  }
+  function setItBody(it, v) {
+    if (!it) return;
+    if (it.memo === undefined) it.review = v; else it.memo = v;
+  }
+  /* 기본 카테고리 속지 화면에서 항목 더하기 — 탭에 맞는 이름으로 넣고, 소속 카드는 첫 번째 카드 */
+  function basePush(k, f) {
+    var it = { id: uid(), done: false };
+    if (k === "todo") { it.text = f.text || ""; it.memo = f.memo || ""; }
+    else if (k === "bucket") { it.title = f.text || ""; it.memo = f.memo || ""; it.cat = "기타"; }
+    else {
+      it.title = f.text || ""; it.review = f.memo || "";
+      it.kind = "movie"; it.rating = f.rating != null ? f.rating : 0; it.place = f.place || ""; it.done = true;
+    }
+    if (f.rating != null) it.rating = f.rating;
+    if (f.place != null) it.place = f.place;
+    if (f.amount != null) it.amount = f.amount;
+    it.date = f.date ? String(f.date).slice(0, 10) : today;
+    it.gid = firstGroupId(k) || "";
+    itemsOf(k).push(it);
+    return it;
+  }
+  /* 기본 카테고리 속지 화면의 머리 — 탭 이름 · 속지 이름 · 「카드」로 되돌리기 */
+  function basePageHead(k, kind) {
+    return '<div class="note-hd"><div class="nh-l"><span class="t">' + esc(noteLabel(k)) + "</span>" +
+      '<span class="k">' + LIST_KIND_DEF[kind].n + "</span></div>" +
+      '<button type="button" class="nh-back" data-act="baseKindClear" data-tab="' + k + '" aria-label="카드로 보기">카드</button></div>';
+  }
   /* 금액 — 「12,000」·「12000원」·「-3,000」 모두 숫자로 */
   function parseAmount(v) {
     var s = String(v == null ? "" : v).replace(/[^\d-]/g, "");
@@ -1766,10 +1847,21 @@
     var kind = listKindOf(l);
     var h = '<div class="note-hd"><div class="nh-l"><span class="t">' + esc(listLabel(l)) + "</span>" +
       '<span class="k">' + LIST_KIND_DEF[kind].n + "</span></div></div>";
-    if (kind === "memo") return h + viewListMemo(l);
-    if (kind === "review") return h + viewListReview(l);
-    if (kind === "expense") return h + viewListExpense(l);
-    return h + viewListCheck(l);
+    return h + viewListBody(l);
+  }
+  /* v39: 속지 본문만 — 기본 카테고리 속지 화면도 같은 본문을 씁니다 */
+  function viewListBody(l) {
+    if (!l) return "";
+    var kind = listKindOf(l);
+    if (kind === "memo") return viewListMemo(l);
+    if (kind === "review") return viewListReview(l);
+    if (kind === "expense") return viewListExpense(l);
+    return viewListCheck(l);
+  }
+  /* v39: 기본 카테고리를 속지로 보기(메모·버킷리스트·영화·먹방 탭에서 고른 경우) */
+  function viewBasePage(k) {
+    var kind = noteBaseKind(k) || "check";
+    return basePageHead(k, kind) + viewListBody(baseContainer(k));
   }
 
   /* 속지 공통: 맨 위 빠른 추가 한 줄 (이름 + [금액] + Add) */
@@ -1802,8 +1894,8 @@
     h += '<div class="todo-items" data-list="' + l.id + '">';
     if (!items.length) h += '<div class="empty">' + (l.items.length ? "완료한 항목을 숨겼어요." : "위 칸에 할 일을 적고 Add 를 눌러 보세요.") + "</div>";
     items.forEach(function (it) {
-      h += listItemRow(it, '<div class="t tw">' + esc(it.text) + "</div>" +
-        (it.memo ? '<div class="sub">' + esc(it.memo) + "</div>" : ""),
+      h += listItemRow(it, '<div class="t tw">' + esc(itTitle(it)) + "</div>" +
+        (itBody(it) ? '<div class="sub">' + esc(itBody(it)) + "</div>" : ""),
         'data-act="toggleListItem" data-list="' + l.id + '" data-id="' + it.id + '"',
         'data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '"',
         'data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '"');
@@ -1821,8 +1913,8 @@
     if (!l.items.length) h += '<div class="empty">아직 메모가 없어요. 위 칸에 제목을 적고 Add 를 눌러 보세요.</div>';
     l.items.forEach(function (it) {
       h += '<div class="memo-card" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '" role="button" tabindex="0">' +
-        (it.text ? '<div class="mc-t">' + esc(it.text) + "</div>" : "") +
-        (it.memo ? '<div class="mc-b">' + esc(it.memo) + "</div>" : "") +
+        (itTitle(it) ? '<div class="mc-t">' + esc(itTitle(it)) + "</div>" : "") +
+        (itBody(it) ? '<div class="mc-b">' + esc(itBody(it)) + "</div>" : "") +
         '<div class="mc-f"><span class="mc-d">' + esc(itemDateTxt(it.date)) + "</span>" +
         '<button type="button" class="x" data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="삭제">' + IC.x + "</button></div></div>";
     });
@@ -1849,11 +1941,11 @@
       if (it.place) meta.push(esc(it.place));
       if (it.date) meta.push(esc(itemDateTxt(it.date)));
       h += '<div class="rv-card" data-list="' + l.id + '" data-id="' + it.id + '">' +
-        '<div class="rv-hd"><div class="rv-t" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '" role="button" tabindex="0">' + esc(it.text) + "</div>" +
+        '<div class="rv-hd"><div class="rv-t" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '" role="button" tabindex="0">' + esc(itTitle(it)) + "</div>" +
         '<button type="button" class="x" data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="삭제">' + IC.x + "</button></div>" +
         '<div class="rv-stars" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="별점 ' + r + '점">' + st + "</div>" +
         (meta.length ? '<div class="rv-meta" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '">' + meta.join(" · ") + "</div>" : "") +
-        (it.memo ? '<div class="rv-note" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '">' + esc(it.memo) + "</div>" : "") +
+        (itBody(it) ? '<div class="rv-note" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '">' + esc(itBody(it)) + "</div>" : "") +
         "</div>";
     });
     h += "</div></div>";
@@ -1875,8 +1967,8 @@
     l.items.forEach(function (it) {
       h += '<div class="ex-row" data-list="' + l.id + '" data-id="' + it.id + '">' +
         '<div class="ex-b" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '" role="button" tabindex="0">' +
-        '<span class="ex-t">' + esc(it.text) + "</span>" +
-        (it.memo ? '<span class="ex-m">' + esc(it.memo) + "</span>" : "") + "</div>" +
+        '<span class="ex-t">' + esc(itTitle(it)) + "</span>" +
+        (itBody(it) ? '<span class="ex-m">' + esc(itBody(it)) + "</span>" : "") + "</div>" +
         '<span class="ex-a">' + wonTxt(it.amount) + "</span>" +
         '<button type="button" class="x" data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="삭제">' + IC.x + "</button></div>";
     });
@@ -1910,12 +2002,22 @@
 
   /* 사진첩 v17: 날짜별(최신순) 묶음 · v37: 날짜마다 정사각형 사진 3열 (폴라로이드 틀은 걷어냈습니다) */
   var PHOTOS_PER_DAY = 3;   /* v18: 하루에 보이는 사진은 3장까지 */
+  /* v39: 날짜 머리글은 「11월 18일」까지만 — 요일은 뺐어요. 태그는 날짜 옆에 가운데 점으로 이어 붙입니다. */
   function photoDayLabel(day) {
     var d = parse(day);
     if (day === today) return '<span class="d acc">오늘</span>';
     if (day === addDays(today, -1)) return '<span class="d acc">어제</span>';
-    return '<span class="d">' + (d.getMonth() + 1) + "월 " + d.getDate() + "일</span>" +
-      '<span class="w">· ' + WD[d.getDay()] + '요일</span>';
+    return '<span class="d">' + (d.getMonth() + 1) + "월 " + d.getDate() + "일</span>";
+  }
+  /* v39: 날짜 옆 태그 — 테두리·바탕 없이 날짜와 같은 크기의 글씨로만 (누르면 그대로 태그 고치기) */
+  function photoDayTagHtml(day) {
+    var tag = dateTagOf(day);
+    if (tag) {
+      return '<span class="pday-dot" aria-hidden="true">·</span>' +
+        '<button type="button" class="pday-tag on" data-act="dateTag" data-date="' + day + '" aria-label="날짜 태그 고치기">' +
+        esc(tag) + "</button>";
+    }
+    return '<button type="button" class="pday-tag empty" data-act="dateTag" data-date="' + day + '" aria-label="날짜 태그 추가">+ 태그</button>';
   }
 
   /* v23: 사진첩 달력 보기 — 한 달만 보이고 화살표·밀어서 달을 넘깁니다.
@@ -1935,13 +2037,13 @@
      열면 이번 달이 화면 가운데쯤 오도록 스크롤해요. 위아래로 자연스럽게 넘겨 보세요. */
   function photoCalMonths() {
     var thisYm = today.slice(0, 7);
-    var firsts = (S.photos || []).map(function (p) { return String(p.date || "").slice(0, 7); })
-      .filter(function (ym) { return /^\d{4}-\d{2}$/.test(ym); });
-    firsts.sort();
-    var start = firsts.length && firsts[0] < thisYm ? firsts[0] : thisYm;
-    var min = shiftYm(thisYm, -12);
-    if (start < min) start = min;
-    var out = [], ym = start, end = shiftYm(thisYm, 1);
+    var have = (S.photos || []).map(function (p) { return String(p.date || "").slice(0, 7); })
+      .filter(function (ym) { return /^\d{4}-\d{2}$/.test(ym); }).sort();
+    /* v39: 이번 달 앞뒤로 12개월씩 — 사진이 그보다 더 예전·나중에 있으면 그 달까지 이어 붙여요 */
+    var start = shiftYm(thisYm, -12), end = shiftYm(thisYm, 12);
+    if (have.length && have[0] < start) start = have[0];
+    if (have.length && have[have.length - 1] > end) end = have[have.length - 1];
+    var out = [], ym = start;
     while (ym <= end) { out.push(ym); ym = shiftYm(ym, 1); }
     return out;
   }
@@ -1956,20 +2058,21 @@
     while (cells.length % 7) cells.push(0);
     var h = '<section class="pcal-m" data-ym="' + ym + '">' +
       '<div class="pcal-ym">' + y + "년 " + m + "월</div>" +
-      '<div class="pcal-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>' +
       '<div class="pcal-grid" data-pcal="1" data-rows="' + (cells.length / 7) + '">';
     cells.forEach(function (dayNo) {
       if (!dayNo) { h += '<div class="pcell blank"></div>'; return; }
       var ds = ym + "-" + pad(dayNo);
       var list = (byDay[ds] || []).slice().sort(byDateDesc);
+      /* v39: 오늘은 숫자 아래에 점 하나 — 사진이 있어도 지우지 않고 위에 얹어 보여 줍니다 */
+      var dot = ds === today ? '<span class="pdot" aria-hidden="true"></span>' : "";
       if (!list.length) {
-        h += '<div class="pcell' + (ds === today ? " today" : "") + '"><span class="pn">' + dayNo + "</span></div>";
+        h += '<div class="pcell' + (ds === today ? " today" : "") + '"><span class="pn">' + dayNo + "</span>" + dot + "</div>";
         return;
       }
       h += '<button type="button" class="pcell has' + (ds === today ? " today" : "") + '" data-act="pcalDay" data-date="' + ds +
-        '" aria-label="' + m + "월 " + dayNo + "일 사진 " + list.length + '장 열기">' +
+        '" aria-label="' + m + "월 " + dayNo + "일" + (ds === today ? " (오늘)" : "") + " 사진 " + list.length + '장 열기">' +
         photoImg(list[0]) + '<span class="pn">' + dayNo + "</span>" +
-        (list.length > 1 ? '<span class="pc">' + list.length + "</span>" : "") + "</button>";
+        (list.length > 1 ? '<span class="pc">' + list.length + "</span>" : "") + dot + "</button>";
     });
     h += "</div></section>";
     return h;
@@ -1984,6 +2087,9 @@
     });
     var months = photoCalMonths();
     var h = '<div class="pcal pcal-stack">';
+    /* v39: 요일 줄은 달력 위에 한 줄로 고정(sticky) — 달을 넘겨도 다시 나오지 않아요 */
+    h += '<div class="pcal-week pcal-stick" aria-hidden="true"><span>일</span><span>월</span><span>화</span>' +
+      "<span>수</span><span>목</span><span>금</span><span>토</span></div>";
     months.forEach(function (ym) { h += photoMonthBlock(ym, byDay); });
     h += '<div style="height:26px"></div></div>';
     return h;
@@ -1996,7 +2102,8 @@
     if (!el || !box) return;
     var r = el.getBoundingClientRect(), b = box.getBoundingClientRect();
     var mid = (box.scrollHeight - b.height) / 2;
-    var top = box.scrollTop + (r.top - b.top) - Math.max(24, Math.round(b.height * 0.16));
+    /* v39: 요일 줄(sticky)이 위에 붙어도 이번 달 제목이 가리지 않게 조금 아래에서 시작 */
+    var top = box.scrollTop + (r.top - b.top) - Math.max(48, Math.round(b.height * 0.2));
     box.scrollTop = Math.max(0, Math.min(top, Math.max(0, mid + 240)));
   }
 
@@ -2042,9 +2149,10 @@
       var d = String(p.date || "").slice(0, 10);
       (days[d] = days[d] || []).push(p);
     });
-    var list = Object.keys(days).sort().reverse();
+    /* v39: 검색 결과도 예전 날짜가 위 · 최근 날짜가 아래 (최근 60일까지만) */
+    var list = Object.keys(days).sort().reverse().slice(0, 60).reverse();
     if (!list.length) return '<div class="sres-empty">「' + esc(raw) + "」와 맞는 사진이 없어요.</div>";
-    return list.slice(0, 60).map(function (d) {
+    return list.map(function (d) {
       var items = days[d];
       var tag = dateTagOf(d);
       var dd = parse(d);
@@ -2076,6 +2184,7 @@
   var photoDayView = null;      /* 'YYYY-MM-DD' — 보고 있는 날짜 모아보기 */
   var pendingPhotoDate = "";    /* v38: 그 날짜에 사진 추가 — 사진 추가 시트의 날짜 기본값 */
   var photoAddMore = false;     /* v38: 사진 추가 시트의 「추가」 — 지금 목록에 이어 담기 */
+  var photoToBottom = true;     /* v39: 사진 목록을 그리면 맨 아래(가장 최근 날짜)로 맞출지 */
 
   function photoDayItems(day) {
     return S.photos.filter(function (p) { return String(p.date || "").slice(0, 10) === day; }).sort(byDateDesc);
@@ -2138,16 +2247,16 @@
     /* 앨범 대신 날짜로 묶어요 — 하루에 담은 순간이 한 줄에 모입니다
        v37: 기본 사진첩은 «이번 달» 사진 중 가장 최근 날짜부터 3일치만.
        지난 달 사진은 오른쪽 위 달력 아이콘으로 달력을 열어 위아래로 넘겨 봅니다. */
-    var thisYm = today.slice(0, 7);
     var groups = [];
     var map = {};
     S.photos.slice().sort(byDateDesc).forEach(function (p) {
       var k = String(p.date || "").slice(0, 10);
-      if (k.slice(0, 7) !== thisYm) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) return;
       if (!map[k]) { map[k] = { date: k, items: [] }; groups.push(map[k]); }
       map[k].items.push(p);
     });
-    groups = groups.slice(0, 3);   /* v37: 가장 최근 사진 날짜부터 3일치만 */
+    /* v39: 3일 제한 없이 사진이 있는 날을 모두 — 예전 날짜가 위, 가장 최근 날짜가 아래(아래로 쌓임) */
+    groups.reverse();
     var daysHtml = "";
     groups.forEach(function (g) {
       /* v37: 날짜 옆에는 장수를 매번 적지 않고, 3장을 넘길 때만 「+N장」 */
@@ -2156,7 +2265,7 @@
       /* v18: 하루는 사진 3장까지 — 넘치면 세 번째에 +N, 눌러서 그날 사진을 모두 봐요 */
       var shown = g.items.slice(0, PHOTOS_PER_DAY);
       daysHtml += '<div class="pday"><div class="pday-hd" role="button" tabindex="0" data-act="openPhotoDay" data-date="' + g.date + '">' + photoDayLabel(g.date) +
-        (dateTagOf(g.date) ? '<button type="button" class="pday-tag" data-act="dateTag" data-date="' + g.date + '">' + esc(dateTagOf(g.date)) + "</button>" : "") +
+        photoDayTagHtml(g.date) +
         (meta ? '<span class="c">' + meta + "</span>" : "") + "</div>" +
         '<div class="polas">' +
         shown.map(function (p, i) {
@@ -2173,14 +2282,26 @@
     });
     if (!groups.length) {
       daysHtml += '<div class="album"><div class="list" style="margin:0"><div class="empty">' +
-        (S.photos.length
-          ? "이번 달에 담은 사진이 없어요.<br>지난 사진은 오른쪽 위 달력에서 볼 수 있어요."
-          : "아직 사진이 없어요.<br>오른쪽 위 <b>+</b> 로 이 순간을 담아 보세요.") +
+        "아직 사진이 없어요.<br>오른쪽 위 <b>+</b> 로 이 순간을 담아 보세요." +
         "</div></div></div>";
     }
-    /* v37: 사진이 적을 때는 화면 가운데, 많아 화면을 넘기면 위에서부터 자연스럽게 스크롤 */
+    /* v37: 사진이 적을 때는 화면 가운데, 많아 화면을 넘기면 위에서부터 자연스럽게 스크롤
+       v39: 가장 최근 날짜가 맨 아래라, 들어올 때는 그 자리(맨 아래)로 맞춰 줍니다 */
+    var scr0 = document.getElementById("screens");
+    var atBottom = !!(scr0 && (scr0.scrollHeight - scr0.scrollTop - scr0.clientHeight) < 48);
     h += '<div class="pbody"><div class="pdays">' + daysHtml + "</div></div>";
     $("#s-photo").innerHTML = h;
+    if (photoToBottom || atBottom) photoListToBottom();
+    photoToBottom = false;
+  }
+  /* v39: 사진 목록의 맨 아래(가장 최근 날짜)로 — 목록이 짧으면 스크롤이 없어 그대로예요 */
+  function photoListToBottom() {
+    var scr = document.getElementById("screens");
+    if (!scr) return;
+    scr.scrollTop = scr.scrollHeight;
+    requestAnimationFrame(function () {
+      if (!photoDayView && !(S.ui && S.ui.photoCal)) scr.scrollTop = scr.scrollHeight;
+    });
   }
 
   /* ------------------------------------------------------------------ sheet */
@@ -2212,6 +2333,8 @@
     sheetWrap.classList.toggle("sheet-center", !!sheetCenter);
     sheetCenter = false;
     sheet.innerHTML = '<div class="grab"></div>' + html;
+    /* v39: + 시트의 카테고리 줄이 있으면 줄 배지·「속지 레이아웃」 표시를 지금 상태에 맞춤 */
+    if (sheet.querySelector("#noteOrderList")) nkPaint();
     sheetSubmit = onSubmit || null;
     sheetWrap.classList.add("open");
     sheetWrap.setAttribute("aria-hidden", "false");
@@ -2266,15 +2389,18 @@
       '<input class="nord-new" name="title" value="" placeholder="새 카테고리 이름" aria-label="새 카테고리 이름" autocomplete="off">' +
       '<button type="button" class="nord-add-btn" data-act="nordAdd">추가</button></div>';
     h += '<div class="set-lbl" style="margin-top:18px">노트 카테고리</div>';
-    h += '<div class="nord-hint nord-hint-top">≡ 를 끌어 위아래로 옮기면 노트 탭 순서가 바뀌어요.</div>';
+    /* v39: 줄을 누르면 그 카테고리의 속지를 바로 고를 수 있어요 */
+    h += '<div class="nord-hint nord-hint-top">줄을 누르면 그 카테고리의 속지를 고를 수 있어요. ≡ 를 끌면 탭 순서가 바뀝니다.</div>';
     h += '<div class="nord" id="noteOrderList">';
-    noteOrderList().forEach(function (k) { h += noteOrderRow(k); });
+    var selKey = l ? "list:" + l.id : "";
+    noteOrderList().forEach(function (k) { h += noteOrderRow(k, null, null, k === selKey); });
     h += "</div>";
     h += '<input type="hidden" name="del" id="noteDelIds" value="">';
-    /* v38: 속지 레이아웃 — 새 카테고리를 어떤 속지로 쓸지 2×2 로 고름 (기본 투두리스트) */
+    /* v38: 속지 레이아웃 — 고른 카테고리(없으면 새 카테고리)의 속지를 2×2 로 고름 (기본 투두리스트)
+       v39: 카테고리 줄을 누르면 그 줄의 속지를 바꾸는 모드로 바뀌고, 기본 카테고리는 「카드」로 되돌릴 수 있어요 */
     var curKind = l ? listKindOf(l) : "check";
-    h += '<div class="set-lbl" style="margin-top:24px">속지 레이아웃</div>';
-    h += '<div class="nkind-hint">' + (l ? "이 카테고리의 속지를 바꿔요." : "새 카테고리에 쓸 속지를 골라요.") + " 나중에 바꿀 수 있어요.</div>";
+    h += '<div class="set-lbl" id="nkindLbl" style="margin-top:24px">속지 레이아웃</div>';
+    h += '<div class="nkind-hint" id="nkindHint">새 카테고리에 쓸 속지를 골라요. 나중에 바꿀 수 있어요.</div>';
     h += '<div class="nkind" data-group="nkind">';
     LIST_KINDS.forEach(function (k) {
       h += '<button type="button" class="nk-card' + (k === curKind ? " active" : "") + '" data-act="nkind" data-kind="' + k + '">' +
@@ -2282,35 +2408,121 @@
         '<span class="nk-d">' + LIST_KIND_DEF[k].d + "</span>" +
         '<span class="nk-ck">' + IC.check + "</span></button>";
     });
+    /* 기본 카테고리만: 속지를 걷고 지금 모양(카드)으로 되돌리기 */
+    h += '<button type="button" class="nk-cards" data-act="nkind" data-kind="">' +
+      '<span class="nk-n">카드</span><span class="nk-d">지금처럼 카드로 모아 보기</span>' +
+      '<span class="nk-ck">' + IC.check + "</span></button>";
     h += '<input type="hidden" name="nkind" value="' + curKind + '">';
-    if (l) h += '<input type="hidden" name="nkind_target" value="' + esc(l.id) + '">';
     h += "</div>";
     h += '<div style="height:14px"></div><button class="btn-primary" type="submit">저장하기</button></form>';
     return h;
   }
 
-  /* + 시트의 카테고리 한 줄 — 3줄 손잡이 · 이름 칸 · (내가 만든 카테고리·새로 더한 줄만) 삭제 */
-  function noteOrderRow(k, tempName) {
+  /* + 시트의 카테고리 한 줄 — 3줄 손잡이 · 이름 칸 · 지금 속지 배지 · (내가 만든 카테고리·새로 더한 줄만) 삭제 */
+  function noteOrderRow(k, tempName, tempKind, selected) {
     var isNew = k.indexOf("new:") === 0;
     var isList = k.indexOf("list:") === 0 || isNew;
-    var name = "", id = "";
+    var name = "", id = "", kind = "";
     if (isNew) {
       name = String(tempName || "");
       id = k.slice(4);
+      kind = LIST_KINDS.indexOf(tempKind) >= 0 ? tempKind : "check";
     } else if (isList) {
       var l = findList(k.slice(5));
       if (!l) return "";
       name = listLabel(l);
       id = l.id;
+      kind = listKindOf(l);
     } else {
       name = noteLabel(k);
+      kind = noteBaseKind(k);           /* "" = 지금 모양(카드) 그대로 */
     }
-    return '<div class="nord-row' + (isNew ? " nord-temp" : "") + '" data-key="' + esc(k) + '">' +
+    return '<div class="nord-row' + (isNew ? " nord-temp" : "") + (selected ? " active" : "") +
+      '" data-key="' + esc(k) + '" data-kind="' + esc(kind) + '">' +
       '<button type="button" class="nord-grip" data-act="nordGrip" aria-label="순서 바꾸기 — 끌거나 위·아래 화살표" title="끌어서 위아래로 옮겨요">' + IC.grip + "</button>" +
       '<input class="field nord-nm" name="n_' + esc(k) + '" value="' + esc(name) + '" aria-label="카테고리 이름" autocomplete="off">' +
+      '<span class="nord-kb">' + esc(nkKindName(kind)) + "</span>" +
       (isList ? '<button type="button" class="nt-del nord-del" data-act="nordDel" data-id="' + esc(id) + '" aria-label="삭제">삭제</button>' : "") +
       "</div>";
   }
+
+  /* v39: 속지 이름 — "" 는 기본 카테고리의 지금 모양(카드) */
+  function nkKindName(kind) {
+    return LIST_KIND_DEF[kind] ? LIST_KIND_DEF[kind].n : "카드";
+  }
+  function nkSelectedRow() {
+    return document.querySelector("#sheet #noteOrderList .nord-row.active");
+  }
+  /* + 시트의 표시를 한 번에 맞춤 — 줄 배지 · 「속지 레이아웃」 제목 · 2×2 카드 체크 · hidden nkind */
+  function nkPaint() {
+    var box = document.querySelector("#sheet #noteOrderList");
+    if (!box) return;
+    var grp = document.querySelector('#sheet [data-group="nkind"]');
+    var rows = Array.prototype.slice.call(box.querySelectorAll(".nord-row"));
+    rows.forEach(function (r) {
+      var kind0 = r.getAttribute("data-kind") || "";
+      var kb = r.querySelector(".nord-kb");
+      if (kb) kb.textContent = nkKindName(kind0);
+    });
+    if (!grp) return;
+    var sel = nkSelectedRow();
+    var kind, label = "속지 레이아웃", hint;
+    if (sel) {
+      kind = sel.getAttribute("data-kind") || "";
+      var nmIn = sel.querySelector(".nord-nm");
+      var nmTxt = nmIn ? String(nmIn.value || "").trim() : "";
+      if (nmTxt) label = "속지 레이아웃 · " + nmTxt;
+      hint = (nmTxt ? "\u300c" + nmTxt + "\u300d" : "이 카테고리") + "에 쓸 속지를 골라요.";
+    } else {
+      var nin0 = grp.querySelector('input[name="nkind"]');
+      var nk0 = nin0 ? String(nin0.value || "") : "check";
+      kind = LIST_KINDS.indexOf(nk0) >= 0 ? nk0 : "check";
+      hint = "새 카테고리에 쓸 속지를 골라요. 나중에 바꿀 수 있어요.";
+    }
+    var lblEl = document.querySelector("#sheet #nkindLbl");
+    if (lblEl) lblEl.textContent = label;
+    var hintEl = document.querySelector("#sheet #nkindHint");
+    if (hintEl) hintEl.textContent = hint;
+    Array.prototype.forEach.call(grp.querySelectorAll(".nk-card"), function (c) {
+      c.classList.toggle("active", (c.getAttribute("data-kind") || "") === kind);
+    });
+    var cardsBtn = grp.querySelector(".nk-cards");
+    if (cardsBtn) {
+      var baseSel = !!(sel && NOTE_BASE.indexOf(sel.getAttribute("data-key") || "") >= 0);
+      cardsBtn.classList.toggle("on", baseSel);
+      cardsBtn.classList.toggle("active", baseSel && kind === "");
+    }
+    var nin = grp.querySelector('input[name="nkind"]');
+    if (nin && LIST_KINDS.indexOf(kind) >= 0) nin.value = kind;
+  }
+  function nkSelectRow(row) {
+    var box = document.querySelector("#sheet #noteOrderList");
+    if (!box) return;
+    Array.prototype.forEach.call(box.querySelectorAll(".nord-row"), function (r) {
+      r.classList.toggle("active", !!row && r === row);
+    });
+    nkPaint();
+  }
+  /* 줄을 누르면 그 줄이 선택되고, 위 「새 카테고리 이름」 칸으로 가면 새 카테고리 모드로 돌아갑니다.
+     ≡ 손잡이·삭제 버튼은 그대로 자기 일을 해요. */
+  document.addEventListener("pointerdown", function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest || !t.closest("#sheet")) return;
+    var row = t.closest("#sheet #noteOrderList .nord-row");
+    if (row) {
+      if (t.closest(".nord-grip") || t.closest(".nord-del")) return;
+      if (!row.classList.contains("active")) nkSelectRow(row);
+      return;
+    }
+    if (t.closest("#sheet .nord-new") || t.closest("#sheet .nord-add-btn")) nkSelectRow(null);
+  }, true);
+  document.addEventListener("focusin", function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest || !t.closest("#sheet")) return;
+    if (t.closest("#sheet .nord-new")) { nkSelectRow(null); return; }
+    var row = t.closest("#sheet #noteOrderList .nord-row");
+    if (row && t.classList && t.classList.contains("nord-nm")) nkSelectRow(row);
+  }, true);
 
   /* v34: + 시트의 ≡ 손잡이 — 터치·마우스로 끌어 순서를 실시간으로 바꿔요.
      v36: 끌고 있는 줄은 손가락을 따라 부드럽게 따라가고(빈 자리는 그대로),
@@ -2447,11 +2659,16 @@
     var box = document.querySelector("#sheet #noteOrderList");
     if (!box) return false;
     var key = "new:" + uid();
-    box.insertAdjacentHTML("beforeend", noteOrderRow(key, nm));
+    var kindInp0 = document.querySelector('#sheet input[name="nkind"]');
+    var kind0 = kindInp0 ? String(kindInp0.value || "") : "check";
+    if (LIST_KINDS.indexOf(kind0) < 0) kind0 = "check";
+    box.insertAdjacentHTML("beforeend", noteOrderRow(key, nm, kind0));
     inp.value = "";
     inp.focus();
     var rows = nordRowsOf(box);
     var last = rows[rows.length - 1];
+    /* v39: 방금 붙인 줄을 그대로 선택 — 이름을 확인하고 바로 속지를 고를 수 있게 */
+    if (last) nkSelectRow(last);
     if (last && last.scrollIntoView) { try { last.scrollIntoView({ block: "nearest" }); } catch (e) {} }
     return true;
   }
@@ -2483,7 +2700,8 @@
       var inp0 = r.querySelector(".nord-nm");
       var sp0 = splitEmojiName(inp0 ? String(inp0.value || "") : "");
       if (!sp0.n) return;                        /* 이름을 지우면 그냥 버림 */
-      var nl0 = { id: uid(), title: sp0.n, emoji: sp0.e, kind: nkind, items: [] };
+      var rk0 = r.getAttribute("data-kind") || "";
+      var nl0 = { id: uid(), title: sp0.n, emoji: sp0.e, kind: LIST_KINDS.indexOf(rk0) >= 0 ? rk0 : nkind, items: [] };
       S.lists.push(nl0);
       newMap[k] = "list:" + nl0.id;
       if (!firstNew) firstNew = newMap[k];
@@ -2530,6 +2748,21 @@
       if (!firstNew) firstNew = "list:" + nl.id;
       added = true;
     }
+    /* v39: 줄마다 고른 속지를 그 카테고리에 반영 — 기본 카테고리는 S.noteKinds, 내 카테고리는 l.kind.
+       기본 카테고리에서 「카드」를 고르면 값을 지워 지금 모양(카드)으로 돌아갑니다. */
+    rows.forEach(function (r) {
+      var k2 = r.getAttribute("data-key") || "";
+      if (!k2 || k2.indexOf("new:") === 0) return;
+      var rk = r.getAttribute("data-kind") || "";
+      if (NOTE_BASE.indexOf(k2) >= 0) {
+        if (LIST_KINDS.indexOf(rk) >= 0) S.noteKinds[k2] = rk; else delete S.noteKinds[k2];
+        return;
+      }
+      if (k2.indexOf("list:") === 0) {
+        var l2 = findList(k2.slice(5));
+        if (l2 && LIST_KINDS.indexOf(rk) >= 0) l2.kind = rk;
+      }
+    });
     /* 카테고리 수정으로 열린 시트 — 고른 속지를 그 카테고리에 반영 */
     if (kindTarget) {
       var kt = findList(kindTarget);
@@ -2589,10 +2822,10 @@
     if (kind === "memo") {
       return sheetHead(isEdit ? "메모 수정" : "새 메모") +
         '<form class="form" id="sheetForm">' +
-        '<div class="f"><label>제목</label><input class="field" name="text" value="' + (it ? esc(it.text) : "") +
+        '<div class="f"><label>제목</label><input class="field" name="text" value="' + (it ? esc(itTitle(it)) : "") +
         '" placeholder="예) 11월에 하고 싶은 것" autocomplete="off"></div>' +
         '<div class="f"><label>본문</label><textarea class="field" name="memo" rows="7" placeholder="자유롭게 적어 두세요">' +
-        (it ? esc(it.memo || "") : "") + "</textarea></div>" + delBtn + submit;
+        (it ? esc(itBody(it)) : "") + "</textarea></div>" + delBtn + submit;
     }
 
     if (kind === "review") {
@@ -2604,7 +2837,7 @@
       }
       return sheetHead(isEdit ? "리뷰 수정" : "새 리뷰") +
         '<form class="form" id="sheetForm">' +
-        '<div class="f"><label>이름</label><input class="field" name="text" value="' + (it ? esc(it.text) : "") +
+        '<div class="f"><label>이름</label><input class="field" name="text" value="' + (it ? esc(itTitle(it)) : "") +
         '" placeholder="예) 성수 카페 · 오늘의 커피" autocomplete="off"></div>' +
         '<div class="f"><label>별점</label><div class="fstars" data-group="fstar" data-v="' + r + '">' + st +
         '</div><input type="hidden" name="rating" value="' + r + '"></div>' +
@@ -2613,26 +2846,26 @@
         '<div class="f"><label>날짜</label><input class="field fdate" type="date" name="date" value="' +
         (it && it.date ? String(it.date).slice(0, 10) : today) + '"></div>' +
         '<div class="f"><label>한줄평</label><textarea class="field" name="memo" rows="3" placeholder="더 적어 두고 싶은 말">' +
-        (it ? esc(it.memo || "") : "") + "</textarea></div>" + delBtn + submit;
+        (it ? esc(itBody(it)) : "") + "</textarea></div>" + delBtn + submit;
     }
 
     if (kind === "expense") {
       return sheetHead(isEdit ? "지출 수정" : "새 지출") +
         '<form class="form" id="sheetForm">' +
-        '<div class="f"><label>항목</label><input class="field" name="text" value="' + (it ? esc(it.text) : "") +
+        '<div class="f"><label>항목</label><input class="field" name="text" value="' + (it ? esc(itTitle(it)) : "") +
         '" placeholder="예) 점심 · 영화표" required autocomplete="off"></div>' +
         '<div class="f"><label>금액 (원)</label><input class="field" name="amount" inputmode="numeric" value="' +
         (it && it.amount != null ? String(it.amount) : "") + '" placeholder="예) 24000" autocomplete="off"></div>' +
         '<div class="f"><label>메모</label><textarea class="field" name="memo" rows="3" placeholder="누구와 · 어떻게 정산할지 (선택)">' +
-        (it ? esc(it.memo || "") : "") + "</textarea></div>" + delBtn + submit;
+        (it ? esc(itBody(it)) : "") + "</textarea></div>" + delBtn + submit;
     }
 
     return sheetHead(isEdit ? "항목 수정" : "항목 추가") +
       '<form class="form" id="sheetForm">' +
       '<div class="f"><label>항목</label>' +
-      '<input class="field" name="text" value="' + (it ? esc(it.text) : "") + '" placeholder="예) 우산 챙기기" required autocomplete="off">' +
+      '<input class="field" name="text" value="' + (it ? esc(itTitle(it)) : "") + '" placeholder="예) 우산 챙기기" required autocomplete="off">' +
       "</div>" +
-      '<div class="f"><label>상세 메모</label><textarea class="field" name="memo" rows="3" placeholder="선택 · 더 자세히 적어 두세요">' + (it ? esc(it.memo || "") : "") + "</textarea></div>" +
+      '<div class="f"><label>상세 메모</label><textarea class="field" name="memo" rows="3" placeholder="선택 · 더 자세히 적어 두세요">' + (it ? esc(itBody(it)) : "") + "</textarea></div>" +
       delBtn + submit;
   }
 
@@ -4029,7 +4262,10 @@
     if (name === "diary" && current !== "diary" && !(opts && opts.keepSeg)) S.ui.seg = "todo";
     /* v37: 사진첩으로 들어올 때는 늘 기본 사진 화면부터 — 달력 보기는 달력 아이콘을
        눌렀을 때만 열리고, 다른 탭에 갔다 오거나 앱을 다시 켜면 다시 목록으로 돌아와요. */
-    if (name === "photo" && current !== "photo") { S.ui.photoCal = false; photoDayView = null; }
+    if (name === "photo" && current !== "photo") {
+      S.ui.photoCal = false; photoDayView = null;
+      photoToBottom = true;          /* v39: 목록은 가장 최근 날짜(맨 아래)부터 보이게 */
+    }
     current = name;
     showScreen(name);
     $("#screens").scrollTop = 0;
@@ -4232,14 +4468,37 @@
       return;
     }
 
-    /* v38: + 시트의 속지 레이아웃 고르기 (2×2 카드 중 하나) */
+    /* v39: + 시트의 속지 레이아웃 — 고른 카테고리 줄이 있으면 그 줄의 속지를 바꾸고,
+       줄을 고르지 않았으면 새 카테고리의 속지를 바꿔요. 「카드」(data-kind="")는 기본 카테고리만. */
     if (act === "nkind") {
-      var nk = el.getAttribute("data-kind") || "check";
+      var nk = el.getAttribute("data-kind") || "";
       var ngrp = el.closest('[data-group="nkind"]');
       if (!ngrp) return;
-      ngrp.querySelectorAll(".nk-card").forEach(function (b) { b.classList.toggle("active", b === el); });
-      var nin = ngrp.querySelector('input[name="nkind"]');
-      if (nin) nin.value = nk;
+      var nrow = document.querySelector("#sheet #noteOrderList .nord-row.active");
+      if (nrow) {
+        if (nk === "" && NOTE_BASE.indexOf(nrow.getAttribute("data-key") || "") < 0) return;
+        nrow.setAttribute("data-kind", nk);
+        if (LIST_KINDS.indexOf(nk) >= 0) {
+          var nin1 = ngrp.querySelector('input[name="nkind"]');
+          if (nin1) nin1.value = nk;
+        }
+      } else if (nk) {
+        var nin0 = ngrp.querySelector('input[name="nkind"]');
+        if (nin0) nin0.value = nk;
+      } else {
+        return;                       /* 새 카테고리는 「카드」가 없어요 */
+      }
+      nkPaint();
+      return;
+    }
+
+    /* v39: 기본 카테고리 속지 화면의 「카드」 — 속지를 걷고 지금 모양(카드)으로 되돌리기 */
+    if (act === "baseKindClear") {
+      var bkT = el.getAttribute("data-tab") || "";
+      if (NOTE_BASE.indexOf(bkT) >= 0) {
+        delete S.noteKinds[bkT];
+        save(); renderDiary(); toast("카드로 돌아왔어요");
+      }
       return;
     }
 
@@ -4259,7 +4518,7 @@
 
     /* v38: 리뷰 목록에서 별을 눌러 점수 바로 매기기 */
     if (act === "rateReview") {
-      var rvl = findList(el.getAttribute("data-list"));
+      var rvl = containerOf(el.getAttribute("data-list"));
       var rvid = el.getAttribute("data-id");
       var rvv = Number(el.getAttribute("data-r")) || 0;
       if (!rvl) return;
@@ -4280,7 +4539,7 @@
     }
 
     if (act === "toggleListItem") {
-      var tl = findList(el.getAttribute("data-list"));
+      var tl = containerOf(el.getAttribute("data-list"));
       var ti = el.getAttribute("data-id");
       var ltBefore = rowTops("#s-diary .dbody");
       if (tl) tl.items.forEach(function (it) { if (it.id === ti) it.done = !it.done; });
@@ -4288,44 +4547,48 @@
     }
 
     if (act === "delListItem") {
-      var dl = findList(el.getAttribute("data-list"));
+      var dl = containerOf(el.getAttribute("data-list"));
       var di = el.getAttribute("data-id");
-      if (dl) dl.items = dl.items.filter(function (it) { return it.id !== di; });
+      if (dl) {
+        if (isBaseContainer(dl)) S[GROUP_ARR[dl.base]] = dl.items.filter(function (it) { return it.id !== di; });
+        else dl.items = dl.items.filter(function (it) { return it.id !== di; });
+      }
       save(); closeSheet(); renderDiary(); return;
     }
 
     if (act === "editListItem") {
-      var elL = findList(el.getAttribute("data-list")), elId = el.getAttribute("data-id");
+      var elCid = el.getAttribute("data-list"), elId = el.getAttribute("data-id");
+      var elL = containerOf(elCid);
       var elIt = elL ? elL.items.filter(function (x) { return x.id === elId; })[0] : null;
       if (!elL || !elIt) return;
       var edKind = listKindOf(elL);
       openSheet(formListItem(elL, elIt), function (fd) {
-        var L2 = findList(elL.id);
+        var L2 = containerOf(elCid);
         var I2 = L2 ? L2.items.filter(function (x) { return x.id === elId; })[0] : null;
         if (!I2) return;
         var txt = String(fd.get("text") || "").trim();
         if (edKind === "memo") {
           var mbody = String(fd.get("memo") || "").trim();
           if (!txt && !mbody) { toast("제목이나 본문을 적어 주세요"); return; }
-          I2.text = txt;
-          I2.memo = mbody;
+          setItTitle(I2, txt);
+          setItBody(I2, mbody);
         } else if (edKind === "review") {
           if (!txt) { toast("이름을 적어 주세요"); return; }
-          I2.text = txt;
+          setItTitle(I2, txt);
           I2.rating = Math.max(0, Math.min(5, Math.round(Number(fd.get("rating")) || 0)));
           I2.place = String(fd.get("place") || "").trim();
           I2.date = String(fd.get("date") || "").slice(0, 10) || today;
-          I2.memo = String(fd.get("memo") || "").trim();
+          setItBody(I2, String(fd.get("memo") || "").trim());
         } else if (edKind === "expense") {
           if (!txt) { toast("항목을 적어 주세요"); return; }
-          I2.text = txt;
+          setItTitle(I2, txt);
           I2.amount = parseAmount(fd.get("amount"));
-          I2.memo = String(fd.get("memo") || "").trim();
+          setItBody(I2, String(fd.get("memo") || "").trim());
           if (!I2.date) I2.date = today;
         } else {
           if (!txt) { toast("내용을 적어 주세요"); return; }
-          I2.text = txt;
-          I2.memo = String(fd.get("memo") || "").trim();
+          setItTitle(I2, txt);
+          setItBody(I2, String(fd.get("memo") || "").trim());
         }
         save(); closeSheet(); renderDiary(); toast("저장했어요");
       });
@@ -4392,33 +4655,39 @@
     }
 
     if (act === "addListItem") {
-      var alL = findList(el.getAttribute("data-list"));
+      var alId = el.getAttribute("data-list");
+      var alL = containerOf(alId);
       if (!alL) return;
       var alKind = listKindOf(alL);
       openSheet(formListItem(alL, null), function (fd) {
-        var L0 = findList(alL.id);
+        var L0 = containerOf(alId);
         if (!L0) return;
         var txt0 = String(fd.get("text") || "").trim();
+        var body0 = String(fd.get("memo") || "").trim();
         if (alKind === "memo") {
-          var b0 = String(fd.get("memo") || "").trim();
-          if (!txt0 && !b0) { toast("제목이나 본문을 적어 주세요"); return; }
-          L0.items.push({ id: uid(), text: txt0, memo: b0, done: false, date: today });
+          if (!txt0 && !body0) { toast("제목이나 본문을 적어 주세요"); return; }
+          if (isBaseContainer(L0)) basePush(L0.base, { text: txt0, memo: body0 });
+          else L0.items.push({ id: uid(), text: txt0, memo: body0, done: false, date: today });
         } else if (alKind === "review") {
           if (!txt0) { toast("이름을 적어 주세요"); return; }
-          L0.items.push({
-            id: uid(), text: txt0, memo: String(fd.get("memo") || "").trim(), done: false,
-            rating: Math.max(0, Math.min(5, Math.round(Number(fd.get("rating")) || 0))),
-            place: String(fd.get("place") || "").trim(),
-            date: String(fd.get("date") || "").slice(0, 10) || today
+          var rate0 = Math.max(0, Math.min(5, Math.round(Number(fd.get("rating")) || 0)));
+          var place0 = String(fd.get("place") || "").trim();
+          var when0 = String(fd.get("date") || "").slice(0, 10) || today;
+          if (isBaseContainer(L0)) basePush(L0.base, { text: txt0, memo: body0, rating: rate0, place: place0, date: when0 });
+          else L0.items.push({
+            id: uid(), text: txt0, memo: body0, done: false,
+            rating: rate0, place: place0, date: when0
           });
         } else if (alKind === "expense") {
           if (!txt0) { toast("항목을 적어 주세요"); return; }
-          L0.items.push({
-            id: uid(), text: txt0, memo: String(fd.get("memo") || "").trim(), done: false,
+          if (isBaseContainer(L0)) basePush(L0.base, { text: txt0, memo: body0, amount: parseAmount(fd.get("amount")) });
+          else L0.items.push({
+            id: uid(), text: txt0, memo: body0, done: false,
             amount: parseAmount(fd.get("amount")), date: today
           });
         } else {
-          L0.items.push({ id: uid(), text: txt0, memo: String(fd.get("memo") || "").trim(), done: false });
+          if (isBaseContainer(L0)) basePush(L0.base, { text: txt0, memo: body0 });
+          else L0.items.push({ id: uid(), text: txt0, memo: body0, done: false });
         }
         save(); closeSheet(); renderDiary(); toast("추가했어요");
       });
@@ -4783,6 +5052,7 @@
       S.ui = S.ui || {};
       S.ui.photoCal = !S.ui.photoCal;
       if (S.ui.photoCal) S.ui.photoMonth = today.slice(0, 7);
+      else photoToBottom = true;     /* v39: 달력에서 목록으로 돌아오면 가장 최근 날짜(맨 아래)로 */
       save(); renderPhoto(); return;
     }
     if (act === "pcalPrev" || act === "pcalNext") {
@@ -4826,8 +5096,8 @@
     }
     if (act === "photoDayBack") {
       photoDayView = null;
+      photoToBottom = true;          /* v39: 목록으로 돌아오면 가장 최근 날짜(맨 아래)로 */
       renderPhoto();
-      $("#screens").scrollTop = 0;
       return;
     }
     if (act === "addPhotoDay") {
@@ -5377,19 +5647,26 @@
       /* v38: 줄글 메모 · 별점 리뷰 · 지출·정산의 맨 위 빠른 추가 한 줄 */
       ev.preventDefault();
       var qf = ev.target;
-      var ql = findList(qf.getAttribute("data-list"));
+      var qid = qf.getAttribute("data-list");
+      var ql = containerOf(qid);
       var qk = qf.getAttribute("data-kind") || "check";
       if (!ql) return;
       var qin = qf.querySelector('input[name="text"]');
       var qtxt = String((qin && qin.value) || "").trim();
       if (!qtxt) { if (qin) qin.focus(); return; }
-      var qit = { id: uid(), text: qtxt, memo: "", done: false, date: today };
-      if (qk === "review") { qit.rating = 0; qit.place = ""; }
-      if (qk === "expense") {
-        var qam = qf.querySelector('input[name="amount"]');
-        qit.amount = parseAmount(qam && qam.value);
+      if (isBaseContainer(ql)) {
+        var qam0 = qf.querySelector('input[name="amount"]');
+        basePush(ql.base, { text: qtxt, memo: "", rating: qk === "review" ? 0 : null, place: qk === "review" ? "" : null,
+          amount: qk === "expense" ? parseAmount(qam0 && qam0.value) : null });
+      } else {
+        var qit = { id: uid(), text: qtxt, memo: "", done: false, date: today };
+        if (qk === "review") { qit.rating = 0; qit.place = ""; }
+        if (qk === "expense") {
+          var qam = qf.querySelector('input[name="amount"]');
+          qit.amount = parseAmount(qam && qam.value);
+        }
+        ql.items.push(qit);
       }
-      ql.items.push(qit);
       save();
       renderDiary();
       var qnew = document.querySelector('#s-diary #listQuickForm input[name="text"]');
@@ -5403,19 +5680,24 @@
       var lid = lf.getAttribute("data-list");
       if (lid) {
         /* 사용자 리스트(리스트 탭) 안에서 바로 더하기 */
-        var lobj = findList(lid);
+        var lobj = containerOf(lid);
         if (!lobj) return;
         var cin = lf.querySelector('input[name="text"]');
         var ctx = String((cin && cin.value) || "").trim();
         if (!ctx) { if (cin) cin.focus(); return; }
-        var cit = { id: uid(), text: ctx, memo: "", done: false };
-        lobj.items.push(cit);
+        var cit;
+        if (isBaseContainer(lobj)) {
+          cit = basePush(lobj.base, { text: ctx, memo: "" });
+        } else {
+          cit = { id: uid(), text: ctx, memo: "", done: false };
+          lobj.items.push(cit);
+        }
         save();
         var cbox = document.querySelector('#s-diary .todo-items[data-list="' + lid + '"]');
         if (cbox) {
           var cem = cbox.querySelector(".empty");
           if (cem) cem.remove();
-          cbox.insertAdjacentHTML("beforeend", listItemRow(cit, '<div class="t tw">' + esc(cit.text) + "</div>",
+          cbox.insertAdjacentHTML("beforeend", listItemRow(cit, '<div class="t tw">' + esc(itTitle(cit)) + "</div>",
             'data-act="toggleListItem" data-list="' + lid + '" data-id="' + cit.id + '"',
             'data-act="editListItem" data-list="' + lid + '" data-id="' + cit.id + '"',
             'data-act="delListItem" data-list="' + lid + '" data-id="' + cit.id + '"'));

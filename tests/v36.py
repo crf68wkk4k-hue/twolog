@@ -1,6 +1,6 @@
 """투로그 v36 확인 — 노트 중복 정리 · 동기화 덮어쓰기 방지 · 카테고리 시트 UI.
 
-1) 버전: sw.js 캐시 twolog-v38 · APP_VERSION v38 · My 탭 「버전 v38」
+1) 버전: sw.js 캐시 twolog-v39 · APP_VERSION v39 · My 탭 「버전 v39」
 2) 노트 중복 정리 (이 폰)
    - 같은 카드 안에 같은 내용이 두 번 들어 있으면 하나로: 체크(done)한 쪽이 살아남고
      상세 메모가 있는 쪽이 살아남음 · 같은 내용이라도 다른 카드/다른 kind 면 그대로
@@ -267,11 +267,11 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v38", 'const VERSION = "twolog-v38"' in sw,
+    check("sw.js 캐시 버전 twolog-v39", 'const VERSION = "twolog-v39"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v38", 'var APP_VERSION = "v38"' in app_js,
+    check("app.js 버전 상수 v39", 'var APP_VERSION = "v39"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v38", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v39", 'const SHELL = "shell-" + VERSION' in sw)
 
     note_tab(page)
     hdr = page.evaluate("""() => {
@@ -284,7 +284,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 500)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v38」", ver.strip() == "버전 v38", ver)
+    check("My 탭 맨 위에 「버전 v39」", ver.strip() == "버전 v39", ver)
     tab(page, 2, 500)
 
     # ==================================================================
@@ -315,7 +315,8 @@ with sync_playwright() as p:
     }""")
     check("안내 문구가 목록 바로 위에 있음", lay["hintNext"] == "noteOrderList", lay["hintNext"])
     check("안내 문구 위가 「노트 카테고리」 라벨", lay["hintPrevTxt"] == "노트 카테고리", lay["hintPrevTxt"])
-    check("안내 문구 내용 그대로", "≡ 를 끌어 위아래로" in lay["hintText"], lay["hintText"])
+    # v39: 안내에 「줄을 누르면 속지 고르기」가 더해짐 — ≡ 드래그 안내는 그대로 남아 있음
+    check("안내 문구 내용 그대로", "줄을 누르면" in lay["hintText"] and "≡ 를 끌면" in lay["hintText"], lay["hintText"])
     check("이름 칸이 네모 테두리가 아닌 밑줄 스타일",
           lay["border"][:3] == ["0px", "0px", "0px"] and lay["border"][3] not in ("0px", ""), lay["border"])
     check("이름 칸 모서리가 각지고 .field 네모칸이 아님",

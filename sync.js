@@ -452,6 +452,14 @@
         }) };
     }
     if (o.gid) p.gid = String(o.gid);        // 어느 카드(리스트)에 들어 있는지
+    /* v39: 기본 카테고리도 속지(별점 리뷰·지출·정산)를 고를 수 있어, 그때 적은 값이 있으면 함께 실어요 */
+    if (kind !== "list") {
+      if (o.text && kind !== "todo") p.text = String(o.text);
+      if (o.rating != null) p.rating = Number(o.rating) || 0;
+      if (o.place) p.place = String(o.place);
+      if (o.amount != null) p.amount = Number(o.amount) || 0;
+      if (o.date && kind !== "log") p.date = String(o.date).slice(0, 10);
+    }
     return p;
   }
 
@@ -490,12 +498,19 @@
       tabs[k] = { e: typeof t.e === "string" ? t.e : "", n: typeof t.n === "string" ? t.n : "" };
     });
     var order = arr(doc && doc.noteOrder).map(function (k) { return String(k); });
-    return { tabs: tabs, order: order };
+    /* v39: 기본 카테고리(메모·버킷리스트·영화·먹방)가 고른 속지 — 없으면 지금 모양(카드) */
+    var kinds = {};
+    var ksrc = (doc && doc.noteKinds) || {};
+    ["todo", "bucket", "log"].forEach(function (k) {
+      if (["check", "memo", "review", "expense"].indexOf(ksrc[k]) >= 0) kinds[k] = ksrc[k];
+    });
+    return { tabs: tabs, order: order, kinds: kinds };
   }
   function noteMetaEmpty(value) {
     if (!value || typeof value !== "object") return true;
     var hasName = ["todo", "bucket", "log"].some(function (k) { return !!(value.tabs && value.tabs[k] && value.tabs[k].n); });
-    return !hasName && !arr(value.order).length;
+    var hasKind = ["todo", "bucket", "log"].some(function (k) { return !!(value.kinds && value.kinds[k]); });
+    return !hasName && !hasKind && !arr(value.order).length;
   }
 
   function noteWhoLabel(who, flip, couple) {
@@ -553,17 +568,26 @@
       .forEach(function (r) {
         var p = r.payload || {};
         var gid = p.gid ? String(p.gid) : undefined;
+        /* v39: 기본 카테고리도 속지(리뷰·지출)를 고를 수 있어, payload 에 있으면 그 값도 함께 되살립니다 */
+        var extra = function (obj) {
+          if (p.rating != null) obj.rating = Number(p.rating) || 0;
+          if (p.place) obj.place = String(p.place);
+          if (p.amount != null) obj.amount = Number(p.amount) || 0;
+          return obj;
+        };
         if (r.kind === "todo") {
-          var todo = { id: r.id, text: p.text || "", memo: p.memo || "", done: !!p.done, who: noteWhoLabel(p.who, flip, doc.couple) };
+          var todo = extra({ id: r.id, text: p.text || "", memo: p.memo || "", done: !!p.done, who: noteWhoLabel(p.who, flip, doc.couple) });
           if (gid) todo.gid = gid;
+          if (p.date) todo.date = String(p.date);
           doc.todos.push(todo);
         } else if (r.kind === "bucket") {
-          var buck = { id: r.id, title: p.title || "", cat: p.cat || "기타", memo: p.memo || "", done: !!p.done, status: p.status || undefined };
+          var buck = extra({ id: r.id, title: p.title || "", cat: p.cat || "기타", memo: p.memo || "", done: !!p.done, status: p.status || undefined });
           if (gid) buck.gid = gid;
+          if (p.date) buck.date = String(p.date);
           doc.bucket.push(buck);
         } else if (r.kind === "log") {
-          var log = { id: r.id, kind: p.kind === "food" ? "food" : "movie", title: p.title || "", rating: Number(p.rating) || 0,
-            date: p.date || nowIso(), review: p.review || "", place: p.place || "", done: p.done !== false };
+          var log = extra({ id: r.id, kind: p.kind === "food" ? "food" : "movie", title: p.title || "", rating: Number(p.rating) || 0,
+            date: p.date || nowIso(), review: p.review || "", place: p.place || "", done: p.done !== false });
           if (gid) log.gid = gid;
           doc.logs.push(log);
         } else if (r.kind === "list") {
@@ -607,6 +631,13 @@
           if (t && typeof t === "object") doc.note[k] = { e: typeof t.e === "string" ? t.e : "", n: typeof t.n === "string" ? t.n : "" };
         });
         if (arr(nm.order).length) doc.noteOrder = arr(nm.order).map(function (k) { return String(k); });
+        /* v39: 기본 카테고리 속지 — 예전(v38) note_meta 에는 없는 값이라 있으면 그때만 읽어요 */
+        if (nm.kinds && typeof nm.kinds === "object") {
+          doc.noteKinds = {};
+          ["todo", "bucket", "log"].forEach(function (k) {
+            if (["check", "memo", "review", "expense"].indexOf(nm.kinds[k]) >= 0) doc.noteKinds[k] = nm.kinds[k];
+          });
+        }
       }
       else if (String(r.key || "").indexOf(K_AVATAR) === 0) {
         /* v26: 프로필 사진 — 사람별 행을 이 기기의 '나/상대'로 바꿔 담습니다 */

@@ -118,8 +118,9 @@ with sync_playwright() as p:
     check("한 줄에 3열", len(grid.split(" ")) == 3, grid)
     page.screenshot(path=os.path.join(SHOT, "photo-v18.png"))
 
-    first = page.locator("#s-photo .pola").first
-    first_title = page.evaluate("document.querySelector('#s-photo .pday .pola .pola-chin').textContent")
+    # v39: 목록은 예전 날짜가 위 · 최근 날짜가 아래 — 사진이 가장 많은(6장) 최근 날짜를 봅니다
+    first = page.locator("#s-photo .pola").last
+    first_title = page.evaluate("document.querySelector('#s-photo .pday:last-child .pola .pola-chin').textContent")
     first.click()
     page.wait_for_timeout(500)
     # v38: 날짜 모아보기가 먼저 — 사진을 누르면 크게 보기

@@ -1,6 +1,6 @@
 """투로그 v37 확인 — 노트 상단 ＋ 테두리 제거 · 사진첩 정사각형 3열 · 사진 달력 정사각 칸·상하 넘김.
 
-1) 버전: sw.js 캐시 twolog-v38 · APP_VERSION v37 · My 탭 「버전 v38」
+1) 버전: sw.js 캐시 twolog-v39 · APP_VERSION v37 · My 탭 「버전 v39」
 2) 노트 맨 윗줄 ＋
    - 동그란 테두리·바탕 없이 ＋ 아이콘만 (border 0 · background 투명 · 모서리 각짐)
    - 터치 영역은 44x44, 아이콘 22px, 오른쪽·높이는 예전 ＋ 자리 그대로
@@ -163,15 +163,15 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check("sw.js 캐시 버전 twolog-v38", 'const VERSION = "twolog-v38"' in sw,
+    check("sw.js 캐시 버전 twolog-v39", 'const VERSION = "twolog-v39"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v37", 'var APP_VERSION = "v38"' in app_js,
+    check("app.js 버전 상수 v37", 'var APP_VERSION = "v39"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v38", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v39", 'const SHELL = "shell-" + VERSION' in sw)
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v38」", ver.strip() == "버전 v38", ver)
+    check("My 탭 맨 위에 「버전 v39」", ver.strip() == "버전 v39", ver)
 
     # ==================================================================
     # 2. 노트 맨 윗줄 ＋ — 테두리 없이 아이콘만
@@ -307,8 +307,9 @@ with sync_playwright() as p:
       return {todayYm: (new Date()).toISOString().slice(0, 7), days: days.length, heads: heads,
               moment: sc.indexOf('월의 순간') >= 0};
     }""")
-    check("처음엔 이번 달 날짜 묶음만" , scope["days"] >= 1 and scope["days"] <= 3, scope["days"])
-    check("지난 달 사진은 기본 화면에 없음", not any("10월 24일" in h["date"] or "8월 8일" in h["date"]
+    # v39: 3일 제한을 풀어 사진이 있는 날을 모두 보여 줍니다
+    check("사진이 있는 날짜가 모두 보임", scope["days"] >= 1, scope["days"])
+    check("지난 달 사진도 기본 화면에 함께 보임", any("10월 24일" in h["date"] or "8월 8일" in h["date"]
                                                  for h in scope["heads"]), scope["heads"])
     check("「{월}월의 순간」 제목 없음", scope["moment"] is False, scope["moment"])
     check("3장을 넘는 날은 「+3장」", any(h["meta"] == "+3장" for h in scope["heads"]), scope["heads"])
@@ -330,18 +331,25 @@ with sync_playwright() as p:
     page.wait_for_timeout(700)
     lim = page.evaluate("""() => {
       const days = Array.from(document.querySelectorAll('#s-photo .pday'));
+      const st = window.__app.state.photos;
       return {n: days.length, heads: days.map(d => { const c = d.querySelector('.pday-hd .c');
-        return {date: d.querySelector('.pday-hd').innerText.replace(/\\n/g, ' ').trim(),
-                meta: c ? c.textContent.trim() : null, count: d.querySelectorAll('.pola').length}; })};
+        const day = d.querySelector('.pday-hd').getAttribute('data-date');
+        return {date: [...d.querySelector('.pday-hd').children].map(x => x.textContent.trim()).filter(Boolean).join(' '),
+                meta: c ? c.textContent.trim() : null, count: d.querySelectorAll('.pola').length,
+                total: st.filter(p => String(p.date || '').slice(0, 10) === day).length}; })};
     }""")
-    check("날짜 묶음은 최근 3일치까지만", lim["n"] == 3, lim["n"])
-    check("2장인 날은 장수 표기 없음(비움)", all(h["meta"] is None for h in lim["heads"] if h["count"] <= 3),
+    check("날짜 묶음은 사진이 있는 날 전부 (3일 제한 없음, v39)", lim["n"] >= 7, lim["n"])
+    # v39: 3일 제한이 없어져 3장을 넘는 날도 함께 보입니다 — «그날 전체 3장 이하»인 날만 표기가 비어 있어야
+    check("3장 이하인 날은 장수 표기 없음(비움)",
+          all(h["meta"] is None for h in lim["heads"] if h["total"] <= 3)
+          and any(h["meta"] for h in lim["heads"] if h["total"] > 3),
           lim["heads"])
     today_d = time.localtime()
     yday = time.strftime("%Y-%m-%d", time.localtime(time.time() - 86400))
-    check("가장 최근 날(어제)부터 보임", lim["heads"] and ("어제" in lim["heads"][0]["date"]
-                                                 or yday[5:7].lstrip("0") + "월" in lim["heads"][0]["date"]),
-          lim["heads"][:1])
+    # v39: 목록은 예전 날짜가 위 · 가장 최근 날짜가 아래 → 마지막 줄이 어제
+    check("가장 최근 날(어제)이 맨 아래", lim["heads"] and ("어제" in lim["heads"][-1]["date"]
+                                                 or yday[5:7].lstrip("0") + "월" in lim["heads"][-1]["date"]),
+          lim["heads"][-1:])
     page.screenshot(path=os.path.join(SHOT, "photo-v37-3days.png"))
 
     # 예시 데이터로 되돌림 (검사용으로 넣은 사진만 걱기)
@@ -354,8 +362,9 @@ with sync_playwright() as p:
     page.screenshot(path=os.path.join(SHOT, "photo-v37.png"))
     page.screenshot(path=os.path.join(SHOT, "photo-v37-full.png"), full_page=True)
 
-    first_title = page.evaluate("(document.querySelector('#s-photo .pola .pola-chin') || {}).textContent || ''")
-    page.locator("#s-photo .pola").first.click()
+    # v39: 목록은 예전 → 최근 순 — 사진이 가장 많은 «최근 날짜»(맨 아래)를 봅니다
+    first_title = page.evaluate("(document.querySelector('#s-photo .pday:last-child .pola .pola-chin') || {}).textContent || ''")
+    page.locator("#s-photo .pola").last.click()
     page.wait_for_timeout(650)
     # v38: 날짜 모아보기가 먼저 → 사진을 누르면 크게 보기
     page.locator("#s-photo .dg-cell").first.click()
@@ -377,7 +386,9 @@ with sync_playwright() as p:
     page.locator('#s-photo [data-act="togglePhotoCal"]').click()
     page.wait_for_timeout(800)
     cal = page.evaluate("""() => {
-      const g = document.querySelector('#s-photo .pcal-grid');
+      /* v39: 앞뒤 12개월이 이어져 첫 달에는 사진이 없을 수 있어 «이번 달» 격자에서 잽니다 */
+      const g = document.querySelector('#s-photo .pcal-m[data-ym="' + (new Date()).getFullYear() + '-' +
+        String((new Date()).getMonth() + 1).padStart(2, '0') + '"] .pcal-grid') || document.querySelector('#s-photo .pcal-grid');
       if (!g) return {ok: false};
       const cells = Array.from(g.querySelectorAll('.pcell'));
       const days = cells.filter(c => !c.classList.contains('blank'));
