@@ -955,10 +955,9 @@ svg [rx]{rx:0}
   touch-action:none; cursor:grab}
 .avcrop-stage:active{cursor:grabbing}
 .avc-img{position:absolute; left:50%; top:50%; max-width:none; transform-origin:center center; user-select:none; -webkit-user-drag:none}
-.avcrop-zoom{display:flex; align-items:center; gap:12px; width:min(84%,300px); color:#FFFFFF; font-size:14px; font-weight:600}
-.avcrop-zoom input[type="range"]{-webkit-appearance:none; appearance:none; flex:1 1 auto; height:3px; border-radius:2px !important; background:rgba(255,255,255,.45); outline:none}
-.avcrop-zoom input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50% !important; background:#FFFFFF; box-shadow:0 1px 3px rgba(0,0,0,.4)}
-.avcrop-zoom input[type="range"]::-moz-range-thumb{width:22px; height:22px; border:0; border-radius:50% !important; background:#FFFFFF}
+/* v45: 확대 슬라이더는 걷어냈어요 — 두 손가락으로 벌려 확대·오므려 축소 (아래 안내 한 줄) */
+.avcrop-hint{margin-top:2px; width:min(88%,320px); text-align:center; color:rgba(255,255,255,.62);
+  font-size:12px; font-weight:500; letter-spacing:-.01em; line-height:1.5; word-break:keep-all}
 .avcrop-btns{display:flex; align-items:center; gap:10px; width:min(84%,300px)}
 .avcrop-btn{flex:1 1 0; height:46px; border-radius:0; border:1px solid rgba(255,255,255,.4); background:transparent;
   color:#FFFFFF; font-size:14.5px; font-weight:600; letter-spacing:-.01em}
@@ -1584,21 +1583,23 @@ html[data-mode="dark"] .fdate{color-scheme:dark}
    ========================================================================== */
 .photo-search svg{width:19px; height:19px}
 /* v39: 목록 날짜 옆 태그는 상자 없이 «날짜와 같은 크기의 글씨» — 가운데 점(·)으로 이어 붙임 */
+/* v45: 기록 이름은 날짜(15px·800)보다 조금 작게 — 13px·600, 같은 밑줄 위에 나란히 */
 .pday-tag{margin:0; height:auto; padding:0; border:0; background:transparent;
-  color:var(--ink); font-size:15px; font-weight:700; letter-spacing:-.03em; line-height:1.2; cursor:pointer;
+  color:var(--ink); font-size:13px; font-weight:600; letter-spacing:-.025em; line-height:1.25; cursor:pointer;
   -webkit-appearance:none; appearance:none; font-family:inherit; white-space:nowrap; max-width:44vw;
   overflow:hidden; text-overflow:ellipsis}
 .pday-tag:active{opacity:.6}
 .pday-tag.empty{color:var(--ink-3); font-weight:600}
-.pday-dot{font-size:15px; font-weight:700; color:var(--ink-3); letter-spacing:-.02em; margin:0 1px}
+.pday-dot{font-size:13px; font-weight:700; color:var(--ink-3); letter-spacing:-.02em; margin:0 1px}
 /* v42: 「11월 21일 · 롯데 리조트」 — 사진첩 목록처럼 테두리·바탕 없이 날짜와 같은 크기·굵기의 검정 글씨 */
+/* v45: 모아보기 머리도 기록 이름을 날짜(20px·800)보다 조금 작게 — 16px·700 */
 .dgal-tag{margin:0; align-self:baseline; max-width:210px; height:auto; padding:0;
-  border:0; background:transparent; color:var(--ink); font-size:20px; font-weight:800;
-  letter-spacing:-.035em; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  border:0; background:transparent; color:var(--ink); font-size:16px; font-weight:700;
+  letter-spacing:-.03em; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   cursor:pointer; -webkit-appearance:none; appearance:none; font-family:inherit}
 .dgal-tag.on{background:transparent; color:var(--ink); border-color:transparent}
 .dgal-tag:active{opacity:.6}
-.dgal-dot{font-size:19px; font-weight:700; color:var(--ink-3); letter-spacing:-.02em; margin:0 1px}
+.dgal-dot{font-size:16px; font-weight:700; color:var(--ink-3); letter-spacing:-.02em; margin:0 1px}
 
 /* ==========================================================================
    v38 — 설정 시트 안 입력칸은 네모 상자 대신 «밑줄»로
@@ -1908,8 +1909,11 @@ html[data-mode="dark"] .up-item.dragging{background:#26262A; box-shadow:0 10px 2
   border-top:1px solid var(--line); background:var(--surface)
 }
 .cmt-form .av,.cmt-form .av-img{width:28px; height:28px; flex:0 0 28px; font-size:11px}
-.cmt-in{flex:1 1 auto; min-width:0; height:40px; padding:0 4px; border:0; border-bottom:1px solid var(--line);
-  background:transparent; font-size:13.5px; color:var(--ink)}
+.cmt-in{flex:1 1 auto; min-width:0; height:40px; min-height:38px; max-height:120px; padding:9px 4px 8px;
+  border:0; border-bottom:1px solid var(--line); background:transparent; font-size:13.5px; color:var(--ink);
+  /* v45: 한 줄 입력칸 → 스스로 늘어나는 textarea (길면 아래로 줄바꿈) */
+  display:block; resize:none; overflow-y:hidden; line-height:1.45; font-family:inherit;
+  white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word}
 .cmt-in:focus{outline:none; border-bottom-color:var(--ink)}
 .cmt-send{flex:0 0 auto; height:34px; padding:0 12px; border:0; background:var(--ink); color:var(--surface);
   font-size:12px; font-weight:800; border-radius:8px !important; letter-spacing:-.01em}
@@ -1966,7 +1970,7 @@ html[data-mode="dark"] .cmt-in{color:#F2F2F4; border-bottom-color:rgba(255,255,2
 .dcmt-b .cmt{padding:7px 0 0}
 .dcmt-b .cmt-empty{padding:10px 2px 6px; font-size:12px}
 .dcmt-b .cmt-form{border-top:1px solid var(--line-2); padding:8px 0 2px}
-.dcmt-b .cmt-in{height:36px; font-size:13px}
+.dcmt-b .cmt-in{height:36px; min-height:36px; padding:8px 4px 6px; font-size:13px}
 .dcmt-b .cmt-send{height:32px; padding:0 11px; font-size:11.5px}
 .dcmt-b .cmt-form .av,.dcmt-b .cmt-form .av-img{width:26px; height:26px; flex:0 0 26px; font-size:10.5px}
 .dcmt-b .cmt .av,.dcmt-b .cmt .av-img{width:26px; height:26px; flex:0 0 26px; font-size:10.5px}
@@ -2109,9 +2113,14 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 .d41-pen{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:3; overflow:visible}
 .d41-pen.on{pointer-events:auto; touch-action:none; cursor:crosshair}
 .d41-tools{
-  flex:0 0 auto; display:flex; align-items:center; justify-content:center; gap:28px;
-  padding:4px 16px 6px; background:var(--surface)
+  flex:0 0 auto; display:flex; align-items:center; justify-content:flex-start; gap:8px;
+  padding:4px 14px 6px; background:var(--surface)
 }
+/* v45: 도구(펜·T·사진)는 왼쪽, 되돌리기·다시 실행은 오른쪽 끝 */
+.d41-tools-gap{flex:1 1 auto}
+.d41-tools .d41-ub{width:34px; height:34px; flex:0 0 34px; margin:0 1px}
+/* v45: 위 줄은 ‹ 뒤로가기 + 가운데 제목만 — 오른쪽에 같은 폭의 빈 자리를 둬 제목을 꼭 가운데로 */
+.d41-top-sp{flex:0 0 40px; width:40px; pointer-events:none}
 /* v44: 아이콘바를 위로 올림 — 종이 위쪽 경계선 */
 .d41-tools{border-bottom:1px solid var(--line); border-top:0}
 .d41-panel{
@@ -2150,18 +2159,28 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
   border-radius:50% !important; cursor:pointer
 }
 .d41-dot.on{box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--ink-3)}
-/* v44: 그리기 도크 — 펜·형광펜·지우개 아이콘 */
+/* v45: 그리기 도크 — 글씨 없이 «한 줄» 그림만 (가느다란 펜·굵은 펜·형광펜·지우개 · 색 · 전체 지우기) */
 .d41-prow-pens{padding:2px 0}
-.d41-pens{display:flex; align-items:center; gap:8px; flex:1 1 auto}
-.d41-pens-gap{flex:1 1 auto}
-.d41-penb{
-  width:40px; height:40px; display:flex; align-items:center; justify-content:center;
-  border:1px solid var(--line) !important; border-radius:10px !important;
-  background:var(--surface); color:var(--ink); cursor:pointer; padding:0
+.d41-prow-dock{padding:4px 0 2px; min-height:0}
+.d41-dock{display:flex; align-items:center; gap:2px; flex:1 1 auto}
+.d41-dock-gap{flex:1 1 auto}
+.d41-dk{
+  width:46px; height:46px; display:flex; align-items:center; justify-content:center;
+  border:0 !important; border-radius:12px !important; background:none; color:var(--ink);
+  cursor:pointer; padding:0; -webkit-appearance:none; appearance:none; font-family:inherit
 }
-.d41-penb svg{width:20px; height:20px}
-.d41-penb.on{background:var(--ink); color:var(--bg); border-color:var(--ink) !important}
-.d41-penb-clear{color:#B4564E}
+.d41-dk svg{width:30px; height:30px}
+.d41-dk.on{background:var(--surface-2)}
+.d41-dk:active{background:var(--surface-2)}
+/* 색 단추 — 지금 펜 색 동그라미 (고르는 동안만 아래에 색 점 줄이 펼쳐져요) */
+.d41-dk-color .d41-dkk{
+  display:block; width:24px; height:24px; border-radius:50% !important;
+  box-shadow:0 0 0 2px var(--surface), 0 0 0 3.4px rgba(120,120,130,.55)
+}
+.d41-dk-color.on .d41-dkk{box-shadow:0 0 0 2px var(--surface), 0 0 0 3.4px var(--ink)}
+.d41-dk-x{color:#B4564E}
+.d41-prow-dotpick{justify-content:flex-start; padding:2px 4px 4px}
+.d41-prow-dotpick .d41-dots{gap:10px}
 /* v44: 고른 그림의 × 지우기 단추 (점선 테두리 왼쪽 위) */
 #sheet .d41-penx{display:flex !important; top:0; left:0; z-index:6}
 /* v44: 글씨 도구 — 정렬·B·S·U·색 동그라미 / − 크기 + 두 줄 */
@@ -2187,6 +2206,35 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 .d41-prow-cp .d41-dots{flex:1 1 auto; justify-content:flex-start}
 
 /* ==========================================================================
+   v45 — 글씨 도구도 «한 줄»: [정렬 B S U − 크기 + 색 동그라미]
+   단추는 조금 크게, 색 동그라미는 작게 · 누르면 전체 컬러판이 아래에 펼쳐짐
+   (「글 수정 / 키보드 내리기」 줄과 안내 글씨는 없앴어요)
+   ========================================================================== */
+.d41-trow{
+  display:flex; align-items:center; gap:2px; flex-wrap:nowrap; min-height:0;
+  padding:2px 0; overflow:visible
+}
+.d41-trow .d41-tb{flex:0 0 auto}
+.d41-tb-lg{min-width:42px; height:40px; padding:0 6px; font-size:17px; border-radius:10px !important}
+.d41-tb-lg svg{width:22px; height:22px}
+.d41-tb-sm{min-width:32px; height:40px; padding:0 4px; font-size:21px; font-weight:600; border-radius:10px !important}
+.d41-tsep{flex:0 0 1px; width:1px; height:22px; margin:0 6px; background:var(--line)}
+.d41-trow .d41-pv{
+  flex:0 0 auto; min-width:34px; height:40px; display:flex; align-items:center; justify-content:center;
+  text-align:center; font-size:15px; font-weight:700; line-height:1;
+  color:var(--ink); font-variant-numeric:tabular-nums
+}
+.d41-trow-gap{flex:1 1 auto}
+/* 색 동그라미 — 작게(22px) 두고 누르면 아래에 전체 컬러판 */
+.d41-trow .d41-tc{width:22px; height:22px; flex:0 0 22px; margin-left:6px;
+  border:2px solid var(--surface) !important;
+  box-shadow:0 0 0 1px rgba(120,120,130,.5)}
+.d41-trow .d41-tc.on{box-shadow:0 0 0 2px var(--surface), 0 0 0 3px var(--ink)}
+.d41-pal{padding:8px 2px 2px; min-height:0}
+.d41-pal-dots{display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-start}
+.d41-dot-lg{width:24px; height:24px}
+
+/* ==========================================================================
    v41 — 날짜(챕터) 댓글: 사진마다 카드 대신 그날 사진 전체에 «한 칸»
    · 머리글(1번째 사진 · 제목)도, 「아직 댓글이 없어요」 문구도 없이
      댓글 목록(프사·이름·내용·답글·삭제) → 프사 · 「댓글 달기」 · 「등록」
@@ -2201,9 +2249,9 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 .dcmt-day .cmt:last-child{padding-bottom:4px}
 .dcmt-day .cmt-form{
   margin-top:2px; padding:12px 0 0; border-top:1px solid var(--line);
-  display:flex; align-items:center; gap:9px
+  display:flex; align-items:flex-end; gap:9px
 }
-.dcmt-day .cmt-in{height:40px; font-size:13.5px}
+.dcmt-day .cmt-in{height:40px; min-height:40px; padding:9px 4px 8px; font-size:13.5px}
 .dcmt-day .cmt-send{
   height:36px; padding:0 14px; border:0 !important; border-radius:8px !important;
   background:var(--ink); color:var(--bg); font-family:inherit; font-size:12.5px; font-weight:700;
@@ -2217,6 +2265,15 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
    ========================================================================== */
 .up-row{display:flex; align-items:flex-end; gap:10px}
 .up-row .f{margin:0; flex:0 0 auto; min-width:0}
+/* v45: 사진 추가·수정 시트 — 「기록 이름」 먼저, 「날짜」는 아래 줄. 한 줄에 붙이지 않고
+   각자 화면 폭을 다 쓰는 밑줄 한 줄 + 두 줄 사이는 넉넉히 띄워요. */
+.up-row.up-stack{display:flex; flex-direction:column; align-items:stretch; gap:16px}
+.up-row.up-stack .f{flex:0 0 auto !important; width:100%; min-width:0}
+/* 예전 한 줄 배치의 «날짜 132px 고정» 은 세로 배치에서 높이가 돼 버려요 — 폭/높이를 풀어 줍니다 */
+.up-row.up-stack .up-date-f{flex:0 0 auto !important; width:100%}
+.up-row.up-stack .up-date{height:44px}
+.up-row.up-stack .f > label{font-size:var(--lbl-fs); font-weight:var(--lbl-fw); color:var(--ink)}
+.up-row.up-stack .field{width:100%; max-width:100%}
 .up-nm-f{flex:1 1 auto !important}
 .up-date-f{flex:0 0 132px !important}
 .up-date-f .up-date{font-variant-numeric:tabular-nums}
@@ -2414,3 +2471,200 @@ html[data-mode="dark"] .d41-new{background:var(--point, #F2F2F4); color:var(--po
 /* v44: 닉네임 라벨은 «생일»·«컬러» 라벨과 맞먹게 크고 진하게, 글씨도 크게 */
 .pr-lbl{font-size:14px; font-weight:700; color:var(--ink); letter-spacing:-.01em}
 #sheet .pr-nm .field{font-size:20px; font-weight:700; height:44px}
+
+/* ==========================================================================
+   v45 — 지출·정산: 함께 쓰는 돈 가계부
+   공동 자금 카드 · 소영/준영 입금 · 내역|달력 · 입금/지출 시트(12 카테고리)
+   ========================================================================== */
+.exp-page{margin:0 20px}
+
+/* --- 머리: ‹ 11월 ›  ·  내역 | 달력 --- */
+.exp-hd{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px}
+.exp-month{display:flex; align-items:center; gap:0; margin-left:-6px}
+.exp-nav{width:30px; height:30px; display:flex; align-items:center; justify-content:center; padding:0;
+  border:0; background:none; color:var(--ink-3); cursor:pointer}
+.exp-nav:active{opacity:.5}
+.exp-month b{font-size:16.5px; font-weight:700; letter-spacing:-.025em; font-variant-numeric:tabular-nums;
+  min-width:46px; text-align:center}
+.exp-month .yr{font-size:11px; font-weight:600; color:var(--ink-3); margin-right:3px; letter-spacing:-.01em}
+.exp-tabs{display:flex; gap:2px; padding:3px; background:var(--surface-2)}
+.exp-tab{height:26px; padding:0 11px; border:0; background:none; color:var(--ink-2);
+  font-size:11.5px; font-weight:600; letter-spacing:-.01em; cursor:pointer}
+.exp-tab.on{background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(28,28,30,.10)}
+
+/* --- 함께 쓰는 돈 카드 --- */
+.exp-fund{background:var(--surface-2); padding:16px 16px 14px}
+.exp-fund-k{font-size:12px; font-weight:600; color:var(--ink-2); letter-spacing:-.01em}
+.exp-fund-total{margin-top:3px; font-size:27px; font-weight:800; letter-spacing:-.045em;
+  font-variant-numeric:tabular-nums; line-height:1.2; color:var(--ink)}
+.exp-fund-row{display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-top:13px;
+  font-size:12px; color:var(--ink-2); letter-spacing:-.01em}
+.exp-fund-row b{font-size:13.5px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums}
+.exp-bar{height:6px; margin-top:7px; background:rgba(0,0,0,.08); overflow:hidden}
+.exp-bar i{display:block; height:100%; background:var(--point, var(--ink)); transition:width .3s ease}
+.exp-bar i.over{background:#C25C45}
+.exp-bar-n{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-top:7px;
+  font-size:11.5px; color:var(--ink-3); letter-spacing:-.01em; font-variant-numeric:tabular-nums}
+.exp-budget{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:6px;
+  font-size:10.5px; color:var(--ink-3); letter-spacing:-.01em}
+.exp-budget-btn{font-size:10.5px; font-weight:600; color:var(--ink-2); text-decoration:underline;
+  text-underline-offset:2px; padding:2px 0; cursor:pointer}
+html[data-mode="dark"] .exp-bar{background:rgba(255,255,255,.12)}
+html[data-mode="dark"] .exp-bar i.over{background:#E0765C}
+
+/* --- 소영 · 준영 입금 --- */
+.exp-people{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:9px}
+.exp-p{border:1px solid var(--line); padding:10px 12px 11px}
+.exp-p .k{display:block; font-size:10.5px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em}
+.exp-p .v{display:block; margin-top:2px; font-size:15.5px; font-weight:700; letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums}
+.exp-both{margin-top:7px; text-align:right; font-size:10.5px; color:var(--ink-3); letter-spacing:-.01em}
+.exp-both b{font-weight:700; color:var(--ink-2); font-variant-numeric:tabular-nums}
+
+/* --- 내역 한 줄 --- */
+.exp-list{margin-top:16px}
+.exp-row{display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line-2)}
+.exp-row:last-child{border-bottom:0}
+.exp-ic{width:38px; height:38px; flex:0 0 38px; display:flex; align-items:center; justify-content:center;
+  background:var(--surface-2); color:var(--ink-2)}
+.exp-ic.in{color:#2F7D5B}
+.exp-ic svg{width:19px; height:19px}
+.exp-row-b{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+  border:0; background:none; text-align:left; cursor:pointer; padding:0}
+.exp-row-b:active{opacity:.6}
+.exp-row-t{font-size:14px; font-weight:600; letter-spacing:-.02em; color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%}
+.exp-row-s{font-size:11px; color:var(--ink-3); letter-spacing:-.01em; font-variant-numeric:tabular-nums;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%}
+.exp-row-a{flex:0 0 auto; font-size:14px; font-weight:700; letter-spacing:-.025em;
+  font-variant-numeric:tabular-nums}
+.exp-row-a.out{color:#C25C45}
+.exp-row-a.in{color:#2F7D5B}
+.exp-x{flex:0 0 20px; width:20px; height:20px; margin-left:-2px; opacity:.34}
+.exp-empty{padding:28px 0; text-align:center; font-size:12.5px; color:var(--ink-3); letter-spacing:-.01em}
+html[data-mode="dark"] .exp-row-a.out{color:#E08C74}
+html[data-mode="dark"] .exp-row-a.in{color:#7FC8A2}
+html[data-mode="dark"] .exp-ic.in{color:#7FC8A2}
+
+/* --- 달력 --- */
+.exp-cal{margin-top:16px}
+.exp-week{display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:4px}
+.exp-week span{text-align:center; font-size:10.5px; font-weight:600; color:var(--ink-3); letter-spacing:0}
+.exp-grid{display:grid; grid-template-columns:repeat(7,1fr); row-gap:1px}
+.exp-blank{min-height:52px}
+.exp-cell{min-height:52px; padding:4px 0 5px; display:flex; flex-direction:column; align-items:center;
+  justify-content:flex-start; gap:1px; border:0; background:none; cursor:pointer; color:var(--ink)}
+.exp-cell-n{font-size:12.5px; font-weight:600; line-height:1.25; font-variant-numeric:tabular-nums}
+.exp-cell.today .exp-cell-n{color:var(--point, var(--ink)); font-weight:800}
+.exp-cell.sel{background:var(--surface-2)}
+.exp-cell .di,.exp-cell .do{font-size:8.5px; font-weight:700; line-height:1.25; letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums; white-space:nowrap}
+.exp-cell .di{color:#2F7D5B}
+.exp-cell .do{color:#C25C45}
+html[data-mode="dark"] .exp-cell .di{color:#7FC8A2}
+html[data-mode="dark"] .exp-cell .do{color:#E08C74}
+.exp-daylist{margin-top:16px; padding-top:12px; border-top:1px solid var(--line)}
+.exp-dayhd{display:flex; align-items:baseline; gap:4px; margin-bottom:2px}
+.exp-dayhd b{font-size:13.5px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums}
+.exp-dayhd .wd{font-size:11.5px; color:var(--ink-3); letter-spacing:-.01em}
+.exp-daynet{margin-left:auto; display:flex; align-items:baseline; gap:7px; font-size:11.5px; font-weight:700;
+  font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+.exp-daynet em{font-style:normal}
+.exp-daynet .di{color:#2F7D5B}
+.exp-daynet .do{color:#C25C45}
+html[data-mode="dark"] .exp-daynet .di{color:#7FC8A2}
+html[data-mode="dark"] .exp-daynet .do{color:#E08C74}
+
+/* --- 아래 + 입금하기 / - 지출하기 (스크롤해도 아래에 붙어 있어요) --- */
+.exp-acts{position:sticky; bottom:-10px; z-index:4; display:grid; grid-template-columns:1fr 1fr; gap:8px;
+  margin:18px -20px 0; padding:12px 20px 16px; background:var(--bg);
+  box-shadow:0 -12px 16px -14px rgba(28,28,30,.30)}
+/* 목록이 단추 뒤로 자연스럽게 사라지도록 위쪽에 옅은 그라데이션 */
+.exp-acts::before{content:""; position:absolute; left:0; right:0; bottom:100%; height:18px;
+  background:linear-gradient(to bottom, rgba(255,255,255,0), var(--bg)); pointer-events:none}
+html[data-mode="dark"] .exp-acts{box-shadow:0 -12px 16px -14px rgba(0,0,0,.8)}
+html[data-mode="dark"] .exp-acts::before{background:linear-gradient(to bottom, rgba(17,17,17,0), var(--bg))}
+.exp-act{height:48px; display:flex; align-items:center; justify-content:center; gap:5px;
+  border:0; font-size:13.5px; font-weight:700; letter-spacing:-.02em; cursor:pointer}
+.exp-act .s{font-size:15px; font-weight:700; line-height:1; margin-top:-1px}
+.exp-act.in{background:var(--surface-2); color:var(--ink)}
+.exp-act.out{background:var(--point, var(--ink)); color:var(--point-ink, var(--bg))}
+.exp-act:active{transform:scale(.994)}
+
+/* --- 시트: 지출 | 입금 · 금액 · 누가 · 카테고리 --- */
+.sheet-hd.exp-shd{display:flex; align-items:center; justify-content:space-between; gap:6px; padding:6px 0 2px}
+.exp-shd .icon-btn{width:32px; height:32px; margin-left:-6px}
+.exp-hdsp{width:32px; height:32px; flex:0 0 32px}
+.exp-delbtn{color:var(--ink-3); margin-left:0; margin-right:-6px}
+.exp-seg{display:flex; gap:2px; padding:3px; background:var(--surface-2)}
+.exp-seg button{height:29px; padding:0 20px; border:0; background:none; color:var(--ink-3);
+  font-size:12.5px; font-weight:700; letter-spacing:-.01em; cursor:pointer}
+.exp-seg button.on{background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(28,28,30,.10)}
+.exp-seg button.on[data-tx="expense"]{color:#C25C45}
+.exp-seg button.on[data-tx="deposit"]{color:#2F7D5B}
+html[data-mode="dark"] .exp-seg button.on[data-tx="expense"]{color:#E08C74}
+html[data-mode="dark"] .exp-seg button.on[data-tx="deposit"]{color:#7FC8A2}
+.exp-form{margin-top:2px}
+.exp-fld{display:flex; align-items:center; gap:12px; padding:13px 0; border-bottom:1px solid var(--line-2)}
+.exp-fld > label{width:52px; flex:0 0 52px; font-size:var(--lbl-fs); font-weight:var(--lbl-fw);
+  color:var(--ink); letter-spacing:-.01em}
+.exp-amt-in{flex:1 1 auto; min-width:0; display:flex; align-items:baseline; justify-content:flex-start; gap:6px}
+.exp-amt-in .w{font-size:17px; font-weight:600; color:var(--ink-3); flex:0 0 auto}
+.exp-amt-in input{flex:1 1 auto; min-width:0; width:100%; border:0; background:none; padding:0;
+  text-align:left; font-size:26px; font-weight:800; letter-spacing:-.04em; color:var(--ink);
+  font-variant-numeric:tabular-nums; outline:none; height:36px}
+.exp-amt-in input::placeholder{color:var(--ink-3); font-weight:600}
+.exp-whos{flex:1 1 auto; display:flex; justify-content:flex-end; gap:6px}
+.exp-who{height:30px; padding:0 13px; border:1px solid var(--line); background:var(--surface);
+  color:var(--ink-2); font-size:11.5px; font-weight:600; letter-spacing:-.01em; cursor:pointer;
+  max-width:96px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.exp-who.on{border-color:var(--ink); color:var(--ink); font-weight:700}
+.exp-cats{padding:14px 0 4px; border-bottom:1px solid var(--line-2)}
+.exp-cats-lb{font-size:var(--lbl-fs); font-weight:var(--lbl-fw); color:var(--ink); letter-spacing:-.01em}
+.exp-catgrid{display:grid; grid-template-columns:repeat(4,1fr); gap:11px 4px; margin-top:12px}
+.exp-cat{display:flex; flex-direction:column; align-items:center; gap:5px; border:0; background:none;
+  padding:2px 0; cursor:pointer; color:var(--ink-2)}
+.exp-cat .ic{width:44px; height:44px; display:flex; align-items:center; justify-content:center;
+  background:var(--surface-2); color:var(--ink-2); transition:background .12s ease, color .12s ease}
+.exp-cat .ic svg{width:20px; height:20px}
+.exp-cat .nm{font-size:10.5px; font-weight:600; letter-spacing:-.02em; color:var(--ink-2);
+  max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.exp-cat.on .ic{background:var(--ink); color:var(--bg)}
+.exp-cat.on .nm{color:var(--ink); font-weight:700}
+.exp-cat-more .ic{background:none; box-shadow:inset 0 0 0 1px var(--line); color:var(--ink-3)}
+.exp-catnew{display:flex; align-items:center; gap:8px; margin-top:4px}
+.exp-catnew[hidden]{display:none !important}
+.exp-cats[hidden]{display:none !important}
+.exp-catnew .field{flex:1 1 auto; min-width:0}
+.exp-catadd{flex:0 0 auto; height:34px; padding:0 12px; border:1px solid var(--ink); background:var(--ink);
+  color:var(--bg); font-size:11.5px; font-weight:700; cursor:pointer}
+.exp-datein{flex:1 1 auto; min-width:0; border:0; background:none; padding:0; text-align:right;
+  font-size:14px; color:var(--ink); outline:none; height:32px; font-variant-numeric:tabular-nums}
+.exp-datein::-webkit-date-and-time-value{text-align:right}
+.exp-datein::-webkit-calendar-picker-indicator{opacity:.4; filter:grayscale(1)}
+.exp-memoin{flex:1 1 auto; min-width:0; border:0; background:none; padding:0; text-align:right;
+  font-size:14px; color:var(--ink); outline:none; height:32px}
+.exp-memoin::placeholder{color:var(--ink-3)}
+.exp-datein:focus,.exp-memoin:focus{color:var(--ink)}
+#sheet .exp-budget-in{text-align:right; font-variant-numeric:tabular-nums}
+
+/* 둥근 끝 (사각 잠금 예외) — 카드·버튼·아이콘 원 */
+.exp-fund,.exp-p,.exp-tabs,.exp-tab,.exp-bar,.exp-bar i,.exp-act,.exp-seg,.exp-seg button,
+.exp-ic,.exp-cat .ic,.exp-cell,.exp-daylist .exp-row-b,.exp-catadd,.exp-budget-btn{
+  border-radius:0
+}
+.exp-fund{border-radius:18px !important}
+.exp-p{border-radius:14px !important}
+.exp-tabs{border-radius:10px !important}
+.exp-tab{border-radius:8px !important}
+.exp-bar{border-radius:3px !important}
+.exp-bar i{border-radius:3px !important}
+.exp-act{border-radius:12px !important}
+.exp-seg{border-radius:11px !important}
+.exp-seg button{border-radius:9px !important}
+.exp-ic{border-radius:50% !important}
+.exp-cat .ic{border-radius:50% !important}
+.exp-cell{border-radius:10px !important}
+.exp-catadd{border-radius:8px !important}
+.exp-who{border-radius:999px !important}
+#sheet .exp-datein,#sheet .exp-memoin{border-radius:0 !important}

@@ -1,9 +1,10 @@
 """투로그 v42 확인 — 「기념일 & 생일」 시트 정리 + 프로필 편집에서 생일 고치기.
 
-1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
+1) 버전: sw.js 캐시 twolog-v45 · APP_VERSION v45 · My 탭 「버전 v45」
 2) 기념일 & 생일 시트 (홈 D-day 카드를 눌러 열기)
    - 「홈 D-day 위에 이 문구가 그대로 보여요.」 안내 문구가 사라짐
    - 아래쪽 생일 달력 입력칸(.bd-in.js-bday) 두 개가 사라짐 · 「고른 생일은 바로 위에 …」 안내도 사라짐
+     (v45: 프로필 생일은 다시 날짜칸 하나 — type=date · name=bday)
    - 1주년·2주년·3주년 줄은 그대로, 생일은 「소영 생일 · 6월 26일 · D-…」 요약 줄만 (요약 줄 유지)
 3) 프로필 편집 연결
    - 시트 안에 「프로필 편집」 버튼이 있고, 누르면 프로필 편집 화면(내 프로필 · 닉네임 · 생일)이 열림
@@ -128,9 +129,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
+    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v45"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -143,7 +144,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v44」", ver.strip() == "버전 v44", ver)
+    check("My 탭 맨 위에 「버전 v45」", ver.strip() == "버전 v45", ver)
 
     tab(page, 0, 520)
 
@@ -197,24 +198,23 @@ with sync_playwright() as p:
     page.wait_for_timeout(480)
     prof = page.evaluate("""() => {
       const q = (s) => document.querySelector(s);
-      const hid = q('#sheet input[type=hidden][name=bday]');
+      const inp = q('#sheet input[name=bday]');
       return {head: (q('#sheet .sheet-hd h2') || {}).textContent || '',
               name: (q('#sheet #personName') || {}).value || '',
-              bday: hid ? hid.value : null,
+              bday: inp ? inp.value : null,
+              date: !!inp && inp.type === 'date',
               sel3: !!q('#sheet select.pr-bday-y'),
               bdLabel: [...document.querySelectorAll('#sheet .f label')].map(l => l.textContent.trim()),
               save: !!q('#sheet button[type=submit]')};}""")
     check("내 프로필 편집 화면이 열림", prof["head"].strip() == "내 프로필", prof)
     check("프로필에 닉네임 칸", prof["name"] == "소영", prof)
-    check("프로필에 생일 «년/월/일» 고르기 (6월 26일 이월)", prof["sel3"]
-          and prof["bday"] in ("1992-06-26", "6월 26일") and "생일" in prof["bdLabel"], prof)
+    # v45: 생일은 날짜칸 한 개 (v44 의 «년/월/일» 세 칸은 다시 걷어냄)
+    check("프로필에 생일 날짜칸 하나 · «생일» 라벨", prof["date"] and not prof["sel3"]
+          and "생일" in prof["bdLabel"], prof)
     page.screenshot(path=os.path.join(SHOT, "dday-v42-profile.png"))
 
-    # v44: 생일은 세 고르기 칸으로 (연·월·일)
-    page.select_option("#sheet select.pr-bday-y", "1993")
-    page.select_option("#sheet select.pr-bday-m", "3")
-    page.select_option("#sheet select.pr-bday-d", "15")
-    page.wait_for_timeout(220)
+    page.fill("#sheet input[name=bday]", "1993-03-15")
+    page.wait_for_timeout(260)
     page.locator("#personForm button[type=submit]").click()
     page.wait_for_timeout(620)
     back = page.evaluate("""() => ({
@@ -234,12 +234,10 @@ with sync_playwright() as p:
     you = page.evaluate("""() => ({
       head: (document.querySelector('#sheet .sheet-hd h2') || {}).textContent || '',
       name: (document.querySelector('#sheet #personName') || {}).value || '',
-      bday: (document.querySelector('#sheet input[type=hidden][name=bday]') || {}).value || ''})""")
+      bday: (document.querySelector('#sheet input[name=bday]') || {}).value || ''})""")
     check("준영 생일 줄 → 준영 프로필 편집 열림", you["name"] == "준영" and "준영" in you["head"], you)
-    page.select_option("#sheet select.pr-bday-y", "1995")
-    page.select_option("#sheet select.pr-bday-m", "11")
-    page.select_option("#sheet select.pr-bday-d", "20")
-    page.wait_for_timeout(220)
+    page.fill("#sheet input[name=bday]", "1995-11-20")
+    page.wait_for_timeout(260)
     page.locator("#personForm button[type=submit]").click()
     page.wait_for_timeout(620)
     back2 = page.evaluate("""() => ({
@@ -344,10 +342,10 @@ with sync_playwright() as p:
     check("헤더에 연도(2026년)·오늘 표기 없음", not day9["year"] and "년" not in (day9["headAll"] or "")
           and "오늘" not in (day9["headAll"] or ""), {"year": day9["year"], "head": day9["headAll"]})
     check("헤더 「11월 21일 · 롯데 리조트」", "롯데 리조트" in (day9["tagTxt"] or "") and "·" in (day9["headAll"] or ""), day9["headAll"])
-    check("기록 이름은 테두리·바탕 없는 검정 글씨 (날짜와 같은 크기·굵기)",
+    check("기록 이름은 테두리·바탕 없는 검정 글씨 · 날짜보다 조금 작게 (v45)",
           day9["tagBorder"] in ("0px",) and day9["tagBg"] in ("rgba(0, 0, 0, 0)", "transparent")
           and day9["tagColor"] not in ("rgb(255, 255, 255)",)
-          and day9["tagFs"] == day9["h1Fs"] and day9["tagFw"] == day9["h1Fw"],
+          and float(day9["h1Fs"].replace("px", "")) - float(day9["tagFs"].replace("px", "")) >= 2,
           {k: day9[k] for k in ("tagBorder", "tagBg", "tagColor", "tagFs", "tagFw", "h1Fs", "h1Fw")})
     check("사진 12장이어도 3×3 9장만 그려짐", day9["cells"] == 9 and day9["wraps"] == 9 and day9["cols"] == 3, day9)
     check("9번째 칸 오른쪽 아래 「+3」 배지", day9["badge"] == "+3" and day9["badgeIn"], day9)

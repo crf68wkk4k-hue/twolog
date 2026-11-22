@@ -88,7 +88,7 @@ with sync_playwright() as p:
     # ---------------- 서비스워커 캐시 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
     # v24: 캐시 버전은 배포마다 올라가므로 v24 으로 (앱 버전 상수와 같은 값)
-    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
+    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
 
     # 예시 데이터로 한 번 열어 상태를 만들고, 저장되는 일반 모드로 옮겨요
@@ -389,10 +389,10 @@ with sync_playwright() as p:
     check("숫자 굵기·자릿수 고정", calw["weight"] == "600" and calw["tnum"] == "tabular-nums", (calw["weight"], calw["tnum"]))
 
     # 「일」 요일 헤더와 모든 일요일 숫자도 공휴일과 같은 진한 빨강
-    # (고른 날은 숫자가 흰색이 되는 원형 표시라 비교에서 뺍니다 — 오늘이 일요일이거나 일요일을 고른 날)
+    # (고른 날은 숫자가 흰색이 되는 원형 표시, 오늘은 강조색 — 둘 다 비교에서 뺍니다)
     sun = page.evaluate("""(() => {
       const wd = document.querySelector('#s-cal .cal-week span');
-      const days = Array.from(document.querySelectorAll('#s-cal .day.sun:not(.sel) .dnum'));
+      const days = Array.from(document.querySelectorAll('#s-cal .day.sun:not(.sel):not(.today) .dnum'));
       return {wd: getComputedStyle(wd).color, wdTxt: wd.textContent.trim(),
               n: days.length, cols: Array.from(new Set(days.map(d => getComputedStyle(d).color)))};
     })()""")

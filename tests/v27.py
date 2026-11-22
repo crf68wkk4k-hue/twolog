@@ -1,6 +1,6 @@
 """투로그 v27 확인 — 노트 카드 묶음(groups·gid) 동기화 · v26 기기 자동 복구 · 달력 글씨.
 
-1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · sync.js 에 repairGroups
+1) 버전: sw.js 캐시 twolog-v45 · APP_VERSION v45 · sync.js 에 repairGroups
 2) 달력 아래 선택한 날 일정 글씨가 커짐(제목 16px · 이름 12.5px → v28 13.5px)
 3) v26 으로 이미 한 번 이전을 마친 폰 재현
    (원격 notes 38개에 gid·memo 없음 + settings 에 groups 없음 + twolog.migrated.<cid> 있음,
@@ -177,9 +177,9 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     sync_js = page.request.get(URL + "sync.js").text()
-    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
+    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:1])
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js)
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v45"' in app_js)
     check("sync.js 에 gid·groups 동기화가 있음",
           "notePayload" in sync_js and 'K_GROUPS = "groups"' in sync_js and "repairGroups" in sync_js)
     ctx.close()
@@ -857,8 +857,9 @@ with sync_playwright() as p:
     check("사진을 고르면 크롭 화면이 뜸(어두운 배경 + 동그라미 가이드)",
           crop["open"] and crop["img"] and round_ok and
           crop["bg"] in ("rgb(8, 8, 10)", "rgba(8, 8, 10, 0.985)"), crop)
-    check("크롭 화면: 취소·적용 버튼과 확대 슬라이더",
-          crop["apply"] and crop["cancel"] and crop["slider"] == ["1", "3"], crop["slider"])
+    # v45: 확대 슬라이더는 걷어내고 두 손가락 확대·축소만 (안내 한 줄)
+    check("크롭 화면: 취소·적용 버튼 · 확대 슬라이더는 없음",
+          crop["apply"] and crop["cancel"] and crop["slider"] is None, crop["slider"])
     page.screenshot(path=os.path.join(SHOT, "my-v27-avatar-crop.png"))
 
     # 드래그로 위치 옮기기 · 슬라이더로 확대
@@ -871,11 +872,28 @@ with sync_playwright() as p:
     moved = page.evaluate("() => document.getElementById('avcImg').style.transform")
     mx = re.search(r"calc\(-50% \+ (-?[\d.]+)px\)", moved or "")
     check("크롭 화면: 끌어서 사진 위치를 옮길 수 있음", bool(mx) and abs(float(mx.group(1))) >= 10, moved)
-    page.evaluate("""() => { const z = document.getElementById('avcZoom');
-      z.value = '2'; z.dispatchEvent(new Event('input', { bubbles: true })); }""")
+    # v45: 두 손가락을 벌려 확대 (슬라이더 없이)
+    pinch = page.evaluate("""() => {
+      const stage = document.getElementById('avcStage');
+      const img = document.getElementById('avcImg');
+      const r = stage.getBoundingClientRect();
+      const cx = r.width / 2, cy = r.height / 2;
+      const mk = (t, id, x, y) => new PointerEvent(t, { pointerId: id, pointerType: 'touch',
+        clientX: r.left + x, clientY: r.top + y, bubbles: true, cancelable: true });
+      const scaleOf = () => { const m = /scale\\(([\\d.]+)\\)/.exec(img.style.transform || ''); return m ? Number(m[1]) : 1; };
+      stage.dispatchEvent(mk('pointerdown', 31, cx - 20, cy));
+      stage.dispatchEvent(mk('pointerdown', 32, cx + 20, cy));
+      for (let i = 1; i <= 4; i++) {
+        stage.dispatchEvent(mk('pointermove', 31, cx - 20 - i * 8, cy));
+        stage.dispatchEvent(mk('pointermove', 32, cx + 20 + i * 8, cy));
+      }
+      const sc = scaleOf();
+      stage.dispatchEvent(mk('pointerup', 32, cx + 52, cy));
+      stage.dispatchEvent(mk('pointerup', 31, cx - 52, cy));
+      return sc;
+    }""")
     page.wait_for_timeout(250)
-    zoomed = page.evaluate("() => document.getElementById('avcImg').style.transform")
-    check("크롭 화면: 슬라이더로 확대", "scale(2)" in zoomed, zoomed)
+    check("크롭 화면: 두 손가락을 벌리면 확대됨", pinch > 1.5, pinch)
 
     # 적용 → 256×256 JPEG 로 저장
     page.locator("#avcApply").click()

@@ -1,6 +1,6 @@
 """투로그 v44 확인 — 동기화 오류 덮어쓰기 방지 · 기념일·프로필 시트 손보기.
 
-1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
+1) 버전: sw.js 캐시 twolog-v45 · APP_VERSION v45 · My 탭 「버전 v45」
 2) 동기화 오류 덮어쓰기 방지 (v44 핵심)
    - 서버 표(events/notes/photos/settings) 읽기가 하나라도 실패하면 load() 가 실패로 끝나고
      빈 배열로 화면을 덮어쓰지 않음 — Realtime 재읽기(scheduleReload)·당겨오기(store.pull) 뒤에도
@@ -10,10 +10,10 @@
 3) 기념일 & 생일 시트 — 「상단 문구」·「우리의 시작」 줄이 가운데로 (두 칸 폭 같게·글자 가운데 정렬·높이 같게),
    상단 문구 라벨 옆 「최대 14자 · 남은 글자」 가 쓰는 동안 줄어듦 (한글 조합 입력 포함)
 4) 내 프로필 — 닉네임 라벨은 크고 진하게(14px·700·진한 색), 닉네임 글씨도 크게(20px·700)
-5) 생일은 «년 / 월 / 일» 세 칸 고르기 (아이폰 날짜 팝업의 «연·월만» 문제 대신) —
-   연도 1940년~올해 · 월 1~12월 · 일은 그 달의 마지막 날까지(윤년 2월 29일 포함, 바뀌면 넘친 일은 맞춰줌),
+5) 생일은 예전처럼 «한 번에» 날짜칸 하나 (type=date · name=bday · 1900-01-01~오늘) —
+   v44 의 «년/월/일» 세 칸 고르기는 v45 에서 걷어냄,
    고르면 아래에 「1992년 6월 26일」 이 바로 보이고 저장하면 YYYY-MM-DD 로 남음(서버 settings birthdays 포함),
-   «선택» 빈 칸으로 두면 생일이 지워짐
+   날짜칸을 비우면 생일이 지워짐
 6) 콘솔/페이지 오류 0건
 
     python3 tests/v44.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
@@ -163,17 +163,17 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
+    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v45"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("예전 v43 문자열이 남아 있지 않음",
-          "twolog-v43" not in sw and 'APP_VERSION = "v43"' not in app_js)
+    check("예전 v44 문자열이 남아 있지 않음",
+          "twolog-v44" not in sw and 'APP_VERSION = "v44"' not in app_js)
 
     seed_demo(page)
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v44」", ver.strip() == "버전 v44", ver)
+    check("My 탭 맨 위에 「버전 v45」", ver.strip() == "버전 v45", ver)
     ctx.close()
 
     # ==================================================================
@@ -247,7 +247,7 @@ with sync_playwright() as p:
     check("브라우저 콘솔/페이지 오류 없음 (기념일 시트)", len(errsA) == 0, errsA[:4])
 
     # ==================================================================
-    # 3. 내 프로필 — 닉네임 크게 · 생일 «년/월/일» 세 칸 고르기
+    # 3. 내 프로필 — 닉네임 크게 · 생일은 날짜칸 한 개 (v45 에서 세 칸 고르기를 걷어냄)
     # ==================================================================
     pageA.locator('#sheet .dday-profs button[data-act="personSheet"][data-who="me"]').click()
     pageA.wait_for_timeout(560)
@@ -255,88 +255,45 @@ with sync_playwright() as p:
       const sh = document.querySelector('#sheet');
       const lbl = sh.querySelector('.pr-lbl');
       const nm = document.getElementById('personName');
-      const ys = sh.querySelector('select.pr-bday-y'), ms = sh.querySelector('select.pr-bday-m'),
-            ds = sh.querySelector('select.pr-bday-d');
-      const hid = sh.querySelector('input[type=hidden][name=bday]');
-      const old = sh.querySelector('input[type=date][name=bday]');
+      const inp = sh.querySelector('input[name=bday]');
       const ls = lbl ? getComputedStyle(lbl) : null, ns = nm ? getComputedStyle(nm) : null;
       const txt = document.getElementById('prBdayTxt');
       return {lbl: ls ? {fs: ls.fontSize, fw: ls.fontWeight, color: ls.color} : null,
         nm: ns ? {fs: ns.fontSize, fw: ns.fontWeight} : null,
-        sel3: !!(ys && ms && ds), oldDate: !!old, hid: hid ? hid.value : null,
-        yOpts: ys ? ys.options.length : 0, mOpts: ms ? ms.options.length : 0, dOpts: ds ? ds.options.length : 0,
-        yVal: ys ? ys.value : '', mVal: ms ? ms.value : '', dVal: ds ? ds.value : '',
-        yFirst: ys ? ys.options[0].textContent : '', yLast: ys ? ys.options[ys.options.length - 1].textContent : '',
-        mFirst: ms ? ms.options[1] ? ms.options[1].textContent : '' : '',
+        date: !!inp && inp.type === 'date', min: inp ? inp.getAttribute('min') : '',
+        max: inp ? inp.getAttribute('max') : '',
+        sel3: !!(sh.querySelector('select.pr-bday-y') || sh.querySelector('select.pr-bday-m') || sh.querySelector('select.pr-bday-d')),
         txt: txt ? txt.textContent : ''};
     }""")
-    check("내 프로필에 «년/월/일» 세 고르기 칸 (date 입력칸 대신)",
-          pr["sel3"] and not pr["oldDate"], pr)
+    check("내 프로필 생일은 날짜칸 하나 (type=date · 세 칸 고르기 없음)",
+          pr["date"] and not pr["sel3"] and pr["min"] == "1900-01-01", pr)
     check("닉네임 라벨이 크고 진하게 (14px·700·진한 글씨)",
           pr["lbl"] and pr["lbl"]["fs"] == "14px" and pr["lbl"]["fw"] in ("700", "bold")
           and pr["lbl"]["color"] not in ("", "rgba(0, 0, 0, 0)"), pr["lbl"])
     check("닉네임 글씨가 크게 (20px·700)",
           pr["nm"] and pr["nm"]["fs"] == "20px" and pr["nm"]["fw"] in ("700", "bold"), pr["nm"])
-    year_now = pageA.evaluate("() => new Date().getFullYear()")
-    check("연도 칸 — «선택» + 올해~1940년 (%d개)" % (year_now - 1940 + 2),
-          pr["yFirst"] == "선택" and pr["yLast"] == "1940년"
-          and pr["yOpts"] == year_now - 1940 + 2, {"yFirst": pr["yFirst"], "yLast": pr["yLast"], "n": pr["yOpts"]})
-    check("월 칸 — «선택» + 1월~12월", pr["mOpts"] == 13 and pr["mFirst"] == "1월", pr["mOpts"])
-    check("일 칸 — «선택» + 그 달의 마지막 날까지 (6월은 30일까지)", pr["dOpts"] == 31, pr["dOpts"])
-    # 1992년 6월 26일 고르기
-    pageA.select_option('#sheet select.pr-bday-y', '1992')
-    pageA.wait_for_timeout(160)
-    pageA.select_option('#sheet select.pr-bday-m', '6')
-    pageA.wait_for_timeout(160)
-    pageA.select_option('#sheet select.pr-bday-d', '26')
-    pageA.wait_for_timeout(200)
-    picked = pageA.evaluate("""() => ({hid: document.querySelector('#sheet input[type=hidden][name=bday]').value,
+    # 1992년 6월 26일 고르기 — 고르는 순간 아래 줄에 보임
+    pageA.fill("#sheet input[name=bday]", "1992-06-26")
+    pageA.wait_for_timeout(260)
+    picked = pageA.evaluate("""() => ({val: document.querySelector('#sheet input[name=bday]').value,
       txt: document.getElementById('prBdayTxt').textContent.trim()})""")
-    check("1992년·6월·26일을 고르면 hidden 에 1992-06-26 · 아래에 「1992년 6월 26일」",
-          picked["hid"] == "1992-06-26" and "1992년 6월 26일" in picked["txt"], picked)
+    check("1992-06-26 을 고르면 아래에 「1992년 6월 26일」", picked["val"] == "1992-06-26"
+          and "1992년 6월 26일" in picked["txt"], picked)
     pageA.screenshot(path=os.path.join(SHOT, "person-v44-sheet.png"))
-    # 윤년 — 2024년 2월은 29일까지
-    pageA.select_option('#sheet select.pr-bday-y', '2024')
-    pageA.wait_for_timeout(140)
-    pageA.select_option('#sheet select.pr-bday-m', '2')
+    # 윤년 날짜도 그대로 담김 (2024-02-29)
+    pageA.fill("#sheet input[name=bday]", "2024-02-29")
     pageA.wait_for_timeout(200)
-    feb = pageA.evaluate("""() => ({n: document.querySelector('#sheet select.pr-bday-d').options.length,
-      hid: document.querySelector('#sheet input[type=hidden][name=bday]').value})""")
-    check("윤년 2024년 2월 — 29일까지 (%d칸)" % feb["n"], feb["n"] == 30, feb)
-    # 31일을 골라 둔 뒤 2월로 바꾸면 29일로 맞춰 줌
-    pageA.select_option('#sheet select.pr-bday-d', '29')
-    pageA.wait_for_timeout(160)
-    pageA.select_option('#sheet select.pr-bday-y', '2025')
+    leap = pageA.evaluate("() => document.querySelector('#sheet input[name=bday]').value")
+    check("윤년 2024-02-29 도 그대로 담김", leap == "2024-02-29", leap)
+    # 비우면 지워짐
+    pageA.fill("#sheet input[name=bday]", "")
     pageA.wait_for_timeout(200)
-    feb2 = pageA.evaluate("""() => { const ds = document.querySelector('#sheet select.pr-bday-d');
-      return {v: ds.value, hid: document.querySelector('#sheet input[type=hidden][name=bday]').value}; }""")
-    check("2025년 2월(평년)로 바꾸면 29일이 28일로 맞춰짐",
-          feb2["v"] == "28" and feb2["hid"] == "2025-02-28", feb2)
-    # 빈 칸(선택)으로 두면 생일 지우기
-    pageA.select_option('#sheet select.pr-bday-y', '')
-    pageA.wait_for_timeout(160)
-    pageA.select_option('#sheet select.pr-bday-m', '')
-    pageA.wait_for_timeout(160)
-    pageA.select_option('#sheet select.pr-bday-d', '')
-    pageA.wait_for_timeout(160)
-    empty = pageA.evaluate("() => document.querySelector('#sheet input[type=hidden][name=bday]').value")
-    check("«선택» 빈 칸으로 두면 생일 값이 지워짐", empty == "", empty)
-    # 월·일만 골라도 남기기 (연도는 비움)
-    pageA.select_option('#sheet select.pr-bday-y', '')
-    pageA.wait_for_timeout(140)
-    pageA.select_option('#sheet select.pr-bday-m', '3')
-    pageA.wait_for_timeout(140)
-    pageA.select_option('#sheet select.pr-bday-d', '9')
-    pageA.wait_for_timeout(160)
-    md = pageA.evaluate("() => document.querySelector('#sheet input[type=hidden][name=bday]').value")
-    check("월·일만 고르면 «3월 9일» 처럼 남음 (연도는 비워 둠)", md == "3월 9일", md)
-    # 다시 고르고 저장 — YYYY-MM-DD 로 남음
-    pageA.select_option('#sheet select.pr-bday-y', '1992')
-    pageA.wait_for_timeout(140)
-    pageA.select_option('#sheet select.pr-bday-m', '6')
-    pageA.wait_for_timeout(140)
-    pageA.select_option('#sheet select.pr-bday-d', '26')
-    pageA.wait_for_timeout(160)
+    empty = pageA.evaluate("""() => ({v: document.querySelector('#sheet input[name=bday]').value,
+      txt: document.getElementById('prBdayTxt').textContent.trim()})""")
+    check("날짜칸을 비우면 생일이 지워짐", empty["v"] == "" and "년" not in empty["txt"], empty)
+    # 다시 1992-06-26 으로 골라 저장
+    pageA.fill("#sheet input[name=bday]", "1992-06-26")
+    pageA.wait_for_timeout(220)
     pageA.locator('#sheet button.btn-primary[type="submit"]').click()
     pageA.wait_for_timeout(700)
     saved = pageA.evaluate("""() => { const s = JSON.parse(localStorage.getItem('twolog:v1:state') || '{}');
@@ -351,11 +308,9 @@ with sync_playwright() as p:
     pageA.wait_for_timeout(600)
     pageA.locator('#sheet .dday-profs button[data-act="personSheet"][data-who="me"]').click()
     pageA.wait_for_timeout(520)
-    back = pageA.evaluate("""() => ({y: document.querySelector('#sheet select.pr-bday-y').value,
-      m: document.querySelector('#sheet select.pr-bday-m').value,
-      d: document.querySelector('#sheet select.pr-bday-d').value,
+    back = pageA.evaluate("""() => ({v: (document.querySelector('#sheet input[name=bday]') || {}).value || '',
       txt: document.getElementById('prBdayTxt').textContent.trim()})""")
-    check("다시 열어도 1992년·6월·26일이 고른 채", (back["y"], back["m"], back["d"]) == ("1992", "6", "26")
+    check("다시 열어도 1992-06-26 이 채워진 채", back["v"] == "1992-06-26"
           and "1992년 6월 26일" in back["txt"], back)
     check("브라우저 콘솔/페이지 오류 없음 (내 프로필)", len(errsA) == 0, errsA[:4])
     pageA.keyboard.press("Escape")
@@ -490,13 +445,14 @@ with sync_playwright() as p:
     pageB.locator("#sheet .d41-tool[aria-label='펜 그리기']").click()
     pageB.wait_for_timeout(340)
     dock4 = pageB.evaluate("""() => ({on: document.getElementById('d41Pen').classList.contains('on'),
-      pens: [...document.querySelectorAll('#sheet .d41-penb')].map(b => b.getAttribute('aria-label')),
-      ws: [...document.querySelectorAll('#sheet [data-act=d41PenW]')].map(b => b.textContent),
+      pens: [...document.querySelectorAll('#sheet .d41-dk')].map(b => b.getAttribute('aria-label')),
+      ws: [...document.querySelectorAll('#sheet [data-act=d41PenMode][data-w]')].map(b => b.getAttribute('data-w')),
+      texts: [...document.querySelectorAll('#sheet .d41-prow-dock .d41-pl')].length,
       dots: document.querySelectorAll('#sheet .d41-dot[data-act=d41PenColor]').length})""")
-    check("펜을 누르면 그리기 도크(펜·형광펜·지우개·전체 지우기 · 굵기 · 색)가 바로 열림",
-          dock4["on"] and dock4["pens"][:3] == ["펜", "형광펜", "지우개"]
-          and "전체 지우기" in dock4["pens"] and dock4["ws"] == ["얇게", "보통", "두껍게"]
-          and dock4["dots"] == 5, dock4)
+    # v45: 글씨 라벨 없는 한 줄 도크 — 가는 펜 · 일반 펜 · 형광펜 · 지우개 · 색 · 전체 지우기
+    check("펜을 누르면 한 줄짜리 그림 도크가 바로 열림 (글씨 라벨 없음)",
+          dock4["on"] and dock4["pens"] == ["가는 펜", "일반 펜", "형광펜", "지우개", "펜 색", "전체 지우기"]
+          and dock4["ws"] == ["2", "4.5"] and dock4["texts"] == 0 and dock4["dots"] == 0, dock4)
     n0 = pageB.evaluate(DRAW_JS, [[[0.15, 0.62], [0.3, 0.66], [0.45, 0.63]]])
     pageB.wait_for_timeout(300)
     saved4a = pageB.evaluate("""() => { const s = JSON.parse(localStorage.getItem('twolog:v1:state') || '{}');
@@ -504,7 +460,7 @@ with sync_playwright() as p:
       return (it.pen || []).length; }""")
     check("펜으로 한 획을 그리면 화면에 선이 남고 자동 저장됨 (저장 단추 없이)",
           n0 == 1 and saved4a == 1, (n0, saved4a))
-    pageB.locator("#sheet .d41-penb[data-mode='hl']").click()
+    pageB.locator("#sheet .d41-dk[data-mode='hl']").click()
     pageB.wait_for_timeout(220)
     n1 = pageB.evaluate(DRAW_JS, [[[0.55, 0.7], [0.7, 0.74], [0.85, 0.71]]])
     pageB.wait_for_timeout(260)
@@ -678,12 +634,8 @@ with sync_playwright() as p:
     pageD.wait_for_timeout(600)
     pageD.locator('#sheet .dday-profs button[data-act="personSheet"][data-who="me"]').click()
     pageD.wait_for_timeout(520)
-    pageD.select_option('#sheet select.pr-bday-y', '1992')
-    pageD.wait_for_timeout(140)
-    pageD.select_option('#sheet select.pr-bday-m', '6')
-    pageD.wait_for_timeout(140)
-    pageD.select_option('#sheet select.pr-bday-d', '26')
-    pageD.wait_for_timeout(160)
+    pageD.fill('#sheet input[name=bday]', '1992-06-26')
+    pageD.wait_for_timeout(240)
     pageD.locator('#sheet button.btn-primary[type="submit"]').click()
     pageD.wait_for_timeout(2800)
     srv = pageD.evaluate("""() => { const row = (window.__stub.settings || []).filter(x => x.key === 'birthdays')[0];

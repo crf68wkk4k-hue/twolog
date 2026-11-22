@@ -1,6 +1,6 @@
 """투로그 v37 확인 — 노트 상단 ＋ 테두리 제거 · 사진첩 정사각형 3열 · 사진 달력 정사각 칸·상하 넘김.
 
-1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v37 · My 탭 「버전 v44」
+1) 버전: sw.js 캐시 twolog-v45 · APP_VERSION v37 · My 탭 「버전 v45」
 2) 노트 맨 윗줄 ＋
    - 동그란 테두리·바탕 없이 ＋ 아이콘만 (border 0 · background 투명 · 모서리 각짐)
    - 터치 영역은 44x44, 아이콘 22px, 오른쪽·높이는 예전 ＋ 자리 그대로
@@ -163,15 +163,15 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
+    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v37", 'var APP_VERSION = "v44"' in app_js,
+    check("app.js 버전 상수 v37", 'var APP_VERSION = "v45"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v44", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v45", 'const SHELL = "shell-" + VERSION' in sw)
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v44」", ver.strip() == "버전 v44", ver)
+    check("My 탭 맨 위에 「버전 v45」", ver.strip() == "버전 v45", ver)
 
     # ==================================================================
     # 2. 노트 맨 윗줄 ＋ — 테두리 없이 아이콘만
@@ -310,8 +310,11 @@ with sync_playwright() as p:
     }""")
     # v39: 3일 제한을 풀어 사진이 있는 날을 모두 보여 줍니다
     check("사진이 있는 날짜가 모두 보임", scope["days"] >= 1, scope["days"])
-    check("지난 달 사진도 기본 화면에 함께 보임", any("10월 24일" in h["date"] or "8월 8일" in h["date"]
-                                                 for h in scope["heads"]), scope["heads"])
+    # (날짜가 오늘 기준으로 밀리므로 «이번 달이 아닌 날짜» 가 있으면 통과 — 예전엔 10월 24일·8월 8일을 찾았어요)
+    def _other_month(h):
+        mm = re.match(r"(\d+)월", h["date"] or "")
+        return bool(mm) and int(mm.group(1)) != int(time.strftime("%m"))
+    check("지난 달 사진도 기본 화면에 함께 보임", any(_other_month(h) for h in scope["heads"]), scope["heads"])
     check("「{월}월의 순간」 제목 없음", scope["moment"] is False, scope["moment"])
     # v40: 장수는 날짜 줄이 아니라 «마지막 사진 오른쪽 아래» 작은 +N 배지로만
     check("3장을 넘는 날은 마지막 사진에 작은 +N", ph.get("more") == "+3" and all(h["meta"] is None for h in scope["heads"]),

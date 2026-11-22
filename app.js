@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v44";
+  var APP_VERSION = "v45";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -75,7 +75,9 @@
     undo: svg('<path d="M8.8 5.6 4.4 10l4.4 4.4"/><path d="M4.4 10h9.6a5.1 5.1 0 0 1 0 10.2h-2.4"/>', 19),
     redo: svg('<path d="M15.2 5.6 19.6 10l-4.4 4.4"/><path d="M19.6 10h-9.6a5.1 5.1 0 0 0 0 10.2h2.4"/>', 19),
     marker: svg('<path d="M5 19.5h14"/><path d="M6.8 15.6 13.7 8.7a1.9 1.9 0 0 1 2.7 0l1.5 1.5a1.9 1.9 0 0 1 0 2.7l-6.9 6.9-3.6.9.9-3.6z"/>', 19),
-    eraser: svg('<path d="M4.5 15.6 12 8.1a2 2 0 0 1 2.8 0l3.6 3.6a2 2 0 0 1 0 2.8l-3.7 3.7H8.7z"/><path d="M4.5 19.6h15"/>', 19)
+    eraser: svg('<path d="M4.5 15.6 12 8.1a2 2 0 0 1 2.8 0l3.6 3.6a2 2 0 0 1 0 2.8l-3.7 3.7H8.7z"/><path d="M4.5 19.6h15"/>', 19),
+    /* v45: 지출·정산 시트 — 고친 항목 지우기 */
+    trash: svg('<path d="M4.6 7h14.8M9.4 7V5.3h5.2V7"/><path d="M6.8 7l.9 12.3a1.5 1.5 0 0 0 1.5 1.4h5.6a1.5 1.5 0 0 0 1.5-1.4L17.2 7"/>', 19)
   };
   var STAR = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.8l2.86 5.94 6.54.9-4.77 4.55 1.18 6.5L12 17.6l-5.81 3.09 1.18-6.5L2.6 9.64l6.54-.9z"/></svg>';
 
@@ -216,6 +218,11 @@
   /* v39: 기본 카테고리(메모·버킷리스트·영화·먹방)가 고른 속지 — 값이 없으면 지금 모양(카드) 그대로예요.
      예) S.noteKinds = { bucket: "expense" } → 버킷리스트 탭이 지출·정산 속지로 그려집니다. */
   if (!S.noteKinds || typeof S.noteKinds !== "object") S.noteKinds = {};
+  /* v45: 기본 카테고리가 지출·정산 속지일 때의 달 예산 — { todo|bucket|log: { "2026-11": 1500000 } } */
+  if (!S.noteBudgets || typeof S.noteBudgets !== "object") S.noteBudgets = {};
+  ["todo", "bucket", "log"].forEach(function (k) {
+    if (!S.noteBudgets[k] || typeof S.noteBudgets[k] !== "object") S.noteBudgets[k] = {};
+  });
   ["todo", "bucket", "log"].forEach(function (k) {
     if (["check", "memo", "review", "expense"].indexOf(S.noteKinds[k]) < 0) delete S.noteKinds[k];
     /* v40: 기본 카테고리의 「투두리스트」는 이제 「카드」와 같은 화면이라 값을 걷어요 */
@@ -311,6 +318,14 @@
     if (["check", "memo", "review", "expense"].indexOf(l.kind) < 0) l.kind = "check";
     if (typeof l.emoji !== "string") l.emoji = "";   /* v33: 이모지 없이 쓰는 카테고리 */
     if (!Array.isArray(l.items)) l.items = [];
+    /* v45: 지출·정산 달 예산 { "2026-11": 1500000 } — 모양이 깨진 값은 걷어 내요 */
+    if (l.budgets != null && typeof l.budgets !== "object") delete l.budgets;
+    if (l.budgets) {
+      Object.keys(l.budgets).forEach(function (k) {
+        var v = Math.round(Number(l.budgets[k]) || 0);
+        if (/^\d{4}-\d{2}$/.test(k) && v > 0) l.budgets[k] = v; else delete l.budgets[k];
+      });
+    }
   });
   S.lists = S.lists.filter(function (l) { return l && typeof l === "object"; });
   /* v40: 「투두리스트」 속지는 2열 카드 묶음 화면이 됐어요 — 내 카테고리도 카드 묶음을 갖고,
@@ -411,12 +426,16 @@
     if (!S2) return 0;
     var removed = 0;
     [["todo", "todos"], ["bucket", "bucket"], ["log", "logs"]].forEach(function (p) {
+      /* v45: 지출·정산 속지의 항목은 같은 이름(같은 카테고리)이어도 하나로 합치지 않아요 */
+      if (noteBaseKind(p[0]) === "expense") return;
       var res = dedupeItems(p[0], S2[p[1]]);
       if (res.removed) { S2[p[1]] = res.items; removed += res.removed; }
     });
     /* 커스텀 리스트(내 카테고리) 안의 항목 */
     (S2.lists || []).forEach(function (l) {
       if (!l || !Array.isArray(l.items)) return;
+      /* v45: 가계부는 «식비» «입금» 처럼 이름이 같은 줄이 여러 개예요 — 합치면 안 돼요 */
+      if (listKindOf(l) === "expense") return;
       var res = dedupeItems("list", l.items);
       if (res.removed) { l.items = res.items; removed += res.removed; }
     });
@@ -1191,56 +1210,19 @@
     return (p.y ? p.y + "년 " : "") + p.m + "월 " + p.d + "일";
   }
   /* =====================================================================
-     v44: 프로필 생일 «년 / 월 / 일» 세 칸 고르기
+     v45: 프로필 생일은 «한 번에» — 날짜 입력칸 하나
      ---------------------------------------------------------------------
-     아이폰 날짜 팝업(input[type=date])은 연도를 찾아 올리면 «연·월»만 남고
-     «일» 칸이 사라져 헷갈렸어요 — 세 개의 고르기 칸으로 바꾸고 값은
-     예전 그대로 YYYY-MM-DD 로 저장해요 (빈 칸으로 두면 생일을 지웁니다).
+     v44 의 «년 / 월 / 일» 세 고르기는 한 번에 고르기 불편하다는 요청으로 걷어냈어요.
+     다시 예전처럼 input[type=date] 한 칸(name=bday)으로 받고, 고르면 바로 아래
+     안내 줄에 「1992년 6월 26일 · D-…」처럼 보여 줍니다.
+     값은 예전 그대로 YYYY-MM-DD 로 저장하고(sync.js K_BDAY), 비우면 지워져요.
      ===================================================================== */
-  function prBdayParts(who) {
-    var p = parseBirthday((S.couple.birthdays || {})[who] || "");
-    return { y: p && p.y ? p.y : 0, m: p ? p.m : 0, d: p ? p.d : 0 };
-  }
-  /* 저장되어 있던 값 그대로 — 연도 없이 «6월 26일»로 쓰던 예전 값도 유지해요 */
   function prBdayValue(who) {
     var v = String((S.couple.birthdays || {})[who] || "").trim();
     var p = parseBirthday(v);
+    /* 연도 없는 예전 값(«6월 26일»)은 날짜칸에 넣을 수 없어 비워 두고 아래 줄에 보여 줘요 */
     if (p && p.y) return p.y + "-" + pad(p.m) + "-" + pad(p.d);
-    return v;
-  }
-  function prBdayMax(y, m) {
-    if (!(m >= 1 && m <= 12)) return 31;
-    /* 연도를 아직 안 골랐으면 2월은 윤년(2000년) 기준 29일까지 보여요 */
-    return new Date(y > 0 ? y : 2000, m, 0).getDate();
-  }
-  function prBdaySelects(who) {
-    var b = prBdayParts(who);
-    var h = '<select class="field pr-bday-y" aria-label="생일 연도"><option value="">선택</option>';
-    for (var y = new Date().getFullYear(); y >= 1940; y--) h += '<option value="' + y + '"' + (b.y === y ? " selected" : "") + ">" + y + "년</option>";
-    h += '</select><select class="field pr-bday-m" aria-label="생일 월"><option value="">선택</option>';
-    for (var m = 1; m <= 12; m++) h += '<option value="' + m + '"' + (b.m === m ? " selected" : "") + ">" + m + "월</option>";
-    h += '</select><select class="field pr-bday-d" aria-label="생일 일"><option value="">선택</option>';
-    for (var d = 1; d <= prBdayMax(b.y, b.m); d++) h += '<option value="' + d + '"' + (b.d === d ? " selected" : "") + ">" + d + "일</option>";
-    return h + "</select>";
-  }
-  /* 고른 연·월·일을 hidden(name=bday)에 YYYY-MM-DD 로 담고, 아래 안내 줄에 바로 보여요 */
-  function prBdaySync(row) {
-    if (!row) return;
-    var ysel = row.querySelector(".pr-bday-y"), msel = row.querySelector(".pr-bday-m"), dsel = row.querySelector(".pr-bday-d");
-    if (!ysel || !msel || !dsel) return;
-    var y = parseInt(ysel.value, 10) || 0, m = parseInt(msel.value, 10) || 0, d = parseInt(dsel.value, 10) || 0;
-    /* 연·월을 바꾸면 일 칸을 그 달의 마지막 날까지 다시 만들어요 — 넘친 일은 그 달의 마지막 날로 */
-    var dmax = prBdayMax(y, m), cur = d;
-    var dh = '<option value="">선택</option>';
-    for (var i = 1; i <= dmax; i++) dh += '<option value="' + i + '"' + (i === cur ? " selected" : "") + ">" + i + "일</option>";
-    dsel.innerHTML = dh;
-    if (cur > dmax) { dsel.value = String(dmax); d = dmax; }
-    var hid = row.parentElement.querySelector('input[name="bday"]');
-    /* v44: 연·월·일을 다 골랐으면 YYYY-MM-DD, 월·일만 골랐으면 «6월 26일» 처럼 남겨요 (연도는 비워 둠) */
-    var v = (y && m && d) ? y + "-" + pad(m) + "-" + pad(d) : (m && d ? m + "월 " + d + "일" : "");
-    if (hid) hid.value = v;
-    var prb = document.getElementById("prBdayTxt");
-    if (prb) prb.textContent = (v ? bdayFullText(v) + " · " : "") + "연·월·일을 골라 주세요. 홈 D-day 에는 월·일로 보여요.";
+    return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "";
   }
   /* 다음 생일까지 남은 날 — 월·일로만 계산해요 */
   function nextBirthday(v) {
@@ -2026,6 +2008,10 @@
     if (f.rating != null) it.rating = f.rating;
     if (f.place != null) it.place = f.place;
     if (f.amount != null) it.amount = f.amount;
+    /* v45: 지출·정산 속지에서 적은 입금/지출·카테고리·누가 */
+    if (f.txType) it.txType = f.txType === "deposit" ? "deposit" : "expense";
+    if (f.cat != null) it.cat = String(f.cat);
+    if (f.who) it.who = f.who;
     it.date = f.date ? String(f.date).slice(0, 10) : today;
     it.gid = firstGroupId(k) || "";
     itemsOf(k).push(it);
@@ -2142,6 +2128,8 @@
   var DOW_ENG = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
   var D41_SIZES = [0, 14, 16.5, 19];
   var D41_COLORS = ["", "#6E6E73", "#B4564E", "#3D6E8A", "#5E7A52"];
+  /* v45: 글씨 색 «전체 컬러판» — 색 동그라미를 누르면 이 판이 펼쳐져요 */
+  var D41_TCOLORS = ["#111111", "#6E6E73", "#B4564E", "#C25C45", "#3D6E8A", "#2F6F62", "#5E7A52", "#7A5C9E", "#A8762F"];
   var diary = null;
 
   function d41Stamp(ds) {
@@ -2599,6 +2587,9 @@
       '<button type="button" class="d41-tool' + (mode === "pen" ? " on" : "") + '" data-act="d41Pen" aria-label="펜 그리기">' + IC.pencil + "</button>" +
       '<button type="button" class="d41-tool d41-tool-t' + (mode === "text" ? " on" : "") + '" data-act="d41Text" aria-label="글씨">T</button>' +
       '<button type="button" class="d41-tool" data-act="d41Img" aria-label="사진 넣기">' + IC.photo + "</button>" +
+      '<span class="d41-tools-gap"></span>' +
+      '<button type="button" class="d41-ub" id="d41UndoBtn" data-act="d41Undo" aria-label="되돌리기" title="되돌리기" disabled>' + IC.undo + "</button>" +
+      '<button type="button" class="d41-ub" id="d41RedoBtn" data-act="d41Redo" aria-label="다시 실행" title="다시 실행" disabled>' + IC.redo + "</button>" +
       "</div>";
   }
   /* v44: T 도구 — 누르면 새 글 상자를 만들어요 (배경을 누르면 이제 글쓰기가 끝나요).
@@ -2624,6 +2615,10 @@
   /* T 패널 — 「작게·보통·크게」 옆에 가로 슬라이더(12~40px)로 세밀하게 */
   /* v44: 글씨 도구 — 가늘고 긴 두 줄: 정렬·B·S·U·색 동그라미 / − 크기 +
      (예전의 작게·보통·크게·슬라이더·색 점·정렬 줄은 정리했어요) */
+  /* v45: 글씨 도구도 «한 줄» — [정렬 B S U − 크기 + 색 동그라미]
+     · 단추를 조금 크게, 색 동그라미는 작게(22px)
+     · 색 동그라미를 누르면 «전체 컬러판» 이 아래에 펼쳐져요
+     · 「글 수정 / 키보드 내리기」 줄과 안내 글씨는 없앴어요 (상자를 한 번 더 톡 누르면 입력) */
   function d41TextPanel() {
     var cur = d41SelText();
     var size = cur ? cur.size : (diary.tsize || 16.5);
@@ -2633,35 +2628,27 @@
     var strike = cur ? !!cur.strike : !!diary.tstrike;
     var under = cur ? !!cur.underline : !!diary.tunderline;
     var aico = align === "center" ? IC.alignC : align === "right" ? IC.alignR : IC.alignL;
-    var h = '<div class="d41-prow d41-prow-t"><div class="d41-tbar">' +
-      '<button type="button" class="d41-tb" data-act="d41Align" aria-label="정렬 바꾸기">' + aico + "</button>" +
-      '<button type="button" class="d41-tb d41-tb-b' + (bold ? " on" : "") + '" data-act="d41Bold" aria-label="굵게">B</button>' +
-      '<button type="button" class="d41-tb d41-tb-s' + (strike ? " on" : "") + '" data-act="d41Strike" aria-label="취소선">S</button>' +
-      '<button type="button" class="d41-tb d41-tb-u' + (under ? " on" : "") + '" data-act="d41Underline" aria-label="밑줄">U</button>' +
-      '<span class="d41-tbar-gap"></span>' +
-      '<button type="button" class="d41-tc' + (color ? "" : " on") + '" data-act="d41ColorPick" aria-label="글씨 색 고르기" style="background:' + (color || "#111111") + '"></button>' +
-      "</div></div>";
+    var h = '<div class="d41-prow d41-trow">' +
+      '<button type="button" class="d41-tb d41-tb-lg" data-act="d41Align" aria-label="정렬 바꾸기">' + aico + "</button>" +
+      '<button type="button" class="d41-tb d41-tb-lg d41-tb-b' + (bold ? " on" : "") + '" data-act="d41Bold" aria-label="굵게">B</button>' +
+      '<button type="button" class="d41-tb d41-tb-lg d41-tb-s' + (strike ? " on" : "") + '" data-act="d41Strike" aria-label="취소선">S</button>' +
+      '<button type="button" class="d41-tb d41-tb-lg d41-tb-u' + (under ? " on" : "") + '" data-act="d41Underline" aria-label="밑줄">U</button>' +
+      '<span class="d41-tsep"></span>' +
+      '<button type="button" class="d41-tb d41-tb-sm" data-act="d41SizeStep" data-d="-1" aria-label="글씨 작게">−</button>' +
+      '<span class="d41-pv">' + Math.round(size) + "</span>" +
+      '<button type="button" class="d41-tb d41-tb-sm" data-act="d41SizeStep" data-d="1" aria-label="글씨 크게">+</button>' +
+      '<span class="d41-trow-gap"></span>' +
+      '<button type="button" class="d41-tc d41-tc-sm' + (diary.cpick ? " on" : "") + '" data-act="d41ColorPick" aria-label="글씨 색 고르기" ' +
+        'style="background:' + (color || "#111111") + '"></button>' +
+      "</div>";
     if (diary.cpick) {
-      h += '<div class="d41-prow d41-prow-cp"><div class="d41-dots">';
-      ["#111111"].concat(D41_COLORS.filter(Boolean)).forEach(function (c, i) {
-        h += '<button type="button" class="d41-dot' + (color === c ? " on" : "") + '" data-act="d41Color" data-color="' + esc(c) +
-          '" aria-label="글씨 색 ' + (i + 1) + '" style="background:' + (c || "#111111") + '"></button>';
+      h += '<div class="d41-prow d41-pal"><div class="d41-dots d41-pal-dots">';
+      D41_TCOLORS.forEach(function (c, i) {
+        h += '<button type="button" class="d41-dot d41-dot-lg' + ((color || "#111111") === c ? " on" : "") +
+          '" data-act="d41Color" data-color="' + esc(c) + '" aria-label="글씨 색 ' + (i + 1) + '" style="background:' + c + '"></button>';
       });
       h += "</div></div>";
     }
-    h += '<div class="d41-prow d41-prow-t"><div class="d41-tbar">' +
-      '<button type="button" class="d41-tb" data-act="d41SizeStep" data-d="-1" aria-label="글씨 작게">−</button>' +
-      '<span class="d41-pv">' + Math.round(size) + "</span>" +
-      '<button type="button" class="d41-tb" data-act="d41SizeStep" data-d="1" aria-label="글씨 크게">+</button>' +
-      "</div></div>";
-    /* v43: 고른 글 상자는 키보드를 내린 채로 다뤄요 — 「글 수정」을 눌러야 입력(키보드) */
-    if (cur) {
-      h += '<div class="d41-prow"><span class="d41-pl">입력</span><div class="d41-pbtns">' +
-        '<button type="button" class="d41-pb on" data-act="d41Edit" data-tx="' + esc(cur.id) + '">글 수정</button>' +
-        '<button type="button" class="d41-pb" data-act="d41Blur">키보드 내리기</button>' +
-        "</div></div>";
-    }
-    h += '<div class="d41-phint">' + (cur ? "한 번 더 누르면 글을 쓸 수 있어요. 끌면 옮겨져요." : "종이를 누르면 그 자리에 글을 써요.") + "</div>";
     return h;
   }
   function d41ImgPanel() {
@@ -2673,27 +2660,49 @@
     h += '<div class="d41-phint">사진을 끌어 옮기고, 오른쪽 아래 모서리를 끌어 크기를 바꿔요.</div>';
     return h;
   }
+  /* v45: 펜을 누르면 «한 줄짜리 그림 도구 판» — 글씨 라벨 없이 펜촉 그림만.
+     가는 펜 · 일반 펜 · 형광펜 · 지우개 · 색 동그라미 · 전체 지우기 (굵기 글씨·슬라이더는 없앰) */
+  function d41PenTipSvg(color, thick) {
+    /* 가는 펜은 몸통도 가늘게, 일반 펜은 굵게 — 한눈에 구분되도록 */
+    var nib = thick ? "M12 1.4 16.4 8.8H7.6z" : "M12 1.6 13.9 8.8H10.1z";
+    var body = thick ? '<rect x="7.6" y="8.8" width="8.8" height="13.4" rx="1.8"/><path d="M7.6 12.8h8.8M7.6 17.4h8.8"/>'
+                     : '<rect x="9.2" y="8.8" width="5.6" height="13.4" rx="1.5"/><path d="M9.2 12.8h5.6M9.2 17.4h5.6"/>';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">' +
+      '<path d="' + nib + '" fill="' + color + '" stroke="' + color + '"/>' + body + "</svg>";
+  }
+  function d41HlTipSvg(color) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">' +
+      '<path d="M8.4 2.6h7.2l2.8 5.2H5.6z" fill="' + color + '" stroke="' + color + '"/>' +
+      '<rect x="6.6" y="7.8" width="10.8" height="9.6" rx="1.5"/>' +
+      '<path d="M6.6 16.4h10.8l-1 4H7.6z"/></svg>';
+  }
   function d41PenPanel() {
-    /* v44: 펜을 누르면 바로 그릴 수 있는 그리기 도크 — 펜·형광펜·지우개 · 굵기 · 색 */
-    var h = '<div class="d41-prow d41-prow-pens"><div class="d41-pens">';
-    [["pen", "펜", IC.pencil], ["hl", "형광펜", IC.marker], ["erase", "지우개", IC.eraser]].forEach(function (o) {
-      h += '<button type="button" class="d41-penb' + (diary.pmode === o[0] ? " on" : "") +
-        '" data-act="d41PenMode" data-mode="' + o[0] + '" aria-label="' + o[1] + '">' + o[2] + "</button>";
-    });
-    h += '<span class="d41-pens-gap"></span>' +
-      '<button type="button" class="d41-penb d41-penb-clear" data-act="d41Clear" aria-label="전체 지우기">' + IC.x + "</button>";
+    var w = Number(diary.pw) || 3.5;
+    var thinOn = diary.pmode === "pen" && Math.abs(w - 2) < 0.6;
+    var normOn = diary.pmode === "pen" && !thinOn;
+    var h = '<div class="d41-prow d41-prow-dock"><div class="d41-dock">';
+    h += '<button type="button" class="d41-dk' + (thinOn ? " on" : "") + '" data-act="d41PenMode" data-mode="pen" data-w="2" aria-label="가는 펜" title="가는 펜">' +
+      d41PenTipSvg(diary.pcolor, false) + "</button>";
+    h += '<button type="button" class="d41-dk' + (normOn ? " on" : "") + '" data-act="d41PenMode" data-mode="pen" data-w="4.5" aria-label="일반 펜" title="일반 펜">' +
+      d41PenTipSvg(diary.pcolor, true) + "</button>";
+    h += '<button type="button" class="d41-dk' + (diary.pmode === "hl" ? " on" : "") + '" data-act="d41PenMode" data-mode="hl" aria-label="형광펜" title="형광펜">' +
+      d41HlTipSvg(diary.pcolor) + "</button>";
+    h += '<button type="button" class="d41-dk' + (diary.pmode === "erase" ? " on" : "") + '" data-act="d41PenMode" data-mode="erase" aria-label="지우개" title="지우개">' +
+      IC.eraser + "</button>";
+    h += '<span class="d41-dock-gap"></span>';
+    h += '<button type="button" class="d41-dk d41-dk-color' + (diary.pcpick ? " on" : "") + '" data-act="d41PenColorPick" aria-label="펜 색" title="펜 색">' +
+      '<span class="d41-dkk" style="background:' + diary.pcolor + '"></span></button>';
+    h += '<button type="button" class="d41-dk d41-dk-x" data-act="d41Clear" aria-label="전체 지우기" title="전체 지우기">' + IC.x + "</button>";
     h += "</div></div>";
-    h += '<div class="d41-prow"><span class="d41-pl">굵기</span><div class="d41-pbtns">';
-    [[2, "얇게"], [3.5, "보통"], [6, "두껍게"]].forEach(function (o) {
-      h += '<button type="button" class="d41-pb' + (Math.abs(diary.pw - o[0]) < 0.01 ? " on" : "") +
-        '" data-act="d41PenW" data-w="' + o[0] + '">' + o[1] + "</button>";
-    });
-    h += '</div></div><div class="d41-prow"><span class="d41-pl">색</span><div class="d41-dots">';
-    ["#111111", "#B4564E", "#3D6E8A", "#5E7A52", "#C9A227"].forEach(function (c, i) {
-      h += '<button type="button" class="d41-dot' + (diary.pcolor === c ? " on" : "") + '" data-act="d41PenColor" data-color="' + esc(c) +
-        '" aria-label="펜 색 ' + (i + 1) + '" style="background:' + c + '"></button>';
-    });
-    return h + "</div></div>";
+    if (diary.pcpick) {
+      h += '<div class="d41-prow d41-prow-cp d41-prow-dotpick"><div class="d41-dots">';
+      ["#111111", "#B4564E", "#3D6E8A", "#5E7A52", "#C9A227"].forEach(function (c, i) {
+        h += '<button type="button" class="d41-dot' + (diary.pcolor === c ? " on" : "") + '" data-act="d41PenColor" data-color="' + esc(c) +
+          '" aria-label="펜 색 ' + (i + 1) + '" style="background:' + c + '"></button>';
+      });
+      h += "</div></div>";
+    }
+    return h;
   }
   function d41PanelHtml() {
     if (!diary) return "";
@@ -2727,7 +2736,7 @@
       editing: !(it && ((itTitle(it) || "").trim() || itBody(it).trim() || (it.imgs || []).length || (it.pen || []).length)),
       tsize: d41Clamp(D41_SIZES[st.size] || 16.5, D41_TXMIN, D41_TXMAX),
       tcolor: st.color || "", talign: st.align || "left",
-      pmode: "pen", pcolor: "#111111", pw: 3.5,
+      pmode: "pen", pcolor: "#111111", pw: 3.5, pcpick: false,
       tbold: false, tstrike: false, tunderline: false, cpick: false
     };
     var h = '<form class="d41" id="sheetForm" autocomplete="off">';
@@ -2735,10 +2744,9 @@
     d41Hist = { stack: [], idx: -1 };
     h += '<div class="d41-top">' +
       '<button type="button" class="d41-back" data-close="1" aria-label="뒤로">' + IC.left + "</button>" +
-      '<button type="button" class="d41-ub" id="d41UndoBtn" data-act="d41Undo" aria-label="되돌리기" disabled>' + IC.undo + "</button>" +
-      '<button type="button" class="d41-ub" id="d41RedoBtn" data-act="d41Redo" aria-label="다시 실행" disabled>' + IC.redo + "</button>" +
       '<input class="d41-title" name="text" value="' + (it ? esc(itTitle(it)) : "") +
-      '" placeholder="새 다이어리" aria-label="다이어리 제목" autocomplete="off"></div>';
+      '" placeholder="새 다이어리" aria-label="다이어리 제목" autocomplete="off">' +
+      '<span class="d41-top-sp" aria-hidden="true"></span></div>';
     /* v44: 아이콘바(펜·글씨·사진)를 아래에서 위로 — 상단 바 바로 아래, 도구 판은 그 아래 */
     h += d41ToolsHtml();
     h += '<div class="d41-panel" id="d41Panel" hidden>' + d41PanelHtml() + "</div>";
@@ -3529,28 +3537,398 @@
     return h;
   }
 
-  /* 4) 지출·정산 — 항목 + 금액, 위에 합계(N원)가 바로 계산돼요 */
-  function viewListExpense(l) {
-    var total = 0;
-    l.items.forEach(function (it) { total += Number(it.amount) || 0; });
-    var h = '<div class="ex-sum" data-list="' + l.id + '"><span class="k">합계</span>' +
-      '<span class="v">' + wonTxt(total) + '</span><span class="c">' + l.items.length + "건</span></div>";
-    h += '<div class="todo-block" data-list="' + l.id + '">';
-    h += quickAddForm(l, "expense", "무엇에 썼나요 (예: 점심)");
-    h += '<div class="ex-list" data-list="' + l.id + '">';
-    if (!l.items.length) h += '<div class="empty">아직 지출이 없어요. 위 칸에 항목과 금액을 적고 Add 를 눌러 보세요.</div>';
-    l.items.forEach(function (it) {
-      h += '<div class="ex-row" data-list="' + l.id + '" data-id="' + it.id + '">' +
-        '<div class="ex-b" data-act="editListItem" data-list="' + l.id + '" data-id="' + it.id + '" role="button" tabindex="0">' +
-        '<span class="ex-t">' + esc(itTitle(it)) + "</span>" +
-        (itBody(it) ? '<span class="ex-m">' + esc(itBody(it)) + "</span>" : "") + "</div>" +
-        '<span class="ex-a">' + wonTxt(it.amount) + "</span>" +
-        '<button type="button" class="x" data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="삭제">' + IC.x + "</button></div>";
+  /* ==========================================================================
+     v45 — 지출·정산: 함께 쓰는 돈(공동 자금) 가계부
+     --------------------------------------------------------------------------
+     · 맨 위 카드 — 고른 달의 «함께 쓰는 돈»(총 입금) · 사용 금액 · 잔액 · 사용률 막대
+       그 아래 소영·준영이 각자 넣은 돈 두 칸 (함께 넣은 돈은 한 줄로)
+     · 내역 | 달력 — 내역은 날짜 최신순, 달력은 칸마다 그날 입금/지출 합계,
+       날짜를 누르면 달력 아래에 그날 내역이 보여요
+     · + 입금하기 / - 지출하기 — 시트에서 지출|입금 · 누가 · 금액 · 카테고리(12) · 날짜 · 메모
+     · 항목은 { txType: "expense"|"deposit", cat, who, amount, date, memo } 로 담고,
+       예전 항목(amount 만 있고 txType 없음)은 «지출» 로 읽어요.
+     · 달 예산은 고른 달에만 — 내 카테고리는 그 리스트(budgets), 기본 카테고리는
+       S.noteBudgets(탭 이름)에 담아 sync.js 가 note_meta·list 행에 함께 실어요.
+     ========================================================================== */
+  var EXP_CATS = ["식비", "카페", "생활용품", "데이트", "교통", "주거",
+                  "쇼핑", "여행", "건강", "통신", "공과금", "기타"];
+  /* 동그란 라인 아이콘 — 24×24, stroke 만 (색은 currentColor) */
+  var EXP_IC = {
+    "식비": '<path d="M8 3.6v6.1"/><path d="M5.9 3.6v3.1a2.1 2.1 0 0 0 4.2 0V3.6"/><path d="M8 9.7v10.7"/><path d="M16.6 20.4V3.6c-1.9.9-3.1 2.8-3.1 5.3 0 1.9 1 3.1 3.1 3.4"/>',
+    "카페": '<path d="M5 7.4h11v6.6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z"/><path d="M16 8.8h1.5a2.4 2.4 0 0 1 0 4.8H16"/><path d="M4.4 20.6h12.2"/>',
+    "생활용품": '<path d="M9.6 3.6h4.8v2.2H9.6z"/><path d="M10.2 5.8v1.5l-1.4 1.5a2 2 0 0 0-.5 1.3v9.4a1.5 1.5 0 0 0 1.5 1.5h4.4a1.5 1.5 0 0 0 1.5-1.5v-9.4a2 2 0 0 0-.5-1.3l-1.4-1.5V5.8"/><path d="M8.3 12.6h7.4"/>',
+    "데이트": '<path d="M12 20.3c-1.6-1-7.4-4.7-7.4-9.3A4.3 4.3 0 0 1 12 7.8a4.3 4.3 0 0 1 7.4 3.2c0 4.6-5.8 8.3-7.4 9.3z"/>',
+    "교통": '<rect x="4.6" y="3.6" width="14.8" height="14"/><path d="M4.6 11h14.8"/><path d="M7 17.6v2.9M17 17.6v2.9"/><path d="M7.9 14.1h.1M16 14.1h.1"/>',
+    "주거": '<path d="M4 10.6 12 4l8 6.6V19a1.4 1.4 0 0 1-1.4 1.4h-3.7v-5.6H9.1v5.6H5.4A1.4 1.4 0 0 1 4 19z"/>',
+    "쇼핑": '<path d="M5.2 8.5h13.6l-1.1 10.4a2 2 0 0 1-2 1.6H8.3a2 2 0 0 1-2-1.6z"/><path d="M8.9 8.5V7a3.1 3.1 0 0 1 6.2 0v1.5"/>',
+    "여행": '<rect x="3.6" y="7.2" width="16.8" height="11.6"/><path d="M9 7.2V5.3a1.2 1.2 0 0 1 1.2-1.2h3.6A1.2 1.2 0 0 1 15 5.3v1.9"/><path d="M3.6 12.4h16.8"/>',
+    "건강": '<path d="M3.5 12.6h4.1l2.2-5.5 4 10.6 2-5.1h4.7"/>',
+    "통신": '<path d="M4 9.1a12 12 0 0 1 16 0"/><path d="M7 12.3a7.6 7.6 0 0 1 10 0"/><path d="M9.8 15.4a3.6 3.6 0 0 1 4.4 0"/><path d="M11.9 18.5h.2"/>',
+    "공과금": '<path d="M13.3 3.4 6 13.3h5l-1.2 7.3 7.3-9.9h-5.1z"/>',
+    "기타": '<path d="M6 12h.1M12 12h.1M18 12h.1"/>'
+  };
+  var EXP_IC_IN = '<rect x="3.6" y="6.2" width="16.8" height="11.6"/><circle cx="12" cy="12" r="2.6"/><path d="M6.8 9.2v.1M17.2 14.7v.1"/>';
+  function expIconSvg(cat, tx) {
+    if (tx === "deposit") return svg(EXP_IC_IN, 19);
+    return svg(EXP_IC[cat] || EXP_IC["기타"], 19);
+  }
+  /* 화면 상태(이 기기에서만) — 카테고리별로 고른 달·보기·날짜 */
+  var EXP_MONTH = {}, EXP_VIEW = {}, EXP_DAY = {};
+  function expMon(cid) { return EXP_MONTH[cid] || today.slice(0, 7); }
+  function expViewOf(cid) { return EXP_VIEW[cid] === "cal" ? "cal" : "list"; }
+  function expMonthTxt(ym) { return Number(String(ym).slice(5, 7)) + "월"; }
+  function expWon(n) { return "₩" + won(Math.abs(Math.round(Number(n) || 0))); }
+  /* 달력 칸용 짧은 금액 — 4.5만 / 67.8만 / 8,900 */
+  function expShort(n) {
+    var v = Math.abs(Math.round(Number(n) || 0));
+    if (v >= 10000) {
+      var m = Math.round(v / 1000) / 10;
+      return (m % 1 === 0 ? String(m) : m.toFixed(1)) + "만";
+    }
+    return won(v);
+  }
+  function expDateTxt(d) { return String(d || "").slice(5, 10).replace("-", "."); }
+  function expDateOf(it) {
+    var d = String((it && it.date) || "").slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : today;
+  }
+  function expTxOf(it) { return it && it.txType === "deposit" ? "deposit" : "expense"; }
+  function expWhoOf(it) {
+    var w = it && it.who;
+    if (w === "me" || w === "you" || w === "both") return w;
+    var me = String((S.couple || {}).me || ""), you = String((S.couple || {}).you || "");
+    if (w === "나" || (me && w === me)) return "me";
+    if (you && w === you) return "you";
+    return "both";
+  }
+  function expWhoName(it) {
+    var w = expWhoOf(it);
+    return w === "me" ? String(S.couple.me) : w === "you" ? String(S.couple.you) : "함께";
+  }
+  function expCatOf(it) {
+    if (expTxOf(it) === "deposit") return "입금";
+    var c = String((it && it.cat) || "").trim();
+    return c || itTitle(it) || "기타";
+  }
+  /* 예산 — 내 카테고리는 그 리스트의 budgets, 기본 카테고리는 S.noteBudgets[탭] */
+  function expBudgetMap(c, create) {
+    if (!c) return {};
+    if (isBaseContainer(c)) {
+      if (create) {
+        if (!S.noteBudgets || typeof S.noteBudgets !== "object") S.noteBudgets = {};
+        if (!S.noteBudgets[c.base] || typeof S.noteBudgets[c.base] !== "object") S.noteBudgets[c.base] = {};
+      }
+      return ((S.noteBudgets || {})[c.base]) || {};
+    }
+    if (create) {
+      if (!c.budgets || typeof c.budgets !== "object") c.budgets = {};
+      return c.budgets;
+    }
+    return (c.budgets && typeof c.budgets === "object") ? c.budgets : {};
+  }
+  function expBudgetOf(c, ym) { return Math.max(0, Math.round(Number(expBudgetMap(c)[ym]) || 0)); }
+  function expSetBudget(cid, ym, n) {
+    var c = containerOf(cid);
+    if (!c) return false;
+    var map = expBudgetMap(c, true);
+    if (n > 0) map[ym] = Math.round(n); else delete map[ym];
+    return true;
+  }
+  /* 한 달치 — 입금·지출 합계와 사람별 입금 */
+  function expMonthList(c, ym) {
+    return (c.items || []).filter(function (it) { return expDateOf(it).slice(0, 7) === ym; });
+  }
+  function expStats(c, ym) {
+    var out = { items: [], dep: 0, spent: 0, me: 0, you: 0, both: 0 };
+    expMonthList(c, ym).forEach(function (it) {
+      out.items.push(it);
+      var amt = Math.abs(Math.round(Number(it.amount) || 0));
+      if (!amt) return;
+      if (expTxOf(it) === "deposit") {
+        out.dep += amt;
+        var w = expWhoOf(it);
+        if (w === "me") out.me += amt;
+        else if (w === "you") out.you += amt;
+        else out.both += amt;
+      } else out.spent += amt;
     });
+    out.items.sort(function (a, b) {
+      var da = expDateOf(a), db = expDateOf(b);
+      if (da === db) return 0;
+      return da < db ? 1 : -1;
+    });
+    return out;
+  }
+  function expRowTitle(it) {
+    return expTxOf(it) === "deposit" ? expWhoName(it) + " 입금" : expCatOf(it);
+  }
+  function expRowHtml(c, it) {
+    var tx = expTxOf(it), amt = Math.abs(Math.round(Number(it.amount) || 0));
+    var sub = [];
+    var memo = String(it.memo || "").trim();
+    if (memo) sub.push(memo);
+    sub.push(expDateTxt(expDateOf(it)));
+    if (tx !== "deposit") sub.push(expWhoName(it));
+    return '<div class="exp-row" data-list="' + c.id + '" data-id="' + it.id + '">' +
+      '<span class="exp-ic' + (tx === "deposit" ? " in" : "") + '">' + expIconSvg(expCatOf(it), tx) + "</span>" +
+      '<button type="button" class="exp-row-b" data-act="editListItem" data-list="' + c.id + '" data-id="' + it.id + '">' +
+        '<span class="exp-row-t">' + esc(expRowTitle(it)) + "</span>" +
+        '<span class="exp-row-s">' + esc(sub.join(" · ")) + "</span>" +
+      "</button>" +
+      '<span class="exp-row-a ' + (tx === "deposit" ? "in" : "out") + '">' + (tx === "deposit" ? "+" : "-") + expWon(amt) + "</span>" +
+      '<button type="button" class="x exp-x" data-act="delListItem" data-list="' + c.id + '" data-id="' + it.id + '" aria-label="삭제">' + IC.x + "</button></div>";
+  }
+  /* 달력 — 칸마다 그날 +입금 / -지출 합계 (0 이면 안 보여요) */
+  function expCalHtml(c, ym, stats, selDay) {
+    var y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7));
+    var first = new Date(y, m - 1, 1).getDay();
+    var days = new Date(y, m, 0).getDate();
+    var byDay = {};
+    stats.items.forEach(function (it) {
+      var d = expDateOf(it);
+      if (d.slice(0, 7) !== ym) return;
+      var k = d.slice(8, 10);
+      if (!byDay[k]) byDay[k] = { in: 0, out: 0 };
+      var amt = Math.abs(Math.round(Number(it.amount) || 0));
+      if (expTxOf(it) === "deposit") byDay[k].in += amt; else byDay[k].out += amt;
+    });
+    var h = '<div class="exp-cal"><div class="exp-week">';
+    ["일", "월", "화", "수", "목", "금", "토"].forEach(function (w) { h += "<span>" + w + "</span>"; });
+    h += '</div><div class="exp-grid">';
+    for (var i = 0; i < first; i++) h += '<span class="exp-blank"></span>';
+    for (var d = 1; d <= days; d++) {
+      var ds = ym + "-" + pad(d);
+      var t = byDay[pad(d)] || null;
+      var cls = "exp-cell" + (ds === today ? " today" : "") + (ds === selDay ? " sel" : "");
+      h += '<button type="button" class="' + cls + '" data-act="expDay" data-list="' + c.id + '" data-day="' + ds + '">' +
+        '<span class="exp-cell-n">' + d + "</span>" +
+        (t && t.in ? '<span class="di">+' + expShort(t.in) + "</span>" : "") +
+        (t && t.out ? '<span class="do">-' + expShort(t.out) + "</span>" : "") +
+        "</button>";
+    }
     h += "</div></div>";
-    h += '<div style="height:6px"></div>';
-    h += addRow("addListItem", ' data-list="' + l.id + '"', "상세히 적기");
     return h;
+  }
+  function expSelDay(c, ym, stats) {
+    var d = EXP_DAY[c.id];
+    if (d && d.slice(0, 7) === ym) return d;
+    if (ym === today.slice(0, 7)) return today;
+    if (stats.items.length) return expDateOf(stats.items[0]);
+    return ym + "-01";
+  }
+  function expDayHtml(c, day) {
+    var rows = expMonthList(c, day.slice(0, 7)).filter(function (it) { return expDateOf(it) === day; })
+      .sort(function (a, b) { var da = expDateOf(a), db = expDateOf(b); return da === db ? 0 : (da < db ? 1 : -1); });
+    var dep = 0, out = 0;
+    rows.forEach(function (it) {
+      var amt = Math.abs(Math.round(Number(it.amount) || 0));
+      if (expTxOf(it) === "deposit") dep += amt; else out += amt;
+    });
+    var h = '<div class="exp-daylist"><div class="exp-dayhd">' +
+      '<b>' + Number(day.slice(5, 7)) + "월 " + Number(day.slice(8, 10)) + "일</b>" +
+      '<span class="wd">(' + WD[parse(day).getDay()] + ')</span>' +
+      '<span class="exp-daynet">' +
+        (dep ? '<em class="di">+' + expWon(dep) + "</em>" : "") +
+        (out ? '<em class="do">-' + expWon(out) + "</em>" : "") + "</span></div>";
+    if (!rows.length) h += '<div class="exp-empty">이 날은 내역이 없어요</div>';
+    rows.forEach(function (it) { h += expRowHtml(c, it); });
+    return h + "</div>";
+  }
+  /* 4) 지출·정산 화면 */
+  function viewListExpense(l) {
+    var cid = l.id, ym = expMon(cid), view = expViewOf(cid);
+    var st = expStats(l, ym);
+    var budget = expBudgetOf(l, ym);
+    var base = budget > 0 ? budget : st.dep;
+    var pct = base > 0 ? Math.round(st.spent / base * 100) : 0;
+    var left = st.dep - st.spent;
+    var h = '<div class="exp-page" data-list="' + cid + '">';
+    /* 달 넘기기 + 내역 | 달력 */
+    h += '<div class="exp-hd"><div class="exp-month">' +
+      '<button type="button" class="exp-nav" data-act="expPrev" data-list="' + cid + '" aria-label="이전 달">' + IC.left + "</button>" +
+      "<b>" + (ym.slice(0, 4) !== today.slice(0, 4) ? '<span class="yr">' + ym.slice(0, 4) + "년</span>" : "") + expMonthTxt(ym) + "</b>" +
+      '<button type="button" class="exp-nav" data-act="expNext" data-list="' + cid + '" aria-label="다음 달">' + IC.right + "</button>" +
+      '</div><div class="exp-tabs">' +
+      '<button type="button" class="exp-tab' + (view === "list" ? " on" : "") + '" data-act="expView" data-list="' + cid + '" data-v="list">내역</button>' +
+      '<button type="button" class="exp-tab' + (view === "cal" ? " on" : "") + '" data-act="expView" data-list="' + cid + '" data-v="cal">달력</button>' +
+      "</div></div>";
+    /* 함께 쓰는 돈 */
+    h += '<div class="exp-fund">' +
+      '<div class="exp-fund-k">' + expMonthTxt(ym) + " 함께 쓰는 돈</div>" +
+      '<div class="exp-fund-total">' + expWon(st.dep) + "</div>" +
+      '<div class="exp-fund-row"><span>사용 금액</span><b class="exp-spent">' + expWon(st.spent) + "</b></div>" +
+      '<div class="exp-bar"><i class="' + (pct > 100 ? "over" : "") + '" style="width:' + Math.max(0, Math.min(100, pct)) + '%"></i></div>' +
+      '<div class="exp-bar-n"><span class="exp-pct">사용 ' + pct + '%</span>' +
+        '<span class="exp-left">' + (left >= 0 ? "잔액 " + expWon(left) : expWon(-left) + " 초과") + "</span></div>" +
+      '<div class="exp-budget">' +
+        (budget > 0
+          ? "<span>예산 " + expWon(budget) + " · " + (budget - st.spent >= 0
+              ? "남은 " + expWon(budget - st.spent)
+              : expWon(st.spent - budget) + " 초과") + "</span>"
+          : "<span></span>") +
+        '<button type="button" class="exp-budget-btn" data-act="expBudget" data-list="' + cid + '">' +
+          (budget > 0 ? "고치기" : "예산 정하기") + "</button></div>" +
+      "</div>";
+    /* 소영 · 준영 입금 */
+    h += '<div class="exp-people">' +
+      '<div class="exp-p"><span class="k">' + esc(S.couple.me) + ' 입금</span><span class="v">' + expWon(st.me) + "</span></div>" +
+      '<div class="exp-p"><span class="k">' + esc(S.couple.you) + ' 입금</span><span class="v">' + expWon(st.you) + "</span></div>" +
+      "</div>" +
+      (st.both > 0 ? '<div class="exp-both">함께 넣은 돈 <b>' + expWon(st.both) + "</b></div>" : "");
+    /* 내역 / 달력 */
+    if (view === "cal") {
+      var sel = expSelDay(l, ym, st);
+      h += expCalHtml(l, ym, st, sel) + expDayHtml(l, sel);
+    } else {
+      h += '<div class="exp-list">';
+      if (!st.items.length) h += '<div class="exp-empty">' + expMonthTxt(ym) + "에는 아직 내역이 없어요</div>";
+      st.items.forEach(function (it) { h += expRowHtml(l, it); });
+      h += "</div>";
+    }
+    /* 아래 두 버튼 */
+    h += '<div class="exp-acts">' +
+      '<button type="button" class="exp-act in" data-act="expAdd" data-list="' + cid + '" data-tx="deposit"><span class="s">+</span>입금하기</button>' +
+      '<button type="button" class="exp-act out" data-act="expAdd" data-list="' + cid + '" data-tx="expense"><span class="s">-</span>지출하기</button>' +
+      "</div></div>";
+    return h;
+  }
+
+  /* 지출·정산 시트 — 지출|입금 · 누가 · 금액 · 카테고리(12 + 직접 입력) · 날짜 · 메모 */
+  function formExpItem(l, it, opts) {
+    var isEdit = !!it;
+    var tx = isEdit ? expTxOf(it) : ((opts && opts.tx) === "deposit" ? "deposit" : "expense");
+    var ym = (opts && opts.ym) || expMon(l.id);
+    var dflt = today.slice(0, 7) === ym ? today : ym + "-01";
+    var cat = isEdit ? (expTxOf(it) === "deposit" ? "입금" : String(it.cat || "").trim()) : "";
+    if (tx === "deposit") cat = "입금";
+    var who = isEdit ? expWhoOf(it) : (tx === "deposit" ? "me" : "both");
+    var amt = isEdit ? Math.abs(Math.round(Number(it.amount) || 0)) : 0;
+    var memo = isEdit ? String(it.memo || "") : "";
+    if (isEdit && !it.cat && !memo) memo = itTitle(it);
+    var date = isEdit ? expDateOf(it) : dflt;
+    var cats = EXP_CATS.slice();
+    (l.items || []).forEach(function (x) {
+      var c = String(x.cat || "").trim();
+      if (c && c !== "입금" && cats.indexOf(c) < 0 && cats.length < 18) cats.push(c);
+    });
+    if (cat && cat !== "입금" && cats.indexOf(cat) < 0) cats.push(cat);
+
+    var whoBtns = [["me", S.couple.me], ["you", S.couple.you], ["both", "함께"]].map(function (w) {
+      return '<button type="button" class="exp-who' + (who === w[0] ? " on" : "") + '" data-act="expWho" data-who="' + w[0] + '">' + esc(w[1]) + "</button>";
+    }).join("");
+    var catTiles = cats.map(function (c) {
+      return '<button type="button" class="exp-cat' + (c === cat ? " on" : "") + '" data-act="expCat" data-cat="' + esc(c) + '">' +
+        '<span class="ic">' + expIconSvg(c, "expense") + '</span><span class="nm">' + esc(c) + "</span></button>";
+    }).join("") +
+      '<button type="button" class="exp-cat exp-cat-more" data-act="expCatNew">' +
+      '<span class="ic">' + IC.plus + '</span><span class="nm">직접 입력</span></button>';
+
+    var h = '<div class="sheet-hd exp-shd">' +
+      '<button type="button" class="icon-btn" data-close="1" aria-label="닫기">' + IC.left + "</button>" +
+      '<div class="exp-seg">' +
+        '<button type="button" class="' + (tx === "expense" ? "on" : "") + '" data-act="expTx" data-tx="expense">지출</button>' +
+        '<button type="button" class="' + (tx === "deposit" ? "on" : "") + '" data-act="expTx" data-tx="deposit">입금</button>' +
+      "</div>" +
+      (isEdit
+        ? '<button type="button" class="icon-btn exp-delbtn" data-act="delListItem" data-list="' + l.id + '" data-id="' + it.id + '" aria-label="삭제">' + IC.trash + "</button>"
+        : '<span class="exp-hdsp"></span>') +
+      "</div>";
+    h += '<form class="exp-form" id="sheetForm" data-tx="' + tx + '">' +
+      '<input type="hidden" name="txType" value="' + tx + '">' +
+      '<input type="hidden" name="cat" value="' + esc(cat) + '">' +
+      '<input type="hidden" name="who" value="' + who + '">' +
+      '<div class="exp-fld exp-amt"><label for="expAmt">금액</label><div class="exp-amt-in">' +
+        '<span class="w">₩</span><input id="expAmt" name="amount" inputmode="numeric" autocomplete="off" placeholder="0" value="' +
+        (amt ? won(amt) : "") + '"></div></div>' +
+      '<div class="exp-fld"><label>누가</label><div class="exp-whos">' + whoBtns + "</div></div>" +
+      '<div class="exp-cats"' + (tx === "deposit" ? " hidden" : "") + '><div class="exp-cats-lb">카테고리</div>' +
+        '<div class="exp-catgrid" id="expCatGrid">' + catTiles + "</div>" +
+        '<div class="exp-catnew" id="expCatNew" hidden>' +
+          '<input class="field exp-catin" id="expCatIn" placeholder="카테고리 이름 (예: 반려동물)" maxlength="10" autocomplete="off">' +
+          '<button type="button" class="exp-catadd" data-act="expCatAdd">확인</button>' +
+        "</div></div>" +
+      '<div class="exp-fld"><label for="expDate">날짜</label><input class="exp-datein" id="expDate" type="date" name="date" value="' + date + '"></div>' +
+      '<div class="exp-fld"><label for="expMemo">메모</label><input class="exp-memoin" id="expMemo" name="memo" value="' + esc(memo) + '" maxlength="40" autocomplete="off" placeholder="' +
+        (tx === "deposit" ? "예: 11월 월급" : "예: 장보기") + '"></div>' +
+      '<div style="height:14px"></div><button class="btn-primary" type="submit">' + (isEdit ? "저장하기" : "추가하기") + "</button>" +
+      "</form>";
+    return h;
+  }
+
+  /* 시트에서 읽은 값 — 금액이 0 이면 저장하지 않아요 */
+  function expFieldsFrom(fd) {
+    var tx = String(fd.get("txType") || "expense") === "deposit" ? "deposit" : "expense";
+    var amt = Math.abs(Math.round(parseAmount(fd.get("amount"))));
+    if (!amt) { toast("금액을 적어 주세요"); return null; }
+    var who = String(fd.get("who") || "");
+    if (["me", "you", "both"].indexOf(who) < 0) who = "both";
+    var cat = String(fd.get("cat") || "").trim().slice(0, 10);
+    return {
+      txType: tx,
+      amount: amt,
+      who: who,
+      cat: tx === "deposit" ? "입금" : (cat || "기타"),
+      date: String(fd.get("date") || "").slice(0, 10) || today,
+      memo: String(fd.get("memo") || "").trim()
+    };
+  }
+  function expApply(it, f, c) {
+    Object.keys(f).forEach(function (k) { it[k] = f[k]; });
+    /* 카드를 보는 화면·다른 자리에서도 읽히도록 «제목» 자리를 비워 두지 않아요 */
+    if (isBaseContainer(c)) {
+      if (c.base === "todo") { if (!String(it.text || "").trim()) it.text = it.memo || it.cat; }
+      else if (!String(it.title || "").trim()) it.title = it.memo || it.cat;
+    } else if (!String(it.text || "").trim()) it.text = it.cat;
+  }
+  function expAfterSave(c, it) {
+    var d = expDateOf(it);
+    EXP_MONTH[c.id] = d.slice(0, 7);
+    EXP_DAY[c.id] = d;
+  }
+  function openExpSheet(c, it, tx) {
+    if (!c) return;
+    var ym = expMon(c.id);
+    openSheet(formExpItem(c, it, { tx: tx, ym: ym }), function (fd) {
+      var L2 = containerOf(c.id);
+      if (!L2) return;
+      var f = expFieldsFrom(fd);
+      if (!f) return;
+      var target = null;
+      if (it) target = L2.items.filter(function (x) { return x.id === it.id; })[0] || null;
+      if (it && !target) return;
+      if (!target) {
+        if (isBaseContainer(L2)) target = basePush(L2.base, { text: f.memo || f.cat, memo: f.memo, amount: f.amount, date: f.date });
+        else { target = { id: uid(), done: false, date: f.date }; L2.items.push(target); }
+      }
+      expApply(target, f, L2);
+      expAfterSave(L2, target);
+      save(); closeSheet(); renderDiary(); toast(it ? "저장했어요" : "추가했어요");
+    });
+  }
+  function expShiftMonth(cid, d) {
+    if (!cid) return;
+    var ym = expMon(cid);
+    var y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7)) + d;
+    if (m < 1) { m = 12; y--; }
+    if (m > 12) { m = 1; y++; }
+    EXP_MONTH[cid] = y + "-" + pad(m);
+    delete EXP_DAY[cid];
+    renderDiary();
+  }
+  function openExpBudget(c) {
+    if (!c) return;
+    var ym = expMon(c.id), cur = expBudgetOf(c, ym);
+    openSheet(sheetHead(expMonthTxt(ym) + " 예산") +
+      '<p class="sheet-sub">이번 달에 쓰기로 한 금액이에요. 비워 두면 함께 쓰는 돈 전체를 기준으로 사용률을 보여줘요.</p>' +
+      '<form class="form" id="sheetForm">' +
+      '<div class="f"><label>예산 (원)</label><input class="field exp-budget-in" name="budget" inputmode="numeric" autocomplete="off" value="' +
+        (cur ? won(cur) : "") + '" placeholder="예) 1,500,000"></div>' +
+      '<div style="height:6px"></div><button class="btn-primary" type="submit">저장하기</button></form>' +
+      (cur ? '<div style="height:8px"></div><button class="btn-line" data-act="expBudgetOff" data-list="' + c.id + '">예산 지우기</button>' : ""),
+      function (fd) {
+        expSetBudget(c.id, ym, Math.abs(Math.round(parseAmount(fd.get("budget")))));
+        save(); closeSheet(); renderDiary(); toast("예산을 저장했어요");
+      });
   }
 
   function viewTodo() { return viewCards("todo"); }
@@ -4407,8 +4785,7 @@
     var cnt = document.querySelector("#sheet #upCount");
     if (cnt) cnt.textContent = String(arr.length);
     if (upMode === "day") return;
-    var sum = document.querySelector("#sheet #upSum");
-    if (sum) sum.textContent = pendingFiles.length + "장 · " + fmtBytes(upTotal()) + " · 긴 변 1800px 로 줄여서 보관해요.";
+    /* v45: 「사진 추가」 아래 장수·용량 요약 줄(#upSum)은 없앴어요 — 담기 단추 글씨만 맞춥니다 */
     var btn = document.querySelector("#sheet #upBtn");
     if (btn) btn.textContent = pendingFiles.length + "장 담기";
   }
@@ -4662,7 +5039,7 @@
   function openNoteSettings() { openSheet(formNoteSettings()); }
 
   /* v38: 속지마다 다른 «항목 쓰기» 시트 */
-  function formListItem(l, it) {
+  function formListItem(l, it, opts) {
     var isEdit = !!it;
     var kind = listKindOf(l);
     var delBtn = isEdit ? '<button type="button" class="btn-del" data-act="delListItem" data-list="' + l.id +
@@ -4693,16 +5070,8 @@
         (it ? esc(itBody(it)) : "") + "</textarea></div>" + delBtn + submit;
     }
 
-    if (kind === "expense") {
-      return sheetHead(isEdit ? "지출 수정" : "새 지출") +
-        '<form class="form" id="sheetForm">' +
-        '<div class="f"><label>항목</label><input class="field" name="text" value="' + (it ? esc(itTitle(it)) : "") +
-        '" placeholder="예) 점심 · 영화표" required autocomplete="off"></div>' +
-        '<div class="f"><label>금액 (원)</label><input class="field" name="amount" inputmode="numeric" value="' +
-        (it && it.amount != null ? String(it.amount) : "") + '" placeholder="예) 24000" autocomplete="off"></div>' +
-        '<div class="f"><label>메모</label><textarea class="field" name="memo" rows="3" placeholder="누구와 · 어떻게 정산할지 (선택)">' +
-        (it ? esc(itBody(it)) : "") + "</textarea></div>" + delBtn + submit;
-    }
+    /* v45: 지출·정산은 전용 시트(지출|입금 · 누가 · 금액 · 카테고리 · 날짜 · 메모)로 */
+    if (kind === "expense") return formExpItem(l, it, opts);
 
     return sheetHead(isEdit ? "항목 수정" : "항목 추가") +
       '<form class="form" id="sheetForm">' +
@@ -5094,12 +5463,24 @@
     h += "</div>";
     return h;
   }
+  /* v45: 댓글 칸은 «한 줄짜리 입력칸» 대신 스스로 늘어나는 textarea —
+     길게 쓰면 가로로 흐르지 않고 화면 폭에 맞춰 아래로 내려가요 (최대 120px, 그 뒤 스크롤).
+     Enter 로 등록, Shift+Enter 로 줄바꿈. 등록하면 1줄로 다시 돌아갑니다. */
+  var CMT_MAX_H = 120;
+  function cmtGrow(el) {
+    if (!el || el.tagName !== "TEXTAREA") return;
+    el.style.height = "auto";
+    var h = Math.min(CMT_MAX_H, Math.max(38, el.scrollHeight));
+    el.style.height = h + "px";
+    el.style.overflowY = el.scrollHeight > CMT_MAX_H ? "auto" : "hidden";
+  }
   function cmtFormHtml(p, day) {
     return '<form class="cmt-form" data-id="' + esc(p ? p.id : "") + '" data-day="' + esc(day || "") + '">' +
       '<input type="hidden" name="re" value="">' +
       '<input type="hidden" name="repid" value="">' +
       avSpan("me") +
-      '<input class="cmt-in" name="text" placeholder="댓글 달기" autocomplete="off" enterkeyhint="send" aria-label="댓글">' +
+      '<textarea class="cmt-in" name="text" rows="1" placeholder="댓글 달기" autocomplete="off" ' +
+      'enterkeyhint="send" aria-label="댓글"></textarea>' +
       '<button class="cmt-send" type="submit">등록</button></form>';
   }
 
@@ -5267,12 +5648,10 @@
         '<button type="button" class="up-x" data-act="upDel" data-i="' + i + '" aria-label="이 사진 빼기">' + IC.x + "</button></div>";
     }).join("");
   }
-  /* 목록·요약·담기 버튼의 장 수를 지금 상태에 맞춰 다시 칩니다 */
+  /* 목록·담기 버튼의 장 수를 지금 상태에 맞춰 다시 칩니다 */
   function refreshAddPhoto() {
     var list = document.querySelector("#sheet #upList");
     if (list) list.innerHTML = photoUpRowsHtml();
-    var sum = document.querySelector("#sheet #upSum");
-    if (sum) sum.textContent = pendingFiles.length + "장 · " + fmtBytes(upTotal()) + " · 긴 변 1800px 로 줄여서 보관해요.";
     var cnt = document.querySelector("#sheet #upCount");
     if (cnt) cnt.textContent = String(pendingFiles.length);
     var btn = document.querySelector("#sheet #upBtn");
@@ -5285,17 +5664,16 @@
     pendingFiles = files || [];
     var dv = dateVal || pendingPhotoDate || today;
     return sheetHead("사진 추가") +
-      '<p class="sheet-sub" id="upSum">' + pendingFiles.length + "장 · " + fmtBytes(upTotal()) + " · 긴 변 1800px 로 줄여서 보관해요.</p>" +
       '<form class="form" id="sheetForm" data-form="photo">' +
-      /* v41: 「기록 이름」과 「날짜」를 한 줄에 나란히 — 세로 여백을 줄였어요.
+      /* v45: «사진 추가» 아래 요약 줄(장수·용량·줄이는 말)은 지웠어요.
+         「기록 이름」 먼저, 「날짜」는 그 아래 줄 — 한 줄에 붙이지 않고 각자 밑줄 한 줄을 씁니다.
          기록 이름은 늘 빈 칸에서 시작(예전에 올린 이름이 따라 올라오지 않게),
          한 시트에서 「+ 추가」로 더 담을 때는 적어 둔 값이 그대로 남아요. */
-      /* v43: 「날짜」가 왼쪽 · 「기록 이름」이 오른쪽 (한 줄) */
-      '<div class="up-row">' +
-      '<div class="f up-date-f"><label>날짜</label><input class="field up-date" type="date" name="date" value="' +
-      dv + '" required></div>' +
+      '<div class="up-row up-stack">' +
       '<div class="f up-nm-f"><label>기록 이름</label><input class="field" name="album_tag" value=""' +
-      ' placeholder="예) 경주여행" autocomplete="off"></div></div>' +
+      ' placeholder="예) 경주여행" autocomplete="off"></div>' +
+      '<div class="f up-date-f"><label>날짜</label><input class="field up-date" type="date" name="date" value="' +
+      dv + '" required></div></div>' +
       /* v40: 「캡션」 칸은 없앴어요 — 날짜·태그·고른 사진만 남깁니다 */
       '<div class="up-hd"><span class="up-hd-t"><i class="up-hd-lb">사진</i><span class="up-hd-c"><b id="upCount">' +
       pendingFiles.length + "</b>장</span></span>" +
@@ -5340,11 +5718,11 @@
     upMode = "day";
     return sheetHead("사진 수정") +
       '<form class="form" id="sheetForm" data-form="photoDay">' +
-      /* v43: 「날짜」가 왼쪽 · 「기록 이름」이 오른쪽 (한 줄) */
-      '<div class="up-row">' +
-      '<div class="f up-date-f"><label>날짜</label><input class="field up-date" type="date" name="date" value="' + day + '" required></div>' +
+      /* v45: 사진 추가와 같은 차례 — 「기록 이름」 먼저, 「날짜」는 아래 줄 (각자 밑줄 한 줄) */
+      '<div class="up-row up-stack">' +
       '<div class="f up-nm-f"><label>기록 이름</label><input class="field" name="album_tag" value="' + esc(dateTagOf(day)) +
-      '" placeholder="예) 경주여행" autocomplete="off"></div></div>' +
+      '" placeholder="예) 경주여행" autocomplete="off"></div>' +
+      '<div class="f up-date-f"><label>날짜</label><input class="field up-date" type="date" name="date" value="' + day + '" required></div></div>' +
       '<div class="up-hd"><span class="up-hd-t"><i class="up-hd-lb">사진</i><span class="up-hd-c"><b id="upCount">' +
       dayEdit.items.length + "</b>장</span></span>" +
       '<button type="button" class="up-add" data-act="upAdd">' + IC.plus + " 추가</button></div>" +
@@ -5537,8 +5915,8 @@
   var personBack = false;   /* v42: 기념일 & 생일 시트에서 연 프로필이면 그 시트로 돌아와요 */
   /* ==========================================================================
      v27: 프로필 사진 — 카카오톡 프사처럼 동그라미 가이드 안에서 옮기고 키워 자르기
-     · 어두운 화면 가운데 밝은 동그라미 안에서 손가락(마우스)으로 옮기고
-       두 손가락(또는 아래 슬라이더)으로 확대·축소
+     · 어두운 화면 가운데 밝은 동그라미 안에서 한 손가락으로 옮기고,
+       두 손가락을 벌리거나 오므려 확대·축소 (v45: 슬라이더 없이 손으로만)
      · 「적용」을 누르면 동그라미에 맞춘 정사각 256×256 JPEG 로 잘라 저장·동기화
      ========================================================================== */
   var AV_SIDE = 256;
@@ -5570,8 +5948,6 @@
       img.style.height = (st.ih * st.base) + "px";
       img.style.transform = "translate(calc(-50% + " + st.tx + "px), calc(-50% + " + st.ty + "px)) scale(" + st.zoom + ")";
     }
-    var z = document.getElementById("avcZoom");
-    if (z && Math.abs(Number(z.value) - st.zoom) > 0.002) z.value = String(st.zoom);
   }
   function showAvatarCrop(img, iw, ih, who) {
     closeAvatarCrop();
@@ -5588,9 +5964,7 @@
       '<div class="avcrop-hd">동그라미 안에 맞춰 주세요</div>' +
       '<div class="avcrop-stage" id="avcStage" style="width:' + box + 'px;height:' + box + 'px">' +
       '<img class="avc-img" id="avcImg" alt="" src="' + img.src + '"></div>' +
-      '<div class="avcrop-zoom"><span aria-hidden="true">−</span>' +
-      '<input id="avcZoom" type="range" min="1" max="3" step="0.01" value="1" aria-label="확대·축소">' +
-      '<span aria-hidden="true">+</span></div>' +
+      '<div class="avcrop-hint">두 손가락으로 벌려 확대 · 오므려 축소 · 한 손가락으로 옮기기</div>' +
       '<div class="avcrop-btns"><button type="button" class="avcrop-btn" id="avcCancel">취소</button>' +
       '<button type="button" class="avcrop-btn on" id="avcApply">적용</button></div>';
     (document.getElementById("phone") || document.body).appendChild(wrap);
@@ -5621,7 +5995,18 @@
         var dist = Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2)) || 1;
         var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
         if (!last || last.n !== 2) { last = { n: 2, dist: dist, x: mx, y: my }; return; }
-        avCrop.zoom = Math.min(3, Math.max(1, avCrop.zoom * (dist / last.dist)));
+        /* 두 손가락 사이를 잡은 점이 그대로 있도록 — 그 점을 중심으로 확대·축소 (v45) */
+        var z0 = avCrop.zoom;
+        var z1 = Math.min(3, Math.max(1, z0 * (dist / last.dist)));
+        if (z1 !== z0) {
+          var rct = stage.getBoundingClientRect();
+          var relx = mx - rct.left - avCrop.box / 2;
+          var rely = my - rct.top - avCrop.box / 2;
+          var k = z1 / z0;
+          avCrop.tx = relx - k * (relx - avCrop.tx);
+          avCrop.ty = rely - k * (rely - avCrop.ty);
+          avCrop.zoom = z1;
+        }
         avCrop.tx += mx - last.x;
         avCrop.ty += my - last.y;
         last = { n: 2, dist: dist, x: mx, y: my };
@@ -5639,12 +6024,6 @@
       avCrop.zoom = Math.min(3, Math.max(1, avCrop.zoom - e.deltaY * 0.0015));
       avDraw();
     }, { passive: false });
-    var zoomIn = document.getElementById("avcZoom");
-    if (zoomIn) zoomIn.addEventListener("input", function () {
-      if (!avCrop) return;
-      avCrop.zoom = Math.min(3, Math.max(1, Number(zoomIn.value) || 1));
-      avDraw();
-    });
     document.getElementById("avcCancel").addEventListener("click", function () { closeAvatarCrop(); });
     document.getElementById("avcApply").addEventListener("click", function () {
       if (!avCrop) return;
@@ -5725,14 +6104,13 @@
       (isMe ? "" : '<p class="sheet-sub pr-note">프로필은 상대방이 직접 설정할 수 있어요.</p>') +
       "</div>" +
       "</div>" +
-      /* v42: 생일도 프로필에서 — 기념일 시트의 생일 달력 입력칸을 대신해요
-         v44: 아이폰 날짜 팝업이 연도를 찾으면 «일» 칸이 사라지므로 «년/월/일» 세 칸 고르기로 바꿨어요 */
-      '<div class="f" style="margin-top:16px"><label>생일</label>' +
-      '<div class="pr-bday-row">' + prBdaySelects(who) + "</div>" +
-      '<input type="hidden" name="bday" value="' + esc(prBdayValue(who)) + '"></div>' +
+      /* v45: 생일은 예전처럼 «한 번에» — 날짜 입력칸 하나 (v44 의 세 칸 고르기는 걷어냄) */
+      '<div class="f" style="margin-top:16px"><label for="personBday">생일</label>' +
+      '<input class="field pr-bday" id="personBday" type="date" name="bday" min="1900-01-01" max="' + today +
+      '" value="' + esc(prBdayValue(who)) + '"></div>' +
       '<p class="sheet-sub pr-bday-txt" id="prBdayTxt">' +
       (prBdayValue(who) ? bdayFullText(prBdayValue(who)) + " · " : "") +
-      "연·월·일을 골라 주세요. 홈 D-day 에는 월·일로 보여요.</p>" +
+      "생일을 골라 주세요. 홈 D-day 에는 월·일로 보여요.</p>" +
       (canPic ? "" : '<div class="set-hint" style="margin-top:10px;padding:0">프로필 사진은 ' + esc(nm) + " 본인 폰에서 바꿀 수 있어요.</div>") +
       '<button class="btn-primary" type="submit" style="margin-top:18px">저장</button></form>' +
       /* v43: 컬러 동그라미 한 줄 — 고르면 프로필 사진 대신 그 컬러로 */
@@ -6424,6 +6802,94 @@
 
     if (act === "pickDay") { S.ui.selDate = el.getAttribute("data-date"); save(); renderCal(); return; }
 
+    /* v45: 지출·정산 — 달 넘기기 · 내역/달력 · 날짜 고르기 · 예산 · 시트 안 고르기 */
+    if (act === "expPrev" || act === "expNext") {
+      expShiftMonth(el.getAttribute("data-list"), act === "expNext" ? 1 : -1);
+      return;
+    }
+    if (act === "expView") {
+      EXP_VIEW[el.getAttribute("data-list")] = el.getAttribute("data-v") === "cal" ? "cal" : "list";
+      renderDiary();
+      return;
+    }
+    if (act === "expDay") {
+      EXP_DAY[el.getAttribute("data-list")] = el.getAttribute("data-day");
+      renderDiary();
+      return;
+    }
+    if (act === "expAdd") {
+      openExpSheet(containerOf(el.getAttribute("data-list")), null, el.getAttribute("data-tx"));
+      return;
+    }
+    if (act === "expBudget") { openExpBudget(containerOf(el.getAttribute("data-list"))); return; }
+    if (act === "expBudgetOff") {
+      var bcid = el.getAttribute("data-list");
+      expSetBudget(bcid, expMon(bcid), 0);
+      save(); closeSheet(); renderDiary(); toast("예산을 지웠어요");
+      return;
+    }
+    if (act === "expTx") {
+      var xtx = el.getAttribute("data-tx") === "deposit" ? "deposit" : "expense";
+      var xseg = el.closest(".exp-seg");
+      if (xseg) xseg.querySelectorAll("button").forEach(function (b) { b.classList.toggle("on", b === el); });
+      var xform = sheet.querySelector("#sheetForm");
+      if (xform) xform.setAttribute("data-tx", xtx);
+      var xtin = sheet.querySelector('#sheetForm input[name="txType"]');
+      if (xtin) xtin.value = xtx;
+      var xcats = sheet.querySelector(".exp-cats");
+      if (xcats) xcats.hidden = xtx === "deposit";
+      var xmemo = sheet.querySelector('#sheetForm input[name="memo"]');
+      if (xmemo) xmemo.setAttribute("placeholder", xtx === "deposit" ? "예: 11월 월급" : "예: 장보기");
+      return;
+    }
+    if (act === "expWho") {
+      var xgrp = el.closest(".exp-whos");
+      if (xgrp) xgrp.querySelectorAll(".exp-who").forEach(function (b) { b.classList.toggle("on", b === el); });
+      var xwin = sheet.querySelector('#sheetForm input[name="who"]');
+      if (xwin) xwin.value = el.getAttribute("data-who") || "both";
+      return;
+    }
+    if (act === "expCat") {
+      var xgrid = document.getElementById("expCatGrid");
+      if (xgrid) xgrid.querySelectorAll(".exp-cat").forEach(function (b) { b.classList.remove("on"); });
+      el.classList.add("on");
+      var xcin = sheet.querySelector('#sheetForm input[name="cat"]');
+      if (xcin) xcin.value = el.getAttribute("data-cat") || "";
+      var xnw = document.getElementById("expCatNew");
+      if (xnw) xnw.hidden = true;
+      return;
+    }
+    if (act === "expCatNew") {
+      var xnw2 = document.getElementById("expCatNew");
+      if (!xnw2) return;
+      xnw2.hidden = false;
+      var xni = document.getElementById("expCatIn");
+      if (xni) { try { xni.focus(); } catch (e) {} }
+      return;
+    }
+    if (act === "expCatAdd") {
+      var xni2 = document.getElementById("expCatIn");
+      var xval = xni2 ? String(xni2.value || "").trim().slice(0, 10) : "";
+      if (!xval) { if (xni2) xni2.focus(); return; }
+      var xcin2 = sheet.querySelector('#sheetForm input[name="cat"]');
+      if (xcin2) xcin2.value = xval;
+      var xgrid2 = document.getElementById("expCatGrid");
+      if (xgrid2) {
+        xgrid2.querySelectorAll(".exp-cat").forEach(function (b) { b.classList.remove("on"); });
+        var xmore = xgrid2.querySelector(".exp-cat-more");
+        var xtile = document.createElement("button");
+        xtile.type = "button";
+        xtile.className = "exp-cat on";
+        xtile.setAttribute("data-act", "expCat");
+        xtile.setAttribute("data-cat", xval);
+        xtile.innerHTML = '<span class="ic">' + expIconSvg(xval, "expense") + '</span><span class="nm">' + esc(xval) + "</span>";
+        if (xmore) xgrid2.insertBefore(xtile, xmore); else xgrid2.appendChild(xtile);
+      }
+      var xnw3 = document.getElementById("expCatNew");
+      if (xnw3) xnw3.hidden = true;
+      return;
+    }
+
     /* v19: 일정 검색 → 결과를 누르면 그 달·날짜로 */
     if (act === "calSearch") {
       sheetCenter = true;   /* v21: 아래가 아니라 화면 가운데에 떠요 */
@@ -6631,12 +7097,22 @@
       if (!diary) return;
       var m44 = el.getAttribute("data-mode");
       diary.pmode = (m44 === "erase" || m44 === "hl") ? m44 : "pen";
+      /* v45: 가는 펜(2) · 일반 펜(4.5) — 한 단추가 굵기까지 함께 골라요 */
+      var w45 = el.getAttribute("data-w");
+      if (w45) diary.pw = Number(w45) || diary.pw;
+      d41PanelRefresh();
+      return;
+    }
+    if (act === "d41PenColorPick") {
+      if (!diary) return;
+      diary.pcpick = !diary.pcpick;
       d41PanelRefresh();
       return;
     }
     if (act === "d41PenColor") {
       if (!diary) return;
       diary.pcolor = el.getAttribute("data-color") || "#111111";
+      diary.pcpick = false;
       d41PanelRefresh();
       return;
     }
@@ -6729,6 +7205,8 @@
       var edKind = listKindOf(elL);
       /* v41: 모눈 메모는 시트 대신 모눈종이 풀스크린 다이어리로 열어요 */
       if (edKind === "memo") { openDiary(elCid, elId); return; }
+      /* v45: 지출·정산은 전용 시트 */
+      if (edKind === "expense") { openExpSheet(elL, elIt); return; }
       openSheet(formListItem(elL, elIt), function (fd) {
         var L2 = containerOf(elCid);
         var I2 = L2 ? L2.items.filter(function (x) { return x.id === elId; })[0] : null;
@@ -6749,12 +7227,6 @@
           I2.place = String(fd.get("place") || "").trim();
           I2.date = String(fd.get("date") || "").slice(0, 10) || today;
           setItBody(I2, String(fd.get("memo") || "").trim());
-        } else if (edKind === "expense") {
-          if (!txt) { toast("항목을 적어 주세요"); return; }
-          setItTitle(I2, txt);
-          I2.amount = parseAmount(fd.get("amount"));
-          setItBody(I2, String(fd.get("memo") || "").trim());
-          if (!I2.date) I2.date = today;
         } else {
           if (!txt) { toast("내용을 적어 주세요"); return; }
           setItTitle(I2, txt);
@@ -6826,6 +7298,8 @@
       var alKind = listKindOf(alL);
       /* v41: 모눈 메모는 새 다이어리로 */
       if (alKind === "memo") { openDiary(alId, null); return; }
+      /* v45: 지출·정산은 전용 시트 */
+      if (alKind === "expense") { openExpSheet(alL, null, null); return; }
       openSheet(formListItem(alL, null), function (fd) {
         var L0 = containerOf(alId);
         if (!L0) return;
@@ -6849,13 +7323,6 @@
           else L0.items.push({
             id: uid(), text: txt0, memo: body0, done: false,
             rating: rate0, place: place0, date: when0
-          });
-        } else if (alKind === "expense") {
-          if (!txt0) { toast("항목을 적어 주세요"); return; }
-          if (isBaseContainer(L0)) basePush(L0.base, { text: txt0, memo: body0, amount: parseAmount(fd.get("amount")) });
-          else L0.items.push({
-            id: uid(), text: txt0, memo: body0, done: false,
-            amount: parseAmount(fd.get("amount")), date: today
           });
         } else {
           if (isBaseContainer(L0)) basePush(L0.base, { text: txt0, memo: body0 });
@@ -7705,6 +8172,18 @@
     if (calSwiped) { ev.stopPropagation(); ev.preventDefault(); calSwiped = false; }
   }, true);
 
+  /* v45: 사진 댓글 — Enter 로 바로 등록, Shift+Enter 는 줄바꿈 (한글 조합 중에는 그대로) */
+  document.addEventListener("keydown", function (ev) {
+    var t = ev.target;
+    if (!t || !t.classList || !t.classList.contains("cmt-in") || t.tagName !== "TEXTAREA") return;
+    if (ev.key !== "Enter" || ev.shiftKey || ev.isComposing) return;
+    ev.preventDefault();
+    var f = t.closest(".cmt-form");
+    if (!f) return;
+    if (f.requestSubmit) f.requestSubmit();
+    else { var b = f.querySelector(".cmt-send"); if (b) b.click(); }
+  }, true);
+
   /* v19: 키보드로도 카드 열기 (Enter / Space) — div[role=button] 은 스스로 click 을 만들지 않아요 */
   document.addEventListener("keydown", function (ev) {
     if (ev.key !== "Enter" && ev.key !== " " && ev.key !== "Spacebar") return;
@@ -8123,6 +8602,15 @@
 
   document.addEventListener("input", function (ev) {
     var t = ev.target;
+    /* v45: 사진 댓글 칸 — 쓰는 만큼 아래로 늘어나요 */
+    if (t && t.classList && t.classList.contains("cmt-in") && t.tagName === "TEXTAREA") { cmtGrow(t); return; }
+    /* v45: 지출·정산 금액·예산 — 치는 대로 1,000 단위 쉼표 */
+    if (t && t.closest && t.closest("#sheet") && (t.name === "amount" || t.name === "budget")) {
+      var digits = String(t.value || "").replace(/[^\d]/g, "").slice(0, 12);
+      var fmt = digits ? won(Number(digits)) : "";
+      if (t.value !== fmt) t.value = fmt;
+      return;
+    }
     /* v42: 모눈 다이어리 글 상자 — 적는 만큼 종이가 길어지고, 그림 좌표도 함께 맞춰요 */
     if (t && t.classList && t.classList.contains("d41-txt")) {
       var d41TidIn = t.getAttribute("data-txedit");
@@ -8183,9 +8671,12 @@
       d41AutoSaveSoon();
       return;
     }
-    /* v44: 프로필 생일 «년/월/일» — 고른 값을 hidden 에 담고 바로 아래에 보여요 */
-    if (t && t.classList && (t.classList.contains("pr-bday-y") || t.classList.contains("pr-bday-m") || t.classList.contains("pr-bday-d"))) {
-      prBdaySync(t.closest(".pr-bday-row"));
+    /* v45: 프로필 생일 — 고르는 순간 바로 아래 줄에 「1992년 6월 26일」로 보여요 */
+    if (t && t.classList && t.classList.contains("pr-bday")) {
+      var pbv = String(t.value || "").slice(0, 10);
+      var prb = document.getElementById("prBdayTxt");
+      if (prb) prb.textContent = (pbv && parseBirthday(pbv) ? bdayFullText(pbv) + " · " : "") +
+        "생일을 골라 주세요. 홈 D-day 에는 월·일로 보여요.";
       return;
     }
   });

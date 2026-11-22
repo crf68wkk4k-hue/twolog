@@ -565,16 +565,33 @@
           if (it.place != null) x.place = String(it.place);
           if (it.date != null) x.date = String(it.date);
           if (it.amount != null) x.amount = Number(it.amount) || 0;
+          /* v45: 지출·정산 — 입금/지출·카테고리·누가 (who 는 두 기기에서 «나/상대»로 바꿔 담아요) */
+          if (it.txType === "deposit" || it.txType === "expense") x.txType = it.txType;
+          if (it.cat != null) x.cat = String(it.cat);
+          if (it.who === "me" || it.who === "you" || it.who === "both") x.who = flip(it.who);
           return x;
         }) };
     }
     if (o.gid) p.gid = String(o.gid);        // 어느 카드(리스트)에 들어 있는지
+    /* v45: 지출·정산 달 예산 — 내 카테고리(list)는 리스트 메타에 함께 실어요 */
+    if (kind === "list" && o.budgets && typeof o.budgets === "object") {
+      var bm = {};
+      Object.keys(o.budgets).forEach(function (k) {
+        var v = Math.round(Number(o.budgets[k]) || 0);
+        if (/^\d{4}-\d{2}$/.test(k) && v > 0) bm[k] = v;
+      });
+      if (Object.keys(bm).length) p.budgets = bm;
+    }
     /* v39: 기본 카테고리도 속지(별점 리뷰·지출·정산)를 고를 수 있어, 그때 적은 값이 있으면 함께 실어요 */
     if (kind !== "list") {
       if (o.text && kind !== "todo") p.text = String(o.text);
       if (o.rating != null) p.rating = Number(o.rating) || 0;
       if (o.place) p.place = String(o.place);
       if (o.amount != null) p.amount = Number(o.amount) || 0;
+      /* v45: 기본 카테고리를 지출·정산 속지로 볼 때 적은 값도 함께 */
+      if (o.cat != null && kind !== "bucket") p.cat = String(o.cat);
+      if (o.txType === "deposit" || o.txType === "expense") p.txType = o.txType;
+      if (kind !== "todo" && (o.who === "me" || o.who === "you" || o.who === "both")) p.who = flip(o.who);
       if (o.date && kind !== "log") p.date = String(o.date).slice(0, 10);
     }
     return p;
@@ -634,13 +651,30 @@
     ["todo", "bucket", "log"].forEach(function (k) {
       if (["check", "memo", "review", "expense"].indexOf(ksrc[k]) >= 0) kinds[k] = ksrc[k];
     });
-    return { tabs: tabs, order: order, kinds: kinds };
+    /* v45: 기본 카테고리의 지출·정산 달 예산 */
+    var budgets = {};
+    var bsrc = (doc && doc.noteBudgets) || {};
+    ["todo", "bucket", "log"].forEach(function (k) {
+      var m = bsrc[k];
+      if (!m || typeof m !== "object") return;
+      var clean = {};
+      Object.keys(m).forEach(function (ym) {
+        var v = Math.round(Number(m[ym]) || 0);
+        if (/^\d{4}-\d{2}$/.test(ym) && v > 0) clean[ym] = v;
+      });
+      if (Object.keys(clean).length) budgets[k] = clean;
+    });
+    return { tabs: tabs, order: order, kinds: kinds, budgets: budgets };
   }
   function noteMetaEmpty(value) {
     if (!value || typeof value !== "object") return true;
     var hasName = ["todo", "bucket", "log"].some(function (k) { return !!(value.tabs && value.tabs[k] && value.tabs[k].n); });
     var hasKind = ["todo", "bucket", "log"].some(function (k) { return !!(value.kinds && value.kinds[k]); });
-    return !hasName && !hasKind && !arr(value.order).length;
+    var hasBudget = ["todo", "bucket", "log"].some(function (k) {
+      var m = value.budgets && value.budgets[k];
+      return !!(m && typeof m === "object" && Object.keys(m).length);
+    });
+    return !hasName && !hasKind && !hasBudget && !arr(value.order).length;
   }
 
   /* v43: 생일 {me,you} — couples 행처럼 «만든 사람» 기준으로 맞춰 담고(swap), 읽을 때 되돌려요 */
@@ -717,6 +751,11 @@
           if (p.rating != null) obj.rating = Number(p.rating) || 0;
           if (p.place) obj.place = String(p.place);
           if (p.amount != null) obj.amount = Number(p.amount) || 0;
+          /* v45: 지출·정산 — 입금/지출·카테고리·누가도 되살려요 */
+          if (p.cat != null && obj.cat === undefined) obj.cat = String(p.cat);
+          if (p.txType === "deposit" || p.txType === "expense") obj.txType = p.txType;
+          if (p.who && obj.who === undefined && (p.who === "me" || p.who === "you" || p.who === "both")) obj.who = flip(p.who);
+          if (p.date && obj.date === undefined) obj.date = String(p.date).slice(0, 10);
           return obj;
         };
         if (r.kind === "todo") {
@@ -775,9 +814,22 @@
               if (it.place != null) x.place = String(it.place);
               if (it.date != null) x.date = String(it.date);
               if (it.amount != null) x.amount = Number(it.amount) || 0;
+              /* v45: 지출·정산 — 입금/지출·카테고리·누가 */
+              if (it.txType === "deposit" || it.txType === "expense") x.txType = it.txType;
+              if (it.cat != null) x.cat = String(it.cat);
+              if (it.who === "me" || it.who === "you" || it.who === "both") x.who = flip(it.who);
               return x;
             }) };
           if (gid) list.gid = gid;
+          /* v45: 지출·정산 달 예산 */
+          if (p.budgets && typeof p.budgets === "object") {
+            var bm2 = {};
+            Object.keys(p.budgets).forEach(function (k) {
+              var v = Math.round(Number(p.budgets[k]) || 0);
+              if (/^\d{4}-\d{2}$/.test(k) && v > 0) bm2[k] = v;
+            });
+            if (Object.keys(bm2).length) list.budgets = bm2;
+          }
           doc.lists.push(list);
         }
       });
@@ -816,6 +868,20 @@
           doc.noteKinds = {};
           ["todo", "bucket", "log"].forEach(function (k) {
             if (["check", "memo", "review", "expense"].indexOf(nm.kinds[k]) >= 0) doc.noteKinds[k] = nm.kinds[k];
+          });
+        }
+        /* v45: 기본 카테고리의 지출·정산 달 예산 */
+        if (nm.budgets && typeof nm.budgets === "object") {
+          doc.noteBudgets = {};
+          ["todo", "bucket", "log"].forEach(function (k) {
+            var m = nm.budgets[k];
+            if (!m || typeof m !== "object") return;
+            var cleanB = {};
+            Object.keys(m).forEach(function (ym) {
+              var v = Math.round(Number(m[ym]) || 0);
+              if (/^\d{4}-\d{2}$/.test(ym) && v > 0) cleanB[ym] = v;
+            });
+            if (Object.keys(cleanB).length) doc.noteBudgets[k] = cleanB;
           });
         }
       }

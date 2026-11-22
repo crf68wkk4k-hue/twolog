@@ -1,11 +1,11 @@
 """투로그 v43 확인 — 모눈 다이어리 손보기.
 
-1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
+1) 버전: sw.js 캐시 twolog-v45 · APP_VERSION v45 · My 탭 「버전 v45」
 2) 글 상자
    - 종이를 톡 누르면 그 자리에 상자가 생기고 바로 입력(포커스)
    - 이미 있는 상자를 한 번 톡 누르면 «고르기»만 — 입력 포커스가 풀려(blur) 아이폰 키보드가 내려가고
-     아래 T 툴바(글 수정 · 키보드 내리기 · 크기 슬라이더 · 색 · 정렬)가 보임
-   - 같은 상자를 두 번 톡 누르거나 「글 수정」을 누르면 그때 입력(포커스)
+     아래 T 툴바(한 줄: 정렬 · B · S · U · − 크기 + · 색 동그라미)가 보임 — v45
+   - 같은 상자를 두 번 톡 누르면 그때 입력(포커스)
    - 오른쪽 위 × 는 누르는 즉시(pointerdown) 그 상자만 삭제 — 새 상자가 생기지 않음 (터치 영역 30px)
    - 빈 「글을 써 보세요」 상자가 쌓이지 않음 (종이를 다시 누르거나 도구를 바꾸면 정리)
 3) 사진 자르기
@@ -175,9 +175,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
+    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v45"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v42 문자열이 남아 있지 않음",
           "twolog-v42" not in sw and 'APP_VERSION = "v42"' not in app_js)
@@ -191,11 +191,11 @@ with sync_playwright() as p:
     page.wait_for_timeout(900)
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v44」", ver.strip() == "버전 v44", ver)
+    check("My 탭 맨 위에 「버전 v45」", ver.strip() == "버전 v45", ver)
     tab(page, 0, 520)
 
     # ==================================================================
-    # 2. 사용자 카테고리 「그림판」 — 글 상자 ×·빈 상자·키보드 내리기
+    # 2. 사용자 카테고리 「그림판」 — 글 상자 ×·빈 상자·한 줄 툴바
     # ==================================================================
     ctxA = new_ctx(browser)
     ctxA.add_init_script("window.__TWOLOG_MODE = 'local';")
@@ -240,8 +240,25 @@ with sync_playwright() as p:
         const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height), getComputedStyle(b).display]; })()})""")
     check("이미 있는 상자를 한 번 톡 누르면 입력 포커스가 풀림 (아이폰 키보드 내려감)",
           "d41-txt" not in (one["focused"] or ""), one["focused"])
-    check("그 상태에서 아래 T 툴바가 보임 — 글 수정 · 키보드 내리기",
-          one["panelHidden"] is False and "글 수정" in one["panel"] and "키보드 내리기" in one["panel"], one["panel"][:60])
+    # v45: T 툴바는 한 줄 [정렬 B S U − 크기 + 색] · 「글 수정/키보드 내리기」 줄은 없앰
+    tbar = pageA.evaluate("""() => { const p = document.getElementById('d41Panel');
+      const row = p.querySelector('.d41-trow');
+      const cs = e => e ? getComputedStyle(e) : null;
+      const order = row ? [...row.querySelectorAll('button, .d41-pv')].map(e => e.getAttribute('data-act') || e.getAttribute('aria-label') || e.textContent.trim()) : [];
+      return {hidden: p.hidden, row: !!row,
+        align: !!p.querySelector('[data-act=d41Align]'), b: !!p.querySelector('[data-act=d41Bold]'),
+        s: !!p.querySelector('[data-act=d41Strike]'), u: !!p.querySelector('[data-act=d41Underline]'),
+        size: p.querySelectorAll('[data-act=d41SizeStep]').length, pv: !!p.querySelector('.d41-pv'),
+        color: !!p.querySelector('[data-act=d41ColorPick]'),
+        edit: p.querySelectorAll('[data-act=d41Edit]').length, blur: p.querySelectorAll('[data-act=d41Blur]').length,
+        hint: p.querySelectorAll('.d41-phint').length, order: order,
+        colorW: (() => { const c = p.querySelector('.d41-tc'); return c ? Math.round(c.getBoundingClientRect().width) : 0; })()}; }""")
+    check("그 상태에서 아래 T 툴바가 한 줄로 보임 (정렬·B·S·U·크기·색)",
+          tbar["hidden"] is False and tbar["row"] and tbar["align"] and tbar["b"] and tbar["s"] and tbar["u"]
+          and tbar["size"] == 2 and tbar["pv"] and tbar["color"], tbar)
+    check("T 툴바에서 「글 수정·키보드 내리기」 줄과 안내 글씨가 사라짐",
+          tbar["edit"] == 0 and tbar["blur"] == 0 and tbar["hint"] == 0, tbar)
+    check("색 동그라미는 작게 (22px)", tbar["colorW"] == 22, tbar["colorW"])
     check("× 삭제 버튼 터치 영역 30px", one["x"] and one["x"][0] == 30 and one["x"][1] == 30 and one["x"][2] == "flex", one["x"])
 
     # 같은 상자를 짧은 사이에 한 번 더 톡 → 입력(포커스)
@@ -252,17 +269,22 @@ with sync_playwright() as p:
     dbl = pageA.evaluate("document.activeElement ? document.activeElement.className : ''")
     check("고른 상자를 한 번 더 톡 누르면 그때 입력(포커스)", "d41-txt" in (dbl or ""), dbl)
 
-    # 「글 수정」 버튼으로도 입력
+    # v45: 「글 수정 / 키보드 내리기」 단추는 없앴어요 — 두 번 톡 누르면 입력, 다른 곳을 누르면 내려가요
     pageA.evaluate("document.activeElement && document.activeElement.blur && document.activeElement.blur()")
     pageA.wait_for_timeout(150)
-    pageA.locator("#d41Panel [data-act=d41Edit]").first.click()
-    pageA.wait_for_timeout(300)
-    btnFocus = pageA.evaluate("document.activeElement ? document.activeElement.className : ''")
-    check("T 툴바의 「글 수정」을 눌러도 입력(포커스)", "d41-txt" in (btnFocus or ""), btnFocus)
-    pageA.locator("#d41Panel [data-act=d41Blur]").first.click()
-    pageA.wait_for_timeout(250)
-    blurFocus = pageA.evaluate("document.activeElement ? document.activeElement.className : ''")
-    check("「키보드 내리기」를 누르면 포커스가 풀림", "d41-txt" not in (blurFocus or ""), blurFocus)
+    gone = pageA.evaluate("""() => ({edit: document.querySelectorAll('#d41Panel [data-act=d41Edit]').length,
+      blur: document.querySelectorAll('#d41Panel [data-act=d41Blur]').length,
+      hint: document.querySelectorAll('#d41Panel .d41-phint').length})""")
+    check("T 툴바에서 「글 수정·키보드 내리기」 단추와 안내 줄이 사라짐",
+          gone["edit"] == 0 and gone["blur"] == 0 and gone["hint"] == 0, gone)
+    pageA.mouse.click(tb["x"] + 18, tb["y"] + 12)
+    pageA.wait_for_timeout(120)
+    pageA.mouse.click(tb["x"] + 18, tb["y"] + 12)
+    pageA.wait_for_timeout(340)
+    againFocus = pageA.evaluate("document.activeElement ? document.activeElement.className : ''")
+    check("상자를 한 번 더 톡 누르면 다시 입력(포커스)", "d41-txt" in (againFocus or ""), againFocus)
+    pageA.evaluate("document.activeElement && document.activeElement.blur && document.activeElement.blur()")
+    pageA.wait_for_timeout(200)
 
     # × — pointerdown 에서 바로 삭제 (click 이 삼켜져도 지워짐)
     pageA.mouse.click(tb["x"] + 18, tb["y"] + 12)
@@ -634,7 +656,8 @@ with sync_playwright() as p:
       const grid = document.querySelector('#sheet #upList');
       const guide = document.querySelector('#sheet .up-guide');
       return {labels: labels,
-        dateLeft: Math.abs(rd.top - rt.top) < 4 && rd.right <= rt.left,
+        /* v45: 한 줄 나란히 → 「기록 이름」 위 · 「날짜」 아래 두 줄 */
+        stacked: rt.bottom <= rd.top + 2 && Math.abs(rd.left - rt.left) < 2,
         lbFs: cs(lb) ? cs(lb).fontSize : null, lbFw: cs(lb) ? cs(lb).fontWeight : null,
         flFs: cs(fl) ? cs(fl).fontSize : null, flFw: cs(fl) ? cs(fl).fontWeight : null,
         cntFs: cs(cnt) ? cs(cnt).fontSize : null, cnt: (document.getElementById('upCount') || {}).textContent,
@@ -643,8 +666,8 @@ with sync_playwright() as p:
         sub: (document.querySelector('#sheet .sheet-sub') || {}).textContent || ''};
     }"""
     fixE = pageC.evaluate(SHEET_JS)
-    check("사진 수정 시트 — 「날짜」가 왼쪽 · 「기록 이름」이 오른쪽 (한 줄)",
-          fixE["labels"] == ["날짜", "기록 이름"] and fixE["dateLeft"], fixE["labels"])
+    check("사진 수정 시트 — 「기록 이름」 위 · 「날짜」 아래 두 줄 (v45)",
+          fixE["labels"] == ["기록 이름", "날짜"] and fixE["stacked"], fixE["labels"])
     check("「사진」 라벨 글씨가 위 라벨(날짜·기록 이름)과 같은 폰트 크기·굵기",
           fixE["lbFs"] == fixE["flFs"] and fixE["lbFw"] == fixE["flFw"], (fixE["lbFs"], fixE["flFs"], fixE["lbFw"], fixE["flFw"]))
     check("옆의 「N장」은 지금 크기(12px) 그대로", fixE["cntFs"] == "12px" and (fixE["cnt"] or "").isdigit(), (fixE["cntFs"], fixE["cnt"]))
@@ -665,8 +688,8 @@ with sync_playwright() as p:
     fc.value.set_files([imgC, imgC, imgC])
     pageC.wait_for_timeout(1000)
     addE = pageC.evaluate(SHEET_JS)
-    check("사진 추가 시트 — 「날짜」 왼쪽 · 「기록 이름」 오른쪽",
-          addE["labels"] == ["날짜", "기록 이름"] and addE["dateLeft"], addE["labels"])
+    check("사진 추가 시트 — 「기록 이름」 위 · 「날짜」 아래 두 줄 (v45)",
+          addE["labels"] == ["기록 이름", "날짜"] and addE["stacked"], addE["labels"])
     check("사진 추가 시트 — 「사진」 라벨 글씨 통일 · 「N장」 그대로 · 5열 · 안내 문구",
           addE["lbFs"] == addE["flFs"] and addE["lbFw"] == addE["flFw"] and addE["cntFs"] == "12px"
           and addE["cols"] == 5 and "끌어 옮기면 순서를 바꿀 수 있어요" in (addE["guide"] or ""), addE)
@@ -789,9 +812,10 @@ with sync_playwright() as p:
     pageD.locator('#s-set [data-act="personSheet"][data-who="you"]').click()
     pageD.wait_for_timeout(600)
     prof0 = pageD.evaluate("""() => { const sh = document.querySelector('#sheet');
-      const b = sh.querySelector('.pr-bday-row');
+      const b = sh.querySelector('input[name=bday]');
       const n = sh.querySelector('input[name=name]');
-      return {sel3: !!(sh.querySelector('select.pr-bday-y') && sh.querySelector('select.pr-bday-m') && sh.querySelector('select.pr-bday-d')),
+      return {date: !!b && b.type === 'date',
+        sel3: !!(sh.querySelector('select.pr-bday-y') || sh.querySelector('select.pr-bday-m')),
         note: (sh.querySelector('.pr-note') || {}).textContent || '',
         belowName: (() => { if (!b || !n) return false;
           const rn = n.getBoundingClientRect(), rb = b.getBoundingClientRect();
@@ -801,11 +825,10 @@ with sync_playwright() as p:
     check("상대 프로필 시트 — 컬러 동그라미 한 줄", prof0["sws"] == 12 and prof0["colorLbl"] == 1, prof0)
     check("상대 프로필 시트 — 닉네임 아래 「프로필은 상대방이 직접 설정할 수 있어요」 안내",
           "프로필은 상대방이 직접 설정할 수 있어요" in (prof0["note"] or "") and prof0["belowName"], prof0)
-    check("생일 칸은 «년/월/일» 세 고르기 (연·월·일 모두 고름)", prof0["sel3"] and prof0["belowName"], prof0)
-    pageD.select_option('#sheet select.pr-bday-y', '1996')
-    pageD.select_option('#sheet select.pr-bday-m', '3')
-    pageD.select_option('#sheet select.pr-bday-d', '9')
-    pageD.wait_for_timeout(250)
+    # v45: 생일은 날짜칸 한 개 (v44 의 세 칸 고르기는 걷어냄)
+    check("생일 칸은 날짜 입력칸 하나 (세 칸 고르기 없음)", prof0["date"] and not prof0["sel3"] and prof0["belowName"], prof0)
+    pageD.fill('#sheet input[name=bday]', '1996-03-09')
+    pageD.wait_for_timeout(280)
     hintNow = pageD.evaluate("(document.getElementById('prBdayTxt') || {}).textContent || ''")
     check("날짜를 고르면 연·월·일이 그 자리에 보임", "1996년 3월 9일" in hintNow, hintNow)
     pageD.locator('#sheet #personForm button[type="submit"]').click()

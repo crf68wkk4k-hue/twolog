@@ -1,6 +1,6 @@
 """투로그 v41 확인 — 모눈 메모가 «모눈종이 풀스크린 다이어리»로 바뀐 것 + + 시트 문구 정리.
 
-1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
+1) 버전: sw.js 캐시 twolog-v45 · APP_VERSION v45 · My 탭 「버전 v45」
 2) + 시트 문구 정리
    - 고른 카테고리 아래 패널 제목은 「속지 · 이름」 (「속지 레이아웃」 아님)
    - 기본 카테고리(메모·버킷리스트·영화·먹방)의 배지와 첫 선택지도 「투두리스트」
@@ -208,9 +208,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
+    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v45"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -223,7 +223,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v44」", ver.strip() == "버전 v44", ver)
+    check("My 탭 맨 위에 「버전 v45」", ver.strip() == "버전 v45", ver)
 
     # ==================================================================
     # 2. + 시트 문구 — 「속지」 · 기본 카테고리도 「투두리스트」
@@ -464,12 +464,15 @@ with sync_playwright() as p:
     page.locator("#sheet .d41-tool[aria-label='펜 그리기']").click()
     page.wait_for_timeout(300)
     pen_on = page.evaluate("""() => ({on: document.getElementById('d41Pen').classList.contains('on'),
-      panel: [...document.querySelectorAll('#sheet .d41-pb')].map(b => b.textContent),
-      pens: [...document.querySelectorAll('#sheet .d41-penb')].map(b => b.getAttribute('aria-label'))})""")
-    check("펜을 누르면 그리기 도크(펜·형광펜·지우개·전체 지우기)가 열리고 되돌리기는 상단 바로",
-          pen_on["on"] and pen_on["pens"][:3] == ["펜", "형광펜", "지우개"]
-          and "전체 지우기" in pen_on["pens"]
-          and page.evaluate("!!document.getElementById('d41UndoBtn')"), pen_on["pens"])
+      texts: [...document.querySelectorAll('#sheet .d41-prow-dock .d41-pl')].length,
+      pens: [...document.querySelectorAll('#sheet .d41-dk')].map(b => b.getAttribute('aria-label')),
+      undoInTools: !!document.querySelector('#sheet .d41-tools #d41UndoBtn'),
+      undoInTop: !!document.querySelector('#sheet .d41-top #d41UndoBtn')})""")
+    # v45: 글씨 라벨 없는 한 줄 그림 도크 · 되돌리기는 펜 옆 도구 줄로
+    check("펜을 누르면 한 줄짜리 그림 도크가 열림 (글씨 라벨 없음)",
+          pen_on["on"] and pen_on["pens"] == ["가는 펜", "일반 펜", "형광펜", "지우개", "펜 색", "전체 지우기"]
+          and pen_on["texts"] == 0, pen_on["pens"])
+    check("되돌리기는 위 줄이 아니라 펜 옆 도구 줄에", pen_on["undoInTools"] and not pen_on["undoInTop"], pen_on)
     box = page.locator("#d41Paper").bounding_box()
     sx, sy = box["x"] + 70, box["y"] + 520
 
@@ -492,7 +495,7 @@ with sync_playwright() as p:
           and all(pts[i] >= 0 for i in range(1, len(pts), 2)), pts[:6])
     page.locator("#d41UndoBtn").click()
     page.wait_for_timeout(300)
-    check("되돌리기(상단 ↶)로 마지막 선이 지워짐",
+    check("되돌리기(↶ · 펜 옆)로 마지막 선이 지워짐",
           page.evaluate("document.querySelectorAll('#d41Pen path').length") == 0)
     draw()
     page.screenshot(path=os.path.join(SHOT, "_p41-test-pen.png"))
@@ -616,14 +619,17 @@ with sync_playwright() as p:
     check("별점 리뷰 속지는 그대로 (배지 없음 · 별 5개)", rv["badge"] is False and rv["cards"] == 1 and rv["stars"] == 5, rv)
 
     create_kind(page2, "데이트 통장", "expense")
-    page2.fill("#s-diary #listQuickForm input[name=text]", "점심")
-    page2.fill("#s-diary #listQuickForm input[name=amount]", "24000")
-    page2.locator("#s-diary #listQuickForm button").click()
-    page2.wait_for_timeout(520)
+    page2.locator("#s-diary .exp-act[data-tx='expense']").click()
+    page2.wait_for_timeout(460)
+    page2.fill("#sheet input[name=amount]", "24000")
+    page2.locator("#sheet .exp-cat[data-cat='식비']").click()
+    page2.fill("#sheet input[name=memo]", "점심")
+    page2.locator("#sheet button.btn-primary").click()
+    page2.wait_for_timeout(600)
     ex = page2.evaluate("""() => ({badge: !!document.querySelector('#s-diary .note-hd .k'),
-      sum: (document.querySelector('#s-diary .ex-sum .v') || {}).textContent,
-      rows: document.querySelectorAll('#s-diary .ex-row').length})""")
-    check("지출·정산 속지는 그대로 (합계 계산)", ex["badge"] is False and ex["sum"] == "24,000원" and ex["rows"] == 1, ex)
+      sum: (document.querySelector('#s-diary .exp-spent') || {}).textContent,
+      rows: document.querySelectorAll('#s-diary .exp-row').length})""")
+    check("지출·정산 속지는 그대로 (사용 금액 계산)", ex["badge"] is False and ex["sum"] == "₩24,000" and ex["rows"] == 1, ex)
     check("브라우저 콘솔/페이지 오류 없음 (다른 속지)", len(errs2) == 0, errs2[:4])
     ctx2.close()
 
@@ -833,13 +839,14 @@ with sync_playwright() as p:
       const cells = [...document.querySelectorAll('#sheet .up-cell')];
       const grid = document.querySelector('#sheet #upList');
       return {labels: [...document.querySelectorAll('#sheet .up-row label')].map(l => l.textContent),
-              sameRow: Math.abs(ra.top - rb.top) < 4 && ra.right <= rb.left,
+              stacked: rb.bottom <= ra.top + 2 && Math.abs(ra.left - rb.left) < 2
+                       && Math.min(ra.width, rb.width) > 100,
               cells: cells.length, xs: document.querySelectorAll('#sheet .up-cell .up-x').length,
               cols: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
               rows: new Set(cells.map(c => Math.round(c.getBoundingClientRect().top))).size,
               add: !!document.querySelector('#sheet .up-add')}; }""")
-    check("사진 추가 시트 — 「날짜」(왼쪽)·「기록 이름」(오른쪽)이 한 줄에 나란히 (v43)",
-          g0["labels"] == ["날짜", "기록 이름"] and g0["sameRow"], g0)
+    check("사진 추가 시트 — 「기록 이름」 위 · 「날짜」 아래 두 줄 (v45)",
+          g0["labels"] == ["기록 이름", "날짜"] and g0["stacked"], g0)
     check("고른 사진은 한 줄에 5개씩 들어가는 네모 그리드 (7장 → 두 줄) — v43",
           g0["cells"] == 7 and g0["cols"] == 5 and g0["rows"] == 2 and g0["xs"] == 7, g0)
     pageA.screenshot(path=os.path.join(SHOT, "photo-v41-editgrid.png"))
@@ -873,15 +880,16 @@ with sync_playwright() as p:
     pageA.wait_for_timeout(700)
     ed1 = pageA.evaluate("""() => ({
       labels: [...document.querySelectorAll('#sheet .up-row label')].map(l => l.textContent),
-      sameRow: (() => { const a = document.querySelector('#sheet input[name=date]');
+      stacked: (() => { const a = document.querySelector('#sheet input[name=date]');
         const b = document.querySelector('#sheet input[name=album_tag]');
         const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-        return Math.abs(ra.top - rb.top) < 4 && ra.right <= rb.left; })(),
+        return rb.bottom <= ra.top + 2 && Math.abs(ra.left - rb.left) < 2
+               && Math.min(ra.width, rb.width) > 100; })(),
       cells: document.querySelectorAll('#sheet .up-cell').length,
       xs: document.querySelectorAll('#sheet .up-cell .up-x').length,
       cols: getComputedStyle(document.querySelector('#sheet #upList')).gridTemplateColumns.split(' ').length}) """)
-    check("사진 수정 시트도 「날짜」·「기록 이름」 한 줄 · 5열 그리드 · 칸마다 × (v43)",
-          ed1["labels"] == ["날짜", "기록 이름"] and ed1["sameRow"]
+    check("사진 수정 시트도 「기록 이름」·「날짜」 두 줄 · 5열 그리드 · 칸마다 × (v45)",
+          ed1["labels"] == ["기록 이름", "날짜"] and ed1["stacked"]
           and ed1["cells"] == ed0["cells"] and ed1["xs"] == ed1["cells"] and ed1["cols"] == 5, ed1)
     pageA.keyboard.press("Escape")
     pageA.wait_for_timeout(400)

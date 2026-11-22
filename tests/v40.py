@@ -1,6 +1,6 @@
 """투로그 v40 확인 — 투두리스트 속지의 2열 카드 묶음 + 카테고리 줄 아래 속지 아코디언 + 모눈 메모.
 
-1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
+1) 버전: sw.js 캐시 twolog-v45 · APP_VERSION v45 · My 탭 「버전 v45」
 2) + 시트 — 속지 레이아웃이 목록 맨 아래가 아니라 «카테고리 줄 바로 아래»로 펼쳐짐
    - 처음엔 접힘 · 줄을 누르면 그 줄 바로 아래에 2×2 · 다른 줄을 누르면 이전 줄은 접힘
    - 같은 줄을 한 번 더 누르면 접힘 · 「추가」로 붙인 줄은 바로 펼쳐짐
@@ -189,9 +189,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
+    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v45"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -204,7 +204,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v44」", ver.strip() == "버전 v44", ver)
+    check("My 탭 맨 위에 「버전 v45」", ver.strip() == "버전 v45", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄 아래로 펼쳐지는 속지 레이아웃 (아코디언)
@@ -585,14 +585,17 @@ with sync_playwright() as p:
     pick_kind(page3, "expense")
     page3.locator("#sheet button.btn-primary").click()
     page3.wait_for_timeout(740)
-    page3.fill("#s-diary #listQuickForm input[name=text]", "점심")
-    page3.fill("#s-diary #listQuickForm input[name=amount]", "24000")
-    page3.locator("#s-diary #listQuickForm button").click()
-    page3.wait_for_timeout(520)
+    page3.locator("#s-diary .exp-act[data-tx='expense']").click()
+    page3.wait_for_timeout(460)
+    page3.fill("#sheet input[name=amount]", "24000")
+    page3.locator("#sheet .exp-cat[data-cat='식비']").click()
+    page3.fill("#sheet input[name=memo]", "점심")
+    page3.locator("#sheet button.btn-primary").click()
+    page3.wait_for_timeout(600)
     ex = page3.evaluate("""() => ({badge: !!document.querySelector('#s-diary .note-hd .k'),
-      sum: (document.querySelector('#s-diary .ex-sum .v') || {}).textContent,
-      rows: document.querySelectorAll('#s-diary .ex-row').length})""")
-    check("지출·정산 속지는 그대로 (합계 계산)", ex["badge"] is False and ex["sum"] == "24,000원" and ex["rows"] == 1, ex)
+      sum: (document.querySelector('#s-diary .exp-spent') || {}).textContent,
+      rows: document.querySelectorAll('#s-diary .exp-row').length})""")
+    check("지출·정산 속지는 그대로 (사용 금액 계산)", ex["badge"] is False and ex["sum"] == "₩24,000" and ex["rows"] == 1, ex)
     check("브라우저 콘솔/페이지 오류 없음 (속지)", len(errs3) == 0, errs3[:4])
     ctx3.close()
 
@@ -831,13 +834,15 @@ with sync_playwright() as p:
       tag: (document.querySelector('#sheet input[name=album_tag]') || {}).value,
       date: (document.querySelector('#sheet input[name=date]') || {}).value,
       labels: [...document.querySelectorAll('#sheet .up-row label')].map(l => l.textContent),
-      sameRow: (() => { const a = document.querySelector('#sheet input[name=date]');
+      stacked: (() => { const a = document.querySelector('#sheet input[name=date]');
         const b = document.querySelector('#sheet input[name=album_tag]');
         if (!a || !b) return false; const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-        return Math.abs(ra.top - rb.top) < 4 && ra.right <= rb.left; })()})""")
+        return rb.bottom <= ra.top + 2 && Math.abs(ra.left - rb.left) < 2 && Math.min(ra.width, rb.width) > 100; })(),
+      sub: (document.querySelector('#sheet .sheet-sub') || {}).textContent || ''})""")
     check("「기록 이름」을 적어 올린 뒤 새 시트를 열면 그 칸이 비어 있음 (라벨도 기록 이름)",
-          tag_new["tag"] == "" and tag_new["labels"] == ["날짜", "기록 이름"], tag_new)
-    check("「날짜」와 「기록 이름」이 한 줄에 나란히 (날짜가 왼쪽) — v43", tag_new["sameRow"] is True, tag_new)
+          tag_new["tag"] == "" and tag_new["labels"] == ["기록 이름", "날짜"], tag_new)
+    check("「기록 이름」과 「날짜」는 한 줄이 아니라 위아래 두 줄 (각자 밑줄) — v45", tag_new["stacked"] is True, tag_new)
+    check("「사진 추가」 아래 장수·용량·줄이는 말 줄은 없음 — v45", "1800px" not in tag_new["sub"], tag_new["sub"])
     # 한 시트 안에서 「추가」로 더 담을 때는 적어 둔 태그가 그대로
     page6.fill("#sheet input[name=album_tag]", "제주 여행")
     with page6.expect_file_chooser() as fc:

@@ -1,6 +1,6 @@
 """투로그 v38 확인 — 노트 + 시트 속지 레이아웃 4종 (투두리스트 · 모눈 메모 · 별점 리뷰 · 지출·정산).
 
-1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
+1) 버전: sw.js 캐시 twolog-v45 · APP_VERSION v45 · My 탭 「버전 v45」
 2) + 시트 하단 「속지 레이아웃」
    - 노트 카테고리 목록(#noteOrderList) 아래 · 「저장하기」 버튼 위
    - 카드 4개 · 2×2 (첫 두 장 같은 줄, 셋째 줄에 두 장) · 각진 네모 · 제목 + 한 줄 설명
@@ -11,7 +11,7 @@
    - check: 진행률 · ○ + Add · 체크하면 완료(취소선)
    - memo: 체크 동그라미 없음 · 메모 카드 · Add 로 제목 추가 · 눌러서 본문 저장
    - review: 별 5개 · 별을 누르면 그 점수 · 이름·장소·날짜·한줄평
-   - expense: 위에 합계 · 항목+금액 Add · 합계 자동(24,000 + 28,000 + 9,500 = 61,500원)
+   - expense: v45 가계부(함께 쓰는 돈 · 사용 금액 자동 24,000 + 28,000 + 9,500 = 61,500)
 4) 기존 카테고리·기본 탭은 그대로
    - 기본 탭 메모·버킷리스트·영화·먹방 동작 · 예전 「메모(kind=memo)」 리스트는 모눈 메모로
    - 예전 체크 리스트는 투두리스트 그대로
@@ -138,6 +138,19 @@ def create_kind(page, name, kind):
     page.wait_for_timeout(760)
 
 
+def add_exp(page, amount, memo, cat="식비"):
+    """v45: + 지출하기 시트에서 카테고리·금액·메모를 적어 담기."""
+    page.locator("#s-diary .exp-act[data-tx='expense']").click()
+    page.wait_for_timeout(460)
+    page.fill("#sheet input[name=amount]", amount)
+    if cat:
+        page.locator("#sheet .exp-cat[data-cat='%s']" % cat).click()
+    if memo:
+        page.fill("#sheet input[name=memo]", memo)
+    page.locator("#sheet button.btn-primary").click()
+    page.wait_for_timeout(560)
+
+
 def seg(page):
     return page.evaluate("""() => {
       const on = document.querySelector('#s-diary .lchip.active, #s-diary .seg-btn.active');
@@ -186,9 +199,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
+    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v45"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -201,7 +214,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v44」", ver.strip() == "버전 v44", ver)
+    check("My 탭 맨 위에 「버전 v45」", ver.strip() == "버전 v45", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄 아래로 펼쳐지는 속지 레이아웃 (v40 아코디언)
@@ -497,44 +510,46 @@ with sync_playwright() as p:
 
     # 3-4) 지출·정산
     create_kind(page, "데이트 통장", "expense")
-    for nm, am in [("점심", "24000"), ("영화표", "28000"), ("커피", "9,500")]:
-        page.fill("#s-diary #listQuickForm input[name=text]", nm)
-        page.fill("#s-diary #listQuickForm input[name=amount]", am)
-        page.locator("#s-diary #listQuickForm button").click()
-        page.wait_for_timeout(430)
+    add_exp(page, "24000", "점심", "식비")
+    add_exp(page, "28000", "영화표", "데이트")
+    add_exp(page, "9500", "커피", "카페")
     ex = page.evaluate("""() => ({
       badge: !!document.querySelector('#s-diary .nh-l .k'),
-      sum: (document.querySelector('#s-diary .ex-sum .v') || {}).textContent,
-      cnt: (document.querySelector('#s-diary .ex-sum .c') || {}).textContent,
-      rows: [...document.querySelectorAll('#s-diary .ex-row')].map(r => [
-        r.querySelector('.ex-t').textContent, r.querySelector('.ex-a').textContent]),
-      amountFields: document.querySelectorAll('#s-diary #listQuickForm input[name=amount]').length })""")
+      sum: (document.querySelector('#s-diary .exp-spent') || {}).textContent,
+      total: (document.querySelector('#s-diary .exp-fund-total') || {}).textContent,
+      rows: [...document.querySelectorAll('#s-diary .exp-row')].map(r => [
+        r.querySelector('.exp-row-t').textContent, r.querySelector('.exp-row-a').textContent]),
+      quick: document.querySelectorAll('#s-diary #listQuickForm').length,
+      acts: [...document.querySelectorAll('#s-diary .exp-acts .exp-act')].map(b => b.textContent.trim()) })""")
     check("지출·정산 — 본문 위에는 속지 배지가 없음", ex["badge"] is False, ex["badge"])
-    check("지출·정산 — 맨 위에 합계", ex["sum"] == "61,500원", ex["sum"])
-    check("지출·정산 — 건수 표시", ex["cnt"] == "3건", ex["cnt"])
-    check("지출·정산 — 항목과 금액", ex["rows"] == [["점심", "24,000원"], ["영화표", "28,000원"], ["커피", "9,500원"]], ex["rows"])
-    check("지출·정산 — 빠른 추가에 금액 칸", ex["amountFields"] == 1, ex["amountFields"])
+    check("지출·정산 — 맨 위에 사용 금액", ex["sum"] == "₩61,500", ex["sum"])
+    check("지출·정산 — 이번 달 함께 쓰는 돈은 0", ex["total"] == "₩0", ex["total"])
+    check("지출·정산 — 3건", len(ex["rows"]) == 3, ex["rows"])
+    check("지출·정산 — 카테고리와 금액",
+          ex["rows"] == [["식비", "-₩24,000"], ["데이트", "-₩28,000"], ["카페", "-₩9,500"]], ex["rows"])
+    check("지출·정산 — 빠른 추가 대신 + 입금하기 / - 지출하기",
+          ex["quick"] == 0 and ex["acts"] == ["+입금하기", "-지출하기"], ex)
     page.screenshot(path=os.path.join(SHOT, "note-v38-expense.png"))
 
-    # 합계는 항목을 지우면 바로 다시 계산
-    page.locator("#s-diary .ex-row").nth(2).locator(".x").click()
-    page.wait_for_timeout(500)
-    check("지출·정산 — 항목을 지우면 합계도 다시",
-          page.evaluate("document.querySelector('#s-diary .ex-sum .v').textContent") == "52,000원",
-          page.evaluate("document.querySelector('#s-diary .ex-sum .v').textContent"))
+    # 사용 금액은 항목을 지우면 바로 다시 계산
+    page.locator("#s-diary .exp-row").nth(2).locator(".exp-x").click()
+    page.wait_for_timeout(560)
+    check("지출·정산 — 항목을 지우면 사용 금액도 다시",
+          page.evaluate("document.querySelector('#s-diary .exp-spent').textContent") == "₩52,000",
+          page.evaluate("document.querySelector('#s-diary .exp-spent').textContent"))
 
     # 지출 항목 수정 시트
-    page.locator("#s-diary .ex-row").first.locator(".ex-t").click()
-    page.wait_for_timeout(470)
-    check("지출 시트 — 항목·금액 칸",
+    page.locator("#s-diary .exp-row").first.locator(".exp-row-b").click()
+    page.wait_for_timeout(520)
+    check("지출 시트 — 금액 칸에 고칠 금액이 채워짐",
           page.evaluate("""() => !!document.querySelector('#sheet input[name=amount]') &&
-            document.querySelector('#sheet input[name=amount]').value === '24000'""") is True)
+            document.querySelector('#sheet input[name=amount]').value === '24,000'""") is True)
     page.fill("#sheet input[name=amount]", "31000")
     page.locator("#sheet button.btn-primary").click()
-    page.wait_for_timeout(540)
-    check("지출 — 고친 금액이 합계에 반영 (59,000원)",
-          page.evaluate("document.querySelector('#s-diary .ex-sum .v').textContent") == "59,000원",
-          page.evaluate("document.querySelector('#s-diary .ex-sum .v').textContent"))
+    page.wait_for_timeout(600)
+    check("지출 — 고친 금액이 사용 금액에 반영 (₩59,000)",
+          page.evaluate("document.querySelector('#s-diary .exp-spent').textContent") == "₩59,000",
+          page.evaluate("document.querySelector('#s-diary .exp-spent').textContent"))
 
     # ==================================================================
     # 4. 기존 카테고리 · 기본 탭은 그대로
@@ -684,21 +699,19 @@ with sync_playwright() as p:
           page2.evaluate("document.querySelectorAll('#s-diary .rv-card .rvs.on').length"))
     page2.locator("#s-diary .lchip", has_text="가계부").first.click()
     page2.wait_for_timeout(520)
-    check("원격 지출 리스트 화면 — 합계 12,000원",
-          page2.evaluate("(document.querySelector('#s-diary .ex-sum .v') || {}).textContent") == "12,000원",
-          page2.evaluate("(document.querySelector('#s-diary .ex-sum .v') || {}).textContent"))
+    check("원격 지출 리스트 화면 — 사용 금액 ₩12,000",
+          page2.evaluate("(document.querySelector('#s-diary .exp-spent') || {}).textContent") == "₩12,000",
+          page2.evaluate("(document.querySelector('#s-diary .exp-spent') || {}).textContent"))
 
     # 화면에서 한 줄 더 → 서버 notes 행에 kind·필드가 담겨 올라감
-    page2.fill("#s-diary #listQuickForm input[name=text]", "택시")
-    page2.fill("#s-diary #listQuickForm input[name=amount]", "8000")
-    page2.locator("#s-diary #listQuickForm button").click()
+    add_exp(page2, "8000", "택시", "교통")
     page2.wait_for_timeout(1800)
     row = page2.evaluate("""() => {
       const r = (window.__stub.notes || []).filter(x => x.id === 'L2')[0] || null;
       return r ? {payload: r.payload, kind: r.kind} : null;
     }""")
     p2 = (row or {}).get("payload") or {}
-    newitem = [it for it in (p2.get("items") or []) if it.get("text") == "택시"]
+    newitem = [it for it in (p2.get("items") or []) if it.get("memo") == "택시"]
     check("서버 notes 행 kind=list · payload.kind=expense", row and row["kind"] == "list" and p2.get("kind") == "expense", p2.get("kind"))
     check("새 지출 항목의 amount·date 가 서버 payload 에 있음",
           bool(newitem) and newitem[0].get("amount") == 8000 and bool(newitem[0].get("date")), newitem)
@@ -1004,13 +1017,15 @@ with sync_playwright() as p:
               btn: (q('#upBtn') || {}).textContent || ''};
     }""")
     check("사진 추가 시트에 앨범 칸이 없음", up["album"] is False and up["datalist"] is False, up)
-    check("맨 윗줄은 「날짜」(왼쪽) + 「기록 이름」(오른쪽) (v43)", up["firstLabel"] == "날짜"
+    # v45: 「기록 이름」이 위, 「날짜」는 아래 줄 (한 줄 나란히 아님)
+    check("맨 윗줄은 「기록 이름」 · 그 아래 「날짜」 (v45)", up["firstLabel"] == "기록 이름"
           and re.match(r"^\d{4}-\d{2}-\d{2}$", up["dateVal"]) is not None, up)
     check("날짜 칸이 시트 폭 안에 들어옴", up["dateIn"] is True, up)
     check("고른 사진 줄에 파일 용량 글씨 없음", up["sizeTxt"] == 0, up["sizeTxt"])
     check("사진 칸마다 × 삭제 버튼", up["rows"] == 2 and up["dels"] == 2, (up["rows"], up["dels"]))
     check("목록 위에 「추가」 버튼", up["addBtn"] and "추가" in up["addTxt"], up)
-    check("요약·담기 버튼이 2장", "2장" in up["sum"] and "2장 담기" in up["btn"], (up["sum"], up["btn"]))
+    # v45: 「사진 추가」 아래 장수·용량 요약 줄은 없앴어요 — 담기 버튼 글씨로만 확인
+    check("장수 요약 줄은 없고 담기 버튼이 2장", up["sum"] == "" and "2장 담기" in up["btn"], (up["sum"], up["btn"]))
     page6.screenshot(path=os.path.join(SHOT, "photo-v38-addsheet.png"))
 
     page6.locator("#sheet .up-x").first.click()
@@ -1019,8 +1034,8 @@ with sync_playwright() as p:
       sum: (document.querySelector('#sheet #upSum') || {}).textContent || '',
       cnt: (document.querySelector('#sheet #upCount') || {}).textContent || '',
       btn: (document.querySelector('#sheet #upBtn') || {}).textContent || ''})""")
-    check("「삭제」로 한 장 빼면 목록·요약·담기 버튼이 바로 갱신",
-          one["rows"] == 1 and "1장" in one["sum"] and one["cnt"] == "1" and "1장 담기" in one["btn"], one)
+    check("「삭제」로 한 장 빼면 목록·장수·담기 버튼이 바로 갱신",
+          one["rows"] == 1 and one["sum"] == "" and one["cnt"] == "1" and "1장 담기" in one["btn"], one)
 
     with page6.expect_file_chooser() as fc:
         page6.locator("#sheet .up-add").click()

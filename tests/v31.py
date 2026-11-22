@@ -8,7 +8,7 @@ v31 은 스키마를 바꾸지 않고 events.memo(text) 한 칸에
   {"end":"YYYY-MM-DD","color":"#RRGGBB"}  ← 여러 날 종료일 + 고른 색
 을 함께 담고, 예전 행의 «YYYY-MM-DD» 평문 memo 도 그대로 읽습니다.
 
-1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
+1) 버전: sw.js 캐시 twolog-v45 · APP_VERSION v45 · My 탭 「버전 v45」
 2) 로컬 모드: 시트에서 색을 고르면 상태·달력 색띠에 그 색, 수정 시트에도 그 색이 선택된 채로 열림
    「기본」을 누르면 담당자 색으로 돌아감
 3) 원격(대역 서버): 색을 골라 저장 → events 행 memo 에 color 가 들어가고,
@@ -181,11 +181,11 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     sync_js = page.request.get(URL + "sync.js").text()
-    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
+    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v45"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v44", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v45", 'const SHELL = "shell-" + VERSION' in sw)
     check("sync.js: 일정 memo 에 end·color 를 함께 담는 인코더/디코더",
           "function encodeEventMemo" in sync_js and "function decodeEventMemo" in sync_js
           and "memo: encodeEventMemo(e)" in sync_js)
@@ -509,7 +509,7 @@ with sync_playwright() as p:
                            " return !!el && el.classList.contains('active') && el.innerText.trim().length > 0; }", sid)
         check("%s 화면이 정상으로 뜸" % name, bool(ok), sid)
     ver = page.inner_text("#s-set .app-ver")
-    check("My 맨 위 버전 표시가 v44", "v44" in ver, ver)
+    check("My 맨 위 버전 표시가 v45", "v45" in ver, ver)
     page.screenshot(path=os.path.join(SHOT, "my-v31.png"))
     check("여기까지 콘솔/페이지 오류 없음", len(errs) == 0, errs[:4])
     ctx.close()
