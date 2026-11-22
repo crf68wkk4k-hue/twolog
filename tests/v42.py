@@ -1,6 +1,6 @@
 """투로그 v42 확인 — 「기념일 & 생일」 시트 정리 + 프로필 편집에서 생일 고치기.
 
-1) 버전: sw.js 캐시 twolog-v47 · APP_VERSION v47 · My 탭 「버전 v47」
+1) 버전: sw.js 캐시 twolog-v48 · APP_VERSION v48 · My 탭 「버전 v48」
 2) 기념일 & 생일 시트 (홈 D-day 카드를 눌러 열기)
    - 「홈 D-day 위에 이 문구가 그대로 보여요.」 안내 문구가 사라짐
    - 아래쪽 생일 달력 입력칸(.bd-in.js-bday) 두 개가 사라짐 · 「고른 생일은 바로 위에 …」 안내도 사라짐
@@ -129,9 +129,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v47", 'const VERSION = "twolog-v47"' in sw,
+    check("sw.js 캐시 버전 twolog-v48", 'const VERSION = "twolog-v48"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v47"' in app_js,
+    check("app.js 버전 상수 v48", 'var APP_VERSION = "v48"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -144,7 +144,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v47」", ver.strip() == "버전 v47", ver)
+    check("My 탭 맨 위에 「버전 v48」", ver.strip() == "버전 v48", ver)
 
     tab(page, 0, 520)
 
@@ -514,15 +514,15 @@ with sync_playwright() as p:
               grid: cs.backgroundImage.indexOf('linear-gradient') >= 0,
               paperH: Math.round(paper.height),
               canvasH: Math.round(document.getElementById('d41Canvas').clientHeight)};}""")
-    check("모눈종이가 도구 바(위로 옮긴 아이콘바) 아래(위 끝)부터 깔림",
-          abs(geo4["paperTop"] - geo4["toolsBottom"]) <= 2 and geo4["toolsTop"] >= geo4["topBottom"]
-          and geo4["grid"], geo4)
+    check("모눈종이가 화면 맨 위(0)까지 깔리고 위 줄·도구 줄은 그 위에 떠 있음 (v48)",
+          geo4["paperTop"] == 0 and geo4["grid"]
+          and geo4["toolsTop"] >= geo4["topBottom"] - 1, geo4)
     check("큰 날짜도 모눈 위에 얹혀 있음", geo4["dateInPaper"], geo4["dateInPaper"])
     check("종이는 화면 한 장을 채움", geo4["paperH"] >= geo4["canvasH"] - 6, (geo4["paperH"], geo4["canvasH"]))
 
     # 종이를 누르면 그 자리에 글 상자 → 바로 써요 (포커스가 남은 채 저장하는 경우까지)
     pb4 = page4.locator("#d41Paper").bounding_box()
-    page4.mouse.click(pb4["x"] + 60, pb4["y"] + 150)
+    page4.mouse.click(pb4["x"] + 60, pb4["y"] + 240)
     page4.wait_for_timeout(420)
     page4.keyboard.type("오늘은 성수에서 파스타를 먹었다")
     page4.wait_for_timeout(240)
@@ -784,7 +784,6 @@ with sync_playwright() as p:
     page5.wait_for_timeout(640)
     page5.locator("#s-diary .d41-new").click()
     page5.wait_for_timeout(760)
-    page5.fill("#sheet .d41-title", "서버로 가는 캔버스")
     pb5 = page5.locator("#d41Paper").bounding_box()
     page5.mouse.click(pb5["x"] + 70, pb5["y"] + 160)
     page5.wait_for_timeout(320)

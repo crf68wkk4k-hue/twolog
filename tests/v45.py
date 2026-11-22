@@ -1,6 +1,6 @@
 """투로그 v45 확인 — 지출·정산 가계부 개편 (함께 쓰는 돈 · 내역/달력 · 입금/지출 시트).
 
-1) 버전: sw.js 캐시 twolog-v47 · APP_VERSION v47 · My 탭 「버전 v47」
+1) 버전: sw.js 캐시 twolog-v48 · APP_VERSION v48 · My 탭 「버전 v48」
 2) 함께 쓰는 돈 카드 — 이번 달 총 입금 · 사용 금액 · 잔액 · 사용률 막대
    소영·준영 입금 두 칸 (함께 넣은 돈은 따로 한 줄)
 3) 내역 — 날짜 최신순 · 카테고리 아이콘 · 카테고리/메모/날짜/누가 · +입금 / -지출
@@ -194,9 +194,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v47", 'const VERSION = "twolog-v47"' in sw,
+    check("sw.js 캐시 버전 twolog-v48", 'const VERSION = "twolog-v48"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v47", 'var APP_VERSION = "v47"' in app_js,
+    check("app.js 버전 상수 v48", 'var APP_VERSION = "v48"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v44 문자열이 남아 있지 않음",
           "twolog-v44" not in sw and 'APP_VERSION = "v44"' not in app_js)
@@ -204,7 +204,7 @@ with sync_playwright() as p:
     seed_expense(page)
     tab(page, 4, 620)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v47」", ver.strip() == "버전 v47", ver)
+    check("My 탭 맨 위에 「버전 v48」", ver.strip() == "버전 v48", ver)
     tab(page, 2, 620)
     page.locator("#s-diary .lchip", has_text="우리 통장").first.click()
     page.wait_for_timeout(560)
@@ -852,8 +852,7 @@ with sync_playwright() as p:
     top = pageR.evaluate("""() => ({
       topBtns: [...document.querySelectorAll('#sheet .d41-top button')].map(b => b.getAttribute('aria-label')),
       title: !!document.querySelector('#sheet .d41-top .d41-title'),
-      titleLeft: Math.round(document.querySelector('#sheet .d41-top .d41-title').getBoundingClientRect().left),
-      titleRight: Math.round(document.querySelector('#sheet .d41-top .d41-title').getBoundingClientRect().right),
+      topText: (document.querySelector('#sheet .d41-top') || {}).textContent ? document.querySelector('#sheet .d41-top').textContent.trim() : '',
       undoInTools: !!document.querySelector('#sheet .d41-tools #d41UndoBtn'),
       redoInTools: !!document.querySelector('#sheet .d41-tools #d41RedoBtn'),
       undoInTop: !!document.querySelector('#sheet .d41-top #d41UndoBtn'),
@@ -862,7 +861,8 @@ with sync_playwright() as p:
         const p = document.querySelector('#sheet .d41-tool[aria-label="사진 넣기"]');
         return !!(u && p) && u.getBoundingClientRect().left < p.getBoundingClientRect().left; })()
     })""")
-    check("위 줄(.d41-top)은 ‹ 뒤로가기와 가운데 제목만", top["topBtns"] == ["뒤로"] and top["title"], top)
+    check("위 줄(.d41-top)은 ‹ 뒤로가기 하나만 — 제목 글씨·입력칸 없음 (v48)",
+          top["topBtns"] == ["뒤로"] and not top["title"] and top["topText"] == "", top)
     check("되돌리기·다시 실행은 도구 줄 왼쪽 끝 · 펜·T·사진은 오른쪽 (v46)", top["undoInTools"] and top["redoInTools"]
           and not top["undoInTop"] and top["undoLeft"], top)
 

@@ -1,6 +1,6 @@
 """투로그 v41 확인 — 모눈 메모가 «모눈종이 풀스크린 다이어리»로 바뀐 것 + + 시트 문구 정리.
 
-1) 버전: sw.js 캐시 twolog-v47 · APP_VERSION v47 · My 탭 「버전 v47」
+1) 버전: sw.js 캐시 twolog-v48 · APP_VERSION v48 · My 탭 「버전 v48」
 2) + 시트 문구 정리
    - 고른 카테고리 아래 패널 제목은 「속지 · 이름」 (「속지 레이아웃」 아님)
    - 기본 카테고리(메모·버킷리스트·영화·먹방)의 배지와 첫 선택지도 「투두리스트」
@@ -174,7 +174,7 @@ def editor(page):
               back: !!q('#sheet .d41-back'),
               save: (q('#sheet .d41-save') || {}).textContent,
               noSave: !q('#sheet .d41-save'),
-              titlePh: (q('#sheet .d41-title') || {}).placeholder,
+              titlePh: !!q('#sheet .d41-title'),
               date: (q('#d41DateBig') || {}).textContent,
               dateVal: (q('#sheet input[name=date]') || {}).value,
               paper: paper ? getComputedStyle(paper).backgroundImage : '',
@@ -208,9 +208,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v47", 'const VERSION = "twolog-v47"' in sw,
+    check("sw.js 캐시 버전 twolog-v48", 'const VERSION = "twolog-v48"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v47"' in app_js,
+    check("app.js 버전 상수 v48", 'var APP_VERSION = "v48"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -223,7 +223,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v47」", ver.strip() == "버전 v47", ver)
+    check("My 탭 맨 위에 「버전 v48」", ver.strip() == "버전 v48", ver)
 
     # ==================================================================
     # 2. + 시트 문구 — 「속지」 · 기본 카테고리도 「투두리스트」
@@ -313,8 +313,8 @@ with sync_playwright() as p:
     stamp = "%d.%02d %s" % (d.tm_mon, d.tm_mday, ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"][d.tm_wday])
     check("새 다이어리는 화면을 꽉 채움", ed["open"] and ed["full"] and ed["h"] >= int(ed["vh"] * 0.98),
           (ed["h"], ed["vh"]))
-    check("위에 ‹ 뒤로 · 가운데 「새 다이어리」 · «저장» 단추는 없음(나가면 자동 저장)", ed["back"] and ed["noSave"]
-          and ed["titlePh"] == "새 다이어리", (ed["back"], ed["save"], ed["titlePh"]))
+    check("위에 ‹ 뒤로 하나만 — 「새 다이어리」 글씨·제목 칸은 없음(v48) · «저장» 단추도 없음(나가면 자동 저장)",
+          ed["back"] and ed["noSave"] and not ed["titlePh"], (ed["back"], ed["save"], ed["titlePh"]))
     check("큰 날짜는 「11.21 SAT」 꼴", ed["date"] == stamp, (ed["date"], stamp))
     check("날짜 줄을 눌러 바꿀 수 있는 날짜 칸이 있음",
           re.match(r"^\d{4}-\d{2}-\d{2}$", ed["dateVal"] or "") is not None, ed["dateVal"])
@@ -503,7 +503,6 @@ with sync_playwright() as p:
     # ==================================================================
     # 8. 저장 — 카드에 반영 · 다시 열어 이어 쓰기
     # ==================================================================
-    page.fill("#sheet .d41-title", "비 오는 목요일")
     page.locator("#sheet .d41-back").click()
     page.wait_for_timeout(900)
     card = page.evaluate("""() => { const c = document.querySelector('#s-diary .d41-card');
@@ -513,8 +512,8 @@ with sync_playwright() as p:
                   thumbs: c.querySelectorAll('.d41-th').length,
                   pen: (c.querySelector('.d41-penz') || {}).textContent,
                   del: !!c.querySelector('.nmemo-x')} : null; }""")
-    check("저장하면 카드에 날짜·제목·본문이 보임",
-          card and card["date"] == "2026.11.19 목요일" and card["title"] == "비 오는 목요일"
+    check("저장하면 카드에 날짜·본문이 보임 (v48: 제목 칸이 없어 제목은 비어요)",
+          card and card["date"] == "2026.11.19 목요일" and (card["title"] or "") == ""
           and "바람이 차가웠다" in (card["body"] or ""), card)
     check("카드에 사진 미리보기와 손그림 표시", card and card["thumbs"] == 2 and "손그림" in (card["pen"] or ""), card)
     check("카드 오른쪽에 × 삭제 버튼", card and card["del"] is True)
@@ -526,13 +525,13 @@ with sync_playwright() as p:
 
     page.locator("#s-diary .d41-card").first.click()
     page.wait_for_timeout(700)
-    again = page.evaluate("""() => ({title: document.querySelector('.d41-title').value,
+    again = page.evaluate("""() => ({titleInput: !!document.querySelector('.d41-title'),
       texts: JSON.parse(document.getElementById('d41TextsIn').value),
       date: document.getElementById('d41DateBig').textContent,
       imgs: document.querySelectorAll('#sheet .d41-imgb').length,
       paths: document.querySelectorAll('#d41Pen path').length})""")
-    check("카드를 누르면 그 다이어리가 그대로 열림 (제목·글·날짜·사진·그림)",
-          again["title"] == "비 오는 목요일" and "바람이 차가웠다" in (again["texts"][0]["text"] if again["texts"] else "")
+    check("카드를 누르면 그 다이어리가 그대로 열림 (글·날짜·사진·그림 · v48: 제목 칸 없음)",
+          (not again["titleInput"]) and "바람이 차가웠다" in (again["texts"][0]["text"] if again["texts"] else "")
           and again["date"] == "11.19 THU" and again["imgs"] == 2 and again["paths"] == 1, again)
     page.screenshot(path=os.path.join(SHOT, "_p41-test-reopen.png"))
 
@@ -982,7 +981,6 @@ with sync_playwright() as p:
         f.write(__import__("base64").b64decode(durl3.split(",", 1)[1]))
     page3.set_input_files("#d41ImgIn", ["/tmp/v41-srv.jpg"])
     page3.wait_for_timeout(1400)
-    page3.fill("#sheet .d41-title", "서버로 가는 다이어리")
     pbox3 = page3.locator("#d41Paper").bounding_box()
     page3.mouse.click(pbox3["x"] + 70, pbox3["y"] + 180)
     page3.wait_for_timeout(300)
@@ -991,10 +989,11 @@ with sync_playwright() as p:
     page3.locator("#sheet .d41-back").click()
     page3.wait_for_timeout(2400)
     srv = page3.evaluate("""() => { const row = (window.__stub.notes || []).filter(x => x.kind === 'list')[0];
-      const it = row ? (row.payload.items || []).filter(i => i.text === '서버로 가는 다이어리')[0] : null;
+      const items = row ? (row.payload.items || []) : [];
+      const it = items.filter(i => (((i.texts || [])[0] || {}).text || '').indexOf('두 폰에서') >= 0)[0] || null;
       return it ? {imgs: (it.imgs || []).length, src: String((it.imgs || [{}])[0].src || '').slice(0, 11),
                    w: ((it.imgs || [{}])[0] || {}).w, texts: (it.texts || []).length,
-                   tx: (((it.texts || [])[0] || {}).text || ''), date: it.date} : null; }""")
+                   tx: (((it.texts || [])[0] || {}).text || ''), date: it.date, title: (it.text || '')} : null; }""")
     check("새 다이어리의 사진(자리·폭)·글 상자가 notes 행 payload 에 실려 올라감",
           srv and srv["imgs"] == 1 and srv["src"].startswith("data:image") and srv["w"] is not None
           and srv["texts"] == 1 and "두 폰에서" in srv["tx"] and srv["date"] == time.strftime("%Y-%m-%d"), srv)
@@ -1006,10 +1005,11 @@ with sync_playwright() as p:
     page3.locator("#s-diary .lchip", has_text="여행 일기").first.click()
     page3.wait_for_timeout(650)
     reloaded = page3.evaluate("""() => ({cards: [...document.querySelectorAll('#s-diary .d41-card .nmemo-t')].map(t => t.textContent),
+      bodies: [...document.querySelectorAll('#s-diary .d41-card .nmemo-b')].map(t => t.textContent),
       thumbs: document.querySelectorAll('#s-diary .d41-card .d41-th').length})""")
     check("새로고침해도 다이어리 두 개와 사진이 그대로",
-          sorted(reloaded["cards"]) == sorted(["바다 보러 간 날", "서버로 가는 다이어리"])
-          and reloaded["thumbs"] == 2, reloaded)
+          reloaded["cards"] == ["바다 보러 간 날"] and reloaded["thumbs"] == 2
+          and any("두 폰에서" in (b or "") for b in reloaded["bodies"]), reloaded)
     db_now = page3.evaluate("() => JSON.parse(localStorage.getItem('stub-sb-db') || 'null')") or diary_db
     check("브라우저 콘솔/페이지 오류 없음 (동기화)", len(errs3) == 0, errs3[:4])
     ctx3.close()
@@ -1032,9 +1032,11 @@ with sync_playwright() as p:
     page4.wait_for_timeout(650)
     other = page4.evaluate("""() => ({me: window.__app.state.couple.me,
       cards: [...document.querySelectorAll('#s-diary .d41-card .nmemo-t')].map(t => t.textContent),
+      bodies: [...document.querySelectorAll('#s-diary .d41-card .nmemo-b')].map(t => t.textContent),
       thumbs: document.querySelectorAll('#s-diary .d41-card .d41-th').length})""")
     check("상대 폰에서도 같은 다이어리와 사진이 보임",
-          "서버로 가는 다이어리" in other["cards"] and other["thumbs"] == 2, other)
+          "바다 보러 간 날" in other["cards"]
+          and any("두 폰에서" in (b or "") for b in other["bodies"]) and other["thumbs"] == 2, other)
     check("브라우저 콘솔/페이지 오류 없음 (상대 폰)", len(errs4) == 0, errs4[:4])
     ctx4.close()
 

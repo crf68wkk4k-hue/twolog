@@ -1,6 +1,6 @@
 """투로그 v43 확인 — 모눈 다이어리 손보기.
 
-1) 버전: sw.js 캐시 twolog-v47 · APP_VERSION v47 · My 탭 「버전 v47」
+1) 버전: sw.js 캐시 twolog-v48 · APP_VERSION v48 · My 탭 「버전 v48」
 2) 글 상자
    - 종이를 톡 누르면 그 자리에 상자가 생기고 바로 입력(포커스)
    - 이미 있는 상자를 한 번 톡 누르면 «고르기»만 — 입력 포커스가 풀려(blur) 아이폰 키보드가 내려가고
@@ -175,9 +175,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v47", 'const VERSION = "twolog-v47"' in sw,
+    check("sw.js 캐시 버전 twolog-v48", 'const VERSION = "twolog-v48"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v47"' in app_js,
+    check("app.js 버전 상수 v48", 'var APP_VERSION = "v48"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v42 문자열이 남아 있지 않음",
           "twolog-v42" not in sw and 'APP_VERSION = "v42"' not in app_js)
@@ -191,7 +191,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(900)
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v47」", ver.strip() == "버전 v47", ver)
+    check("My 탭 맨 위에 「버전 v48」", ver.strip() == "버전 v48", ver)
     tab(page, 0, 520)
 
     # ==================================================================
@@ -319,7 +319,6 @@ with sync_playwright() as p:
     pageA.wait_for_timeout(360)
     pageA.keyboard.type("자르기와 핀치를 시험하는 날")
     pageA.wait_for_timeout(240)
-    pageA.locator("#sheet .d41-title").fill("v43 사진 시험")
     pageA.wait_for_timeout(150)
 
     # ==================================================================
@@ -416,8 +415,8 @@ with sync_playwright() as p:
         title: (c.querySelector('.nmemo-t') || {}).textContent,
         body: (c.querySelector('.nmemo-b') || {}).textContent,
         thumbs: c.querySelectorAll('.d41-th').length} : null; }""")
-    check("저장하면 카드에 날짜·제목·글·사진 미리보기",
-          cardA and "v43 사진 시험" == (cardA["title"] or "") and "자르기와 핀치" in (cardA["body"] or "")
+    check("저장하면 카드에 날짜·글·사진 미리보기 (v48: 제목 칸이 없어 제목은 비어요)",
+          cardA and (cardA["title"] or "") == "" and "자르기와 핀치" in (cardA["body"] or "")
           and cardA["thumbs"] == 1, cardA)
     pageA.locator("#s-diary .d41-card").first.click()
     pageA.wait_for_timeout(700)
@@ -458,7 +457,6 @@ with sync_playwright() as p:
     pageB.wait_for_timeout(620)
     pageB.locator("#s-diary .d41-new").click()
     pageB.wait_for_timeout(720)
-    pageB.locator("#sheet .d41-title").fill("미정 탭 다이어리")
     pbB = pageB.locator("#d41Paper").bounding_box()
     pageB.mouse.click(pbB["x"] + 60, pbB["y"] + 200)
     pageB.wait_for_timeout(360)
@@ -475,8 +473,8 @@ with sync_playwright() as p:
       return c ? {title: (c.querySelector('.nmemo-t') || {}).textContent,
         body: (c.querySelector('.nmemo-b') || {}).textContent,
         thumbs: c.querySelectorAll('.d41-th').length, date: (c.querySelector('.nmemo-date') || {}).textContent} : null; }""")
-    check("기본 카테고리(모눈 메모) 저장 — 카드에 제목·글·사진이 보임",
-          baseCard and "미정 탭 다이어리" == (baseCard["title"] or "")
+    check("기본 카테고리(모눈 메모) 저장 — 카드에 글·사진이 보임",
+          baseCard and (baseCard["title"] or "") == ""
           and "기본 카테고리에도" in (baseCard["body"] or "") and baseCard["thumbs"] == 1, baseCard)
     baseSaved = pageB.evaluate("""() => { const l = (window.__app.state.logs || [])[0] || {};
       return {texts: (l.texts || []).length, imgs: (l.imgs || []).length, memo: l.memo || l.review || ''}; }""")
@@ -742,7 +740,6 @@ with sync_playwright() as p:
     pageD.wait_for_timeout(640)
     pageD.locator("#s-diary .d41-new").click()
     pageD.wait_for_timeout(760)
-    pageD.locator("#sheet .d41-title").fill("서버로 가는 기본 다이어리")
     pbD = pageD.locator("#d41Paper").bounding_box()
     pageD.mouse.click(pbD["x"] + 70, pbD["y"] + 170)
     pageD.wait_for_timeout(340)
@@ -761,9 +758,9 @@ with sync_playwright() as p:
     check("기본 카테고리 다이어리의 글·사진이 notes(log) payload 에 실림",
           len(srv["texts"]) == 1 and "서버 왕복에도" in (srv["texts"][0].get("text") or "")
           and len(srv["imgs"]) == 1 and srv["imgs"][0].get("src", "").startswith("data:image"), srv)
-    check("글 상자 좌표·크기와 제목도 함께 올라감",
+    check("글 상자 좌표·크기도 함께 올라감 (v48: 위 줄 제목 칸 없음)",
           0 <= srv["texts"][0].get("x", -1) <= 1 and srv["texts"][0].get("size", 0) > 0
-          and "서버로 가는 기본 다이어리" in (srv["title"] or ""), srv["texts"][0])
+          and (srv["title"] or "") == "", srv["texts"][0])
     # (b) 사용자 카테고리 「세상 메모」
     pageD.keyboard.press("Escape")
     pageD.wait_for_timeout(300)
@@ -771,7 +768,6 @@ with sync_playwright() as p:
     pageD.wait_for_timeout(620)
     pageD.locator("#s-diary .d41-new").click()
     pageD.wait_for_timeout(760)
-    pageD.locator("#sheet .d41-title").fill("서버로 가는 내 카테고리")
     pbD2 = pageD.locator("#d41Paper").bounding_box()
     pageD.mouse.click(pbD2["x"] + 70, pbD2["y"] + 170)
     pageD.wait_for_timeout(340)

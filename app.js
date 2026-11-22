@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v47";
+  var APP_VERSION = "v48";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -2161,6 +2161,13 @@
     var p = document.getElementById("d41Paper");
     return Math.max(1, p ? p.clientWidth : 360);
   }
+  /* v48: 모눈종이가 화면 맨 위(모서리)까지 깔리고, ‹ 뒤로·도구 줄은 그 위에 떠 있어요.
+     글·사진·그림이 놓이는 자리(#d41Nodes)는 머리 높이만큼 내려 시작하고, 좌표는 모두
+     그 자리에서 잽니다 — 그래서 종이를 위로 올려도 글·그림이 겹치지 않고 그대로 따라가요. */
+  function d41Top() {
+    var n = document.getElementById("d41Nodes");
+    return n && n.offsetTop > 0 ? n.offsetTop : 0;
+  }
 
   /* 저장된 글 상자 — v41 의 한 덩어리 본문(memo)은 첫 글 상자로 이어받아요 */
   function diaryTextsOf(it) {
@@ -2274,6 +2281,10 @@
     /* v47: 보기(스크롤) 모드에서는 글 상자 위에서도 화면을 밀어 넘기고 글자를 고를 수 있어요 */
     var paperEl = document.getElementById("d41Paper");
     if (paperEl) paperEl.classList.toggle("view", !diary.editing);
+    /* v48: 보기(전체화면)에서는 펜도 잠가요 — 종이를 밀어 넘길 수 있게 (톡 누르면 고치기로 돌아와요) */
+    var penSvg = document.getElementById("d41Pen");
+    if (penSvg) penSvg.classList.toggle("on", !!diary.editing && diary.mode === "pen");
+    if (paperEl) paperEl.classList.toggle("pen", !!diary.editing && diary.mode === "pen");
     if (!diary.editing) {
       var panel = document.getElementById("d41Panel");
       if (panel) panel.hidden = true;
@@ -2316,13 +2327,14 @@
     if (!svgEl || !paper || !diary) return;
     var W = Math.max(1, Math.round(paper.clientWidth));
     var H = Math.max(1, Math.round(paper.offsetHeight || paper.scrollHeight || 1));
+    var T = d41Top();            /* v48: 그림도 글과 같은 머리 높이에서 시작 */
     svgEl.setAttribute("viewBox", "0 0 " + W + " " + H);
     var out = "";
     diary.pen.forEach(function (s) {
       if (!s.p || s.p.length < 4) return;
       var d = "";
       for (var i = 0; i < s.p.length; i += 2) {
-        d += (i ? "L" : "M") + (s.p[i] * W).toFixed(1) + " " + (s.p[i + 1] * W).toFixed(1);
+        d += (i ? "L" : "M") + (s.p[i] * W).toFixed(1) + " " + (s.p[i + 1] * W + T).toFixed(1);
       }
       /* v44: 형광펜(stroke hl)은 반투명하게 */
       out += '<path d="' + d + '" fill="none" stroke="' + esc(s.c) + '" stroke-width="' + s.w +
@@ -2336,7 +2348,7 @@
       var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
       for (var i = 0; i < selPen.p.length; i += 2) {
         minX = Math.min(minX, selPen.p[i] * W); maxX = Math.max(maxX, selPen.p[i] * W);
-        minY = Math.min(minY, selPen.p[i + 1] * W); maxY = Math.max(maxY, selPen.p[i + 1] * W);
+        minY = Math.min(minY, selPen.p[i + 1] * W + T); maxY = Math.max(maxY, selPen.p[i + 1] * W + T);
       }
       var pad = 8;
       out += '<rect x="' + (minX - pad).toFixed(1) + '" y="' + (minY - pad).toFixed(1) +
@@ -2373,8 +2385,9 @@
     diary.pen.forEach(function (s) {
       for (var i = 1; i < s.p.length; i += 2) bottom = Math.max(bottom, s.p[i] * W);
     });
+    /* v48: 종이가 화면 맨 위(0)부터 깔리니, 머리(위 줄+도구 줄) 높이만큼 더해 길이를 정해요 */
     var base = Math.max(380, (canvas ? canvas.clientHeight : 0) - 2);
-    paper.style.minHeight = Math.max(base, Math.ceil(bottom) + 130) + "px";
+    paper.style.minHeight = Math.max(base, Math.ceil(bottom) + d41Top() + 130) + "px";
     d41Paint();
   }
 
@@ -2458,6 +2471,11 @@
 
   /* ---------------- v43: 빈 글 상자 정리 · 포커스 · 즉시 삭제 ---------------- */
   var d41Ime = false;                     /* 한글 조합 중에는 빈 상자를 지우지 않아요 */
+  /* v48: 글을 다 쓰고 아이폰 키보드 «완료» 를 누르면(입력창에서 손을 뗐을 때) —
+     점선 테두리·× 를 걷어 «다 쓴 레이아웃» 그대로 보이게 해요.
+     다만 코드가 키보드를 내릴 때(d41BlurQuietAt)와 도구·색상 판을 누른 것뿐일 때(UI 탭)는
+     그 상자를 계속 고치는 중이니 고른 표시를 그대로 둡니다. */
+  var d41BlurQuietAt = 0, d41UiTapAt = 0, d41UiWatch = false;
   function d41EmptyText(t) { return !String(t && t.text != null ? t.text : "").replace(/\u00a0/g, " ").trim(); }
   function d41FocusedTx() {
     var a = document.activeElement;
@@ -2466,7 +2484,28 @@
   }
   function d41BlurAll() {
     var a = document.activeElement;
-    if (a && a.blur && a.classList && a.classList.contains("d41-txt")) { try { a.blur(); } catch (e) {} }
+    if (a && a.blur && a.classList && a.classList.contains("d41-txt")) {
+      d41BlurQuietAt = Date.now();       /* v48: 코드가 내리는 키보드로는 고른 표시를 지우지 않아요 */
+      try { a.blur(); } catch (e) {}
+    }
+  }
+  /* v48: 입력창에서 손을 뗀 순간(아이폰 «완료») — 다 쓴 모습으로 돌리고 조용히 저장 */
+  function d41FinishTyping(ed) {
+    if (!diary || diary.editing === false || !ed) return;
+    var id = String(ed.getAttribute("data-txedit") || "");
+    d41CommitTexts();
+    d41PruneEmpty(id);
+    if (Date.now() - d41BlurQuietAt > 350 && Date.now() - d41UiTapAt > 350 &&
+        id && diary.sel === "tx:" + id) {
+      diary.sel = null;
+      var el = document.querySelector('#d41Nodes .d41-tx[data-tx="' + id + '"]');
+      if (el) el.classList.remove("sel");
+      d41PanelHide();
+    }
+    d41Grow();
+    d41Sync();
+    d41HistPush();
+    d41AutoSave();
   }
   /* 아무 글자도 안 쓴 글 상자를 지워요 — exceptId 상자와 한글 조합 중인 상자는 남깁니다.
      화면은 통째로 다시 그리지 않고 그 상자만 걷어내서, 끌고 있던 다른 상자는 끊기지 않아요. */
@@ -2919,6 +2958,9 @@
     var st = diaryStyOf(it);
     diary = {
       cid: cid, id: it ? it.id : null,
+      /* v48: 위 줄의 «새 다이어리» 글씨를 없앴으니 제목은 보이지 않게만 들고 있어요 —
+         예전에 쓴 다이어리의 제목이 저장하면서 사라지지 않게 그대로 돌려줘요. */
+      title: it ? String(itTitle(it) || "") : "",
       date: String((it && it.date) || today).slice(0, 10) || today,
       texts: diaryTextsOf(it), imgs: diaryImgsOf(it), pen: diaryPenOf(it),
       mode: "text", sel: null,
@@ -2935,10 +2977,9 @@
     d41Hist = { stack: [], idx: -1 };
     h += '<div class="d41-top">' +
       '<button type="button" class="d41-back" data-close="1" aria-label="뒤로">' + IC.left + "</button>" +
-      '<input class="d41-title" name="text" value="' + (it ? esc(itTitle(it)) : "") +
-      '" placeholder="새 다이어리" aria-label="다이어리 제목" autocomplete="off">' +
-      '<span class="d41-top-sp" aria-hidden="true"></span></div>';
-    /* v44: 아이콘바(펜·글씨·사진)를 아래에서 위로 — 상단 바 바로 아래, 도구 판은 그 아래 */
+      "</div>";
+    /* v44: 아이콘바(펜·글씨·사진)를 아래에서 위로 — 위 줄 바로 아래, 도구 판은 그 아래 */
+    /* v48: 위 줄·도구 줄은 모눈 위에 떠 있고(흐름에서 빠짐), 그 높이만큼 글·그림이 내려 시작해요 */
     h += d41ToolsHtml();
     h += '<div class="d41-panel" id="d41Panel" hidden>' + d41PanelHtml() + "</div>";
     /* v46: 색상 스펙트럼 판 — 색 동그라미를 누르면 여기에 올라와요 */
@@ -3043,7 +3084,7 @@
       raf = 0;
       if (!diary) return;
       var x = d41Clamp((qx - offX - pr.left) / W, 0, kind === "img" ? 0.96 : 0.9);
-      var y = Math.max(0, (qy - offY - pr.top) / W);
+      var y = Math.max(0, (qy - offY - pr.top - d41Top()) / W);
       nx = x; ny = y;
       node.style.transform = "translate3d(" + (x * W - baseL).toFixed(1) + "px," +
         (y * W - baseT).toFixed(1) + "px,0)";
@@ -3122,9 +3163,26 @@
     var paper = document.getElementById("d41Paper");
     if (!paper) return;
     d41BindPinch(paper);
+    /* v48: 도구·색상 판·위 줄을 누른 것뿐이면 «고른 표시»를 지우지 않아요 (계속 그 상자를 고치는 중) */
+    if (!d41UiWatch) {
+      d41UiWatch = true;
+      document.addEventListener("pointerdown", function (ev) {
+        var t = ev.target;
+        if (t && t.closest && t.closest("#sheet .d41-top, #sheet .d41-tools, #sheet .d41-panel, #sheet .d41-sp, #d41CropWrap")) {
+          d41UiTapAt = Date.now();
+        }
+      }, true);
+    }
+    /* v48: 입력창에서 손을 떼면(아이폰 키보드 «완료») 다 쓴 레이아웃으로 — 점선·× 가 사라져요 */
+    paper.addEventListener("focusout", function (ev) {
+      var ed = ev.target;
+      if (!ed || !ed.classList || !ed.classList.contains("d41-txt")) return;
+      d41FinishTyping(ed);
+    });
     paper.addEventListener("pointerdown", function (ev) {
-      if (!diary || diary.mode === "pen") return;
-      /* v44: 보기(스크롤) 모드 — 스크롤은 그대로 흘러가고, 톡 누르면 고치기로 바뉼니다 */
+      if (!diary) return;
+      /* v44: 보기(스크롤) 모드 — 스크롤은 그대로 흘러가고, 톡 누르면 고치기로 바뀝니다
+         v48: 펜 모드에서도 같아요 (보기에서는 그리지 않고, 톡 누르면 도구 줄이 돌아와요) */
       if (!diary.editing) {
         var vStartX = ev.clientX, vStartY = ev.clientY, vMoved = false;
         var vMv = function (e) {
@@ -3141,6 +3199,7 @@
         document.addEventListener("pointercancel", vUp, true);
         return;
       }
+      if (diary.mode === "pen") return;
       var t = ev.target;
       /* v43: 글·사진 상자의 × — 누르는 순간 바로 지워요.
          (아이폰에서 입력창 포커스가 풀리며 click 이 삼켜져도 지워지도록 pointerdown 에서 처리) */
@@ -3198,7 +3257,7 @@
         /* v44: 도구 판(굵기·색 등)도 덮어 — 쓴 내용만 보이게 */
         d41PanelHide();
         if (wasSel) d41AutoSave();
-        else d41AddTextAt((ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.width);
+        else d41AddTextAt((ev.clientX - r.left) / r.width, (ev.clientY - r.top - d41Top()) / r.width);
       }
     });
     /* 한글 조합 중에는 빈 상자 정리를 미뤄요 */
@@ -3236,7 +3295,7 @@
     var pr = paper.getBoundingClientRect();
     var W = Math.max(1, pr.width);
     d41Pinch = { id: id, im: im, d0: d0, w0: im.w, x0: im.x, y0: im.y,
-      mx: ((ps[0].x + ps[1].x) / 2 - pr.left) / W, my: ((ps[0].y + ps[1].y) / 2 - pr.top) / W };
+      mx: ((ps[0].x + ps[1].x) / 2 - pr.left) / W, my: ((ps[0].y + ps[1].y) / 2 - pr.top - d41Top()) / W };
     el.classList.add("drag");
     d41Select("img:" + id);
   }
@@ -3492,9 +3551,10 @@
     var paper = document.getElementById("d41Paper");
     if (!svgEl || !paper) return;
     var cur = null, liveEl = null, lastX = 0, lastY = 0;
+    var downX = 0, downY = 0, moved = false;     /* v48: 톡 누름(그리지 않음)을 가려내요 */
     function pt(ev) {
       var r = paper.getBoundingClientRect();
-      return { x: ev.clientX - r.left, y: ev.clientY - r.top, W: Math.max(1, r.width) };
+      return { x: ev.clientX - r.left, y: ev.clientY - r.top - d41Top(), W: Math.max(1, r.width) };
     }
     function addPoint(p) {
       if (Math.abs(p.x - lastX) < 1.6 && Math.abs(p.y - lastY) < 1.6) return false;
@@ -3512,8 +3572,16 @@
     }
     svgEl.addEventListener("pointerdown", function (ev) {
       if (!diary || diary.mode !== "pen") return;
+      /* v48: 보기(전체화면) 모드에서는 그리지 않아요 — 종이를 톡 누르면 고치기로 돌아옵니다 */
+      if (diary.editing === false) {
+        d41Track(ev, null, null, null, function () {
+          if (diary && diary.editing === false) d41SetEditing(true);
+        }, svgEl);
+        return;
+      }
       var p = pt(ev);
       ev.preventDefault();
+      downX = p.x; downY = p.y; moved = false;
       if (diary.pmode === "erase") {
         var hit = -1, W = p.W;
         diary.pen.forEach(function (s, idx) {
@@ -3546,18 +3614,31 @@
     svgEl.addEventListener("pointermove", function (ev) {
       if (!cur || !diary || diary.mode !== "pen") return;
       ev.preventDefault();
-      if (addPoint(pt(ev))) live();
+      var p = pt(ev);
+      if (Math.abs(p.x - downX) >= 4 || Math.abs(p.y - downY) >= 4) moved = true;
+      if (addPoint(p)) live();
     });
-    function end() {
+    /* v48: 끌지 않고 톡 누르면 — 방금 만든 보이지 않는 점을 지우고 전체화면 보기로 돌아가요.
+       (펜 모드에서도 글씨 모드처럼 종이를 톡 누르면 도구 줄이 사라져 깨끗한 다이어리만 보여요) */
+    function end(isUp) {
       if (!cur) return;
+      var stroke = cur;
       cur = null; liveEl = null;
+      if (isUp && !moved) {
+        var i = diary ? (diary.pen || []).indexOf(stroke) : -1;
+        if (i >= 0) (diary.pen || []).splice(i, 1);
+        d41Paint();
+        d41PanelHide();
+        d41SetEditing(false);
+        return;
+      }
       d41Grow(); d41Sync();
       d41HistPush();
       d41AutoSave();
     }
-    svgEl.addEventListener("pointerup", end);
-    svgEl.addEventListener("pointercancel", end);
-    svgEl.addEventListener("pointerleave", end);
+    svgEl.addEventListener("pointerup", function () { end(true); });
+    svgEl.addEventListener("pointercancel", function () { end(false); });
+    svgEl.addEventListener("pointerleave", function () { end(false); });
   }
   /* =====================================================================
      v44: 그림(펜 획)도 글·사진처럼 고르고 끌어 옮기기
@@ -3587,7 +3668,7 @@
     var paper = document.getElementById("d41Paper");
     if (!paper) return null;
     var r = paper.getBoundingClientRect();
-    var x = ev.clientX - r.left, y = ev.clientY - r.top, W = Math.max(1, r.width);
+    var x = ev.clientX - r.left, y = ev.clientY - r.top - d41Top(), W = Math.max(1, r.width);
     var hit = null;
     (diary.pen || []).forEach(function (s) {
       if (hit) return;
@@ -3691,9 +3772,8 @@
     d41CommitTexts();
     var l = containerOf(diary.cid);
     if (!l) return;
-    var titleEl = document.querySelector("#sheet .d41-title");
+    var title = String(diary.title || "").trim();
     var dateEl = document.querySelector("#sheet .d41-datein");
-    var title = String((titleEl && titleEl.value) || "").trim();
     var date = String((dateEl && dateEl.value) || diary.date || today).slice(0, 10) || today;
     var texts = (diary.texts || []).filter(function (t) { return String(t.text == null ? "" : t.text).trim(); });
     var imgs = (diary.imgs || []).filter(function (x) { return x && x.src; });
@@ -3720,7 +3800,8 @@
     d41CommitTexts();
     var l = containerOf(diary.cid);
     if (!l) { closeSheet(); return; }
-    var title = String(fd.get("text") || "").trim();
+    /* v48: 제목 칸은 없앴어요 — 예전 제목은 diary.title 로 들고 있다가 그대로 담아요 */
+    var title = String(diary.title || "").trim();
     var date = String(fd.get("date") || "").slice(0, 10) || today;
     var texts = (diary.texts || []).filter(function (t) { return String(t.text == null ? "" : t.text).trim(); });
     var body = texts.map(function (t) { return t.text; }).join("\n").trim();
@@ -8918,8 +8999,8 @@
       if (pcnt) pcnt.textContent = "최대 14자 · " + Math.max(0, 14 - String(t.value || "").length);
       return;
     }
-    /* v44: 다이어리 제목·날짜를 바꾸면 자동 저장 */
-    if (t && (t.classList.contains("d41-title") || t.classList.contains("d41-datein"))) {
+    /* v44: 다이어리 날짜를 바꾸면 자동 저장 (v48: 제목 칸은 없앴어요) */
+    if (t && t.classList.contains("d41-datein")) {
       d41AutoSaveSoon();
       return;
     }

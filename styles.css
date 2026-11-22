@@ -2050,25 +2050,36 @@ html[data-mode="dark"] .d41-empty{background:rgba(29,29,32,.7)}
 
 /* ---- 화면을 꽉 채우는 모눈 다이어리 ---- */
 .sheet-wrap.sheet-full .sheet.d41sheet{padding:0 !important; overflow:hidden; border-radius:0 !important; background:var(--surface)}
-.d41{display:flex; flex-direction:column; flex:1 1 auto; height:100%; min-height:0; background:var(--surface)}
-.d41-top{display:flex; align-items:center; gap:4px; flex:0 0 auto; padding:8px 8px 6px; min-height:52px}
+/* v48: 모눈종이가 화면 맨 위(모서리)까지 — 위 줄(‹ 뒤로)과 도구 줄은 모눈 위에 떠 있고,
+   글·사진·그림은 --d41-hd(위 줄+도구 줄) 아래부터 놓여요 */
+.d41{
+  --d41-safe: env(safe-area-inset-top, 0px);
+  --d41-hd: calc(var(--d41-safe) + 108px);
+  position:relative; display:flex; flex-direction:column; flex:1 1 auto; height:100%; min-height:0;
+  overflow:hidden; background:var(--surface)
+}
+.d41-top{
+  position:absolute; left:0; right:0; top:0; z-index:7; display:flex; align-items:center; gap:4px;
+  padding:calc(var(--d41-safe) + 4px) 8px 4px; min-height:0; background:none; pointer-events:none
+}
 .d41-back{
-  flex:0 0 40px; width:40px; height:40px; display:flex; align-items:center; justify-content:center;
-  border:0 !important; background:none; color:var(--ink); cursor:pointer
+  pointer-events:auto; flex:0 0 44px; width:44px; height:44px; display:flex; align-items:center; justify-content:center;
+  border:0 !important; border-radius:12px !important; background:none; color:var(--ink); cursor:pointer
 }
+.d41-back:active{background:rgba(0,0,0,.05)}
+html[data-mode="dark"] .d41-back:active{background:rgba(255,255,255,.08)}
 .d41-back svg{width:22px; height:22px}
-.d41-title{
-  flex:1 1 auto; min-width:0; height:40px; border:0 !important; background:none; outline:none;
-  text-align:center; font-family:inherit; font-size:16px; font-weight:700; letter-spacing:-.025em; color:var(--ink)
-}
-.d41-title::placeholder{color:var(--ink-3); font-weight:600}
+/* v48: «새 다이어리» 제목 칸은 없앴어요 (예전 제목은 저장할 때 그대로 돌려줘요) */
 .d41-date{position:relative; flex:0 0 auto; padding:2px 20px 14px}
 .d41-dbig{font-size:27px; font-weight:800; letter-spacing:-.035em; color:var(--ink); font-variant-numeric:tabular-nums}
 .d41-datein{
   position:absolute; left:14px; top:-4px; width:168px; height:48px; opacity:0;
   border:0 !important; background:none; cursor:pointer
 }
-.d41-canvas{flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain}
+.d41-canvas{
+  position:absolute; inset:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+  z-index:0
+}
 .d41-paper{
   position:relative; min-height:100%; padding:8px 20px 140px;
   --d41-line: rgba(0,0,0,.055);
@@ -2112,10 +2123,13 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 .d41-szb.on{background:var(--ink); color:var(--bg); border-color:var(--ink) !important}
 .d41-pen{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:3; overflow:visible}
 .d41-pen.on{pointer-events:auto; touch-action:none; cursor:crosshair}
+/* v48: 도구 줄은 모눈 위에 떠 있는 얇은 줄 — 아래 선 없이 아이콘만 (배경도 없어 모눈이 그대로 비쳐요) */
 .d41-tools{
-  flex:0 0 auto; display:flex; align-items:center; justify-content:flex-start; gap:8px;
-  padding:4px 14px 6px; background:var(--surface)
+  position:absolute; left:0; right:0; top:calc(var(--d41-safe) + 52px); z-index:6;
+  display:flex; align-items:center; justify-content:flex-start; gap:8px;
+  padding:4px 10px 6px; background:none; pointer-events:none
 }
+.d41-tools > *{pointer-events:auto}
 /* v45: 도구(펜·T·사진)는 왼쪽, 되돌리기·다시 실행은 오른쪽 끝 */
 /* v46: ↶ ↷ 가 왼쪽 끝, 펜·T·사진이 오른쪽 — 사이를 이 간격이 벌려요 */
 .d41-tools-gap{flex:1 1 auto}
@@ -2130,14 +2144,18 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 .d41-tools .d41-ub svg{width:27px; height:27px}
 .d41-tools .d41-ub svg path{stroke-width:2.05}
 .d41-tools .d41-ub:disabled svg path{stroke-width:2.05}
-/* v45: 위 줄은 ‹ 뒤로가기 + 가운데 제목만 — 오른쪽에 같은 폭의 빈 자리를 둬 제목을 꼭 가운데로 */
-.d41-top-sp{flex:0 0 40px; width:40px; pointer-events:none}
-/* v44: 아이콘바를 위로 올림 — 종이 위쪽 경계선 */
-.d41-tools{border-bottom:1px solid var(--line); border-top:0}
+/* v45: 위 줄은 ‹ 뒤로가기 하나만 (v48: «새 다이어리» 제목·가운데 맞춤 빈자리는 없앴어요) */
+/* v44: 아이콘바를 위로 올림 — v48: 모눈 위에 띄어 두고 아래 선은 없땜어요 */
+.d41-tools{border:0}
+/* v48: 도구 판은 도구 줄 바로 아래에 모눈 위로 띄워요 (살짝 비치는 흰 바탕 + 둥근 아래 모서리) */
 .d41-panel{
-  flex:0 0 auto; padding:8px 14px 8px; background:var(--surface);
-  border-top:0; border-bottom:1px solid var(--line)
+  position:absolute; left:0; right:0; top:var(--d41-hd); z-index:6;
+  padding:8px 14px; border:0; border-radius:0 0 14px 14px !important;
+  background:rgba(255,255,255,.94);
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+  box-shadow:0 10px 22px rgba(0,0,0,.06)
 }
+html[data-mode="dark"] .d41-panel{background:rgba(26,26,29,.94)}
 .d41-tool{
   width:46px; height:46px; display:flex; align-items:center; justify-content:center;
   border:0 !important; border-radius:12px !important; background:none; color:var(--ink);
@@ -2385,9 +2403,10 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
    ========================================================================== */
 /* 종이(모눈)는 상단 바 바로 아래부터 — 날짜는 종이 위에 얹고, 글·사진은 그 위에 자유 배치 */
 #sheet .d41-paper{position:relative; padding:0; min-height:100%; overflow:hidden}
-#sheet .d41-date{position:absolute; left:0; top:0; z-index:5; padding:16px 20px 0; pointer-events:none}
+#sheet .d41-date{position:absolute; left:0; top:var(--d41-hd); z-index:5; padding:16px 20px 0; pointer-events:none}
 #sheet .d41-date .d41-datein{pointer-events:auto}
-#sheet .d41-nodes{position:absolute; inset:0; z-index:2; pointer-events:none}
+/* v48: 글·사진은 위 줄·도구 줄 아래부터 — 좌표(0)가 이 자리에서 시작해요 */
+#sheet .d41-nodes{position:absolute; left:0; right:0; top:var(--d41-hd); bottom:0; z-index:2; pointer-events:none}
 /* v47: 글 상자 끌기 — 손가락이 스크롤·글자 고르기에 뺏기지 않게 touch-action 을 끄고,
    끄는 동안에는 글자 고르기·길게 누르기 메뉴도 막아요 (글을 쓸 때만 글자 고르기 허용) */
 #sheet .d41-tx{position:absolute; max-width:90%; min-width:84px; pointer-events:auto; z-index:2;
