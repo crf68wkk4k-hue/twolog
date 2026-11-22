@@ -1,6 +1,6 @@
 """투로그 v45 확인 — 지출·정산 가계부 개편 (함께 쓰는 돈 · 내역/달력 · 입금/지출 시트).
 
-1) 버전: sw.js 캐시 twolog-v46 · APP_VERSION v46 · My 탭 「버전 v46」
+1) 버전: sw.js 캐시 twolog-v47 · APP_VERSION v47 · My 탭 「버전 v47」
 2) 함께 쓰는 돈 카드 — 이번 달 총 입금 · 사용 금액 · 잔액 · 사용률 막대
    소영·준영 입금 두 칸 (함께 넣은 돈은 따로 한 줄)
 3) 내역 — 날짜 최신순 · 카테고리 아이콘 · 카테고리/메모/날짜/누가 · +입금 / -지출
@@ -194,9 +194,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v46", 'const VERSION = "twolog-v46"' in sw,
+    check("sw.js 캐시 버전 twolog-v47", 'const VERSION = "twolog-v47"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v46", 'var APP_VERSION = "v46"' in app_js,
+    check("app.js 버전 상수 v47", 'var APP_VERSION = "v47"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v44 문자열이 남아 있지 않음",
           "twolog-v44" not in sw and 'APP_VERSION = "v44"' not in app_js)
@@ -204,7 +204,7 @@ with sync_playwright() as p:
     seed_expense(page)
     tab(page, 4, 620)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v46」", ver.strip() == "버전 v46", ver)
+    check("My 탭 맨 위에 「버전 v47」", ver.strip() == "버전 v47", ver)
     tab(page, 2, 620)
     page.locator("#s-diary .lchip", has_text="우리 통장").first.click()
     page.wait_for_timeout(560)
@@ -275,6 +275,8 @@ with sync_playwright() as p:
         out: (c.querySelector('.do')||{}).textContent||'' }; });
       return {n: cells.length, week: [...document.querySelectorAll('#s-diary .exp-week span')].map(s=>s.textContent),
         d1: by['2026-11-01'], d2: by['2026-11-02'], d20: by['2026-11-20'], d21: by['2026-11-21'],
+        today: (() => { const d = new Date();
+          return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
         sel: (document.querySelector('#s-diary .exp-cell.sel')||{}).getAttribute ? document.querySelector('#s-diary .exp-cell.sel').getAttribute('data-day') : '',
         dayhd: (document.querySelector('#s-diary .exp-dayhd b')||{}).textContent||'',
         rows: [...document.querySelectorAll('#s-diary .exp-daylist .exp-row-t')].map(x=>x.textContent)};
@@ -282,7 +284,10 @@ with sync_playwright() as p:
     check("달력 — 11월 30칸 · 일~토 머리", cal["n"] == 30 and cal["week"] == ["일", "월", "화", "수", "목", "금", "토"], cal)
     check("칸마다 그날 입금/지출 합계 (1일 +100만 / 20일 -3.2만)",
           cal["d1"]["inn"] == "+100만" and cal["d20"]["out"] == "-3.2만", (cal["d1"], cal["d20"]))
-    check("오늘(11.22)이 골라져 있고 그날 내역이 아래에", cal["sel"] == "2026-11-22" and cal["dayhd"] == "11월 22일", (cal["sel"], cal["dayhd"]))
+    check("오늘이 골라져 있고 그날 내역이 아래에",
+          cal["sel"] == cal["today"]
+          and cal["dayhd"] == "%d월 %d일" % (int(cal["today"][5:7]), int(cal["today"][8:10])),
+          (cal["sel"], cal["dayhd"], cal["today"]))
     page.locator("#s-diary .exp-cell[data-day='2026-11-20']").click()
     page.wait_for_timeout(420)
     day = page.evaluate("""() => ({sel: (document.querySelector('#s-diary .exp-cell.sel')||{}).getAttribute('data-day'),
@@ -329,7 +334,8 @@ with sync_playwright() as p:
         "식비", "카페", "생활용품", "데이트", "교통", "주거", "쇼핑", "여행", "건강", "통신", "공과금", "기타"], sh["cats"])
     check("카테고리 아이콘은 동그란 라인", sh["circ"], sh["circ"])
     check("금액 · 날짜 · 메모 칸", sh["amount"] and sh["date"] and sh["memo"])
-    check("날짜 기본은 오늘", sh["dateVal"] == "2026-11-22", sh["dateVal"])
+    today_js = page.evaluate("() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }")
+    check("날짜 기본은 오늘", sh["dateVal"] == today_js, (sh["dateVal"], today_js))
 
     page.fill("#sheet input[name=amount]", "12345")
     page.wait_for_timeout(160)
@@ -602,7 +608,9 @@ with sync_playwright() as p:
     }""")
     check("프로필 생일은 날짜칸 하나 (type=date · name=bday)", bd["date"], bd)
     check("«년/월/일» 세 칸 고르기는 없음", bd["selects"] == 0 and not bd["row"], bd)
-    check("날짜칸 범위 1900-01-01 ~ 오늘", bd["min"] == "1900-01-01" and bd["max"] == "2026-11-22", (bd["min"], bd["max"]))
+    check("날짜칸 범위 1900-01-01 ~ 오늘", bd["min"] == "1900-01-01"
+          and bd["max"] == pageP.evaluate("() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }"),
+          (bd["min"], bd["max"]))
     pageP.fill("#sheet input[name=bday]", "1992-06-26")
     pageP.wait_for_timeout(260)
     picked = pageP.evaluate("""() => ({val: document.querySelector('#sheet input[name=bday]').value,
@@ -916,7 +924,7 @@ with sync_playwright() as p:
     colored = pageR.evaluate("""() => ({sp: !document.getElementById('d41Sp').hidden,
       swatch: (document.querySelector('#sheet .d41-dkk') || {}).style ? document.querySelector('#sheet .d41-dkk').style.background : ''})""")
     check("색을 고르면 판이 접히고 동그라미 색이 바뀜", colored["sp"] is False
-          and colored["swatch"] in ("rgb(180, 86, 78)", "#B4564E"), colored)
+          and colored["swatch"] in ("rgb(220, 74, 152)", "#DC4A98"), colored)
     pageR.locator("#sheet .d41-dk[aria-label='형광펜']").click()
     pageR.wait_for_timeout(260)
     hlOn = pageR.evaluate("() => { const b = document.querySelector('#sheet .d41-dk.on'); return b ? b.getAttribute('aria-label') : ''; }")
@@ -985,7 +993,7 @@ with sync_playwright() as p:
     picked = pageR.evaluate("""() => ({sp: !document.getElementById('d41Sp').hidden,
       swatch: (document.querySelector('#sheet .d41-tc') || {}).style ? document.querySelector('#sheet .d41-tc').style.background : ''})""")
     check("색을 고르면 판이 접히고 동그라미에 그 색",
-          picked["sp"] is False and picked["swatch"] in ("rgb(194, 92, 69)", "#C25C45"), picked)
+          picked["sp"] is False and picked["swatch"] in ("rgb(146, 104, 201)", "#9268C9"), picked)
     pageR.screenshot(path=os.path.join(SHOT, "diary-v45-textbar.png"))
     check("브라우저 콘솔/페이지 오류 없음 (다이어리 도구)", len(errsR) == 0, errsR[:4])
     ctxR.close()

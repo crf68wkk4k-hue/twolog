@@ -1,7 +1,7 @@
 """투로그 v46 확인 — 모눈 다이어리 도구 줄 순서(↶ ↷ 왼쪽 · 펜/T/사진 오른쪽)와
 «색상 스펙트럼 판»(아이폰 색상 › 스펙트럼 모양), 글씨 크기 숫자 크게.
 
-1) 버전: sw.js 캐시 twolog-v46 · APP_VERSION v46 · My 탭 「버전 v46」
+1) 버전: sw.js 캐시 twolog-v47 · APP_VERSION v47 · My 탭 「버전 v47」
 2) 도구 줄 순서 — ↶ 되돌리기 · ↷ 다시 실행이 «맨 왼쪽», 펜 · T · 사진이 «오른쪽»
    (x 좌표 undo < redo < pen < text < photo, 두 묶음 사이는 넓게 벌어짐)
 3) 펜 도크의 색 동그라미는 22px 로 작게 · 누르면 스펙트럼 판이 올라옴
@@ -183,10 +183,12 @@ GRAD = """() => {
   const c = cv.getContext('2d');
   const px = (fx, fy) => { const d = c.getImageData(Math.round(fx * (cv.width - 1)), Math.round(fy * (cv.height - 1)), 1, 1).data; return [d[0], d[1], d[2]]; };
   const lum = p => Math.round(0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2]);
+  /* v47: 판 방향 — 왼쪽 하양 · 가운데 순색 · 오른쪽 검정 (가로) · 세로는 색(hue) */
   return {
     left: lum(px(0.01, 0.1)), right: lum(px(0.97, 0.1)),
-    top: lum(px(0.5, 0.02)), bottom: lum(px(0.5, 0.98)),
-    midA: px(0.55, 0.3), midB: px(0.75, 0.3)
+    white: px(0.01, 0.1), black: px(0.97, 0.1),
+    top: px(0.5, 0.01), midG: px(0.5, 0.34), midB: px(0.5, 0.67), bottom: px(0.5, 0.99),
+    pink: px(0.25, 0.01), vivid: px(0.5, 0.01)
   };
 }"""
 
@@ -259,12 +261,12 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check('sw.js 캐시 버전 twolog-v46', 'const VERSION = "twolog-v46"' in sw,
+    check('sw.js 캐시 버전 twolog-v47', 'const VERSION = "twolog-v47"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v46", 'var APP_VERSION = "v46"' in app_js,
+    check("app.js 버전 상수 v47", 'var APP_VERSION = "v47"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("예전 v45 문자열이 남아 있지 않음",
-          "twolog-v45" not in sw and 'APP_VERSION = "v45"' not in app_js)
+    check("예전 v46 문자열이 남아 있지 않음",
+          "twolog-v46" not in sw and 'APP_VERSION = "v46"' not in app_js)
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
     page.wait_for_timeout(700)
@@ -274,7 +276,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(900)
     tab(page, 4, 620)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v46」", ver.strip() == "버전 v46", ver)
+    check("My 탭 맨 위에 「버전 v47」", ver.strip() == "버전 v47", ver)
 
     tab(page, 2, 700)
     page.locator("#s-diary .lchip", has_text="그림판").first.click()
@@ -325,10 +327,15 @@ with sync_playwright() as p:
           sp["hex"] == "#111111" and sp["swatch"] in ("rgb(17, 17, 17)", "#111111")
           and len(sp["ring"]) == 2 and sp["ring"][0].endswith("%"), sp)
     gr = page.evaluate(GRAD)
-    check("스펙트럼 — 왼쪽은 하얗고 오른쪽은 진한 색",
-          gr["left"] >= 200 and gr["right"] < gr["left"] - 60, gr)
-    check("스펙트럼 — 위는 밝고 아래는 어두움",
-          gr["top"] > gr["bottom"] + 100, gr)
+    check("스펙트럼 — 왼쪽은 하얗고 오른쪽은 검정 (가로 = 하양→순색→검정)",
+          gr["left"] >= 240 and gr["right"] <= 30, (gr["left"], gr["right"]))
+    check("스펙트럼 — 세로가 색(hue): 위 빨강 · 가운데 초록 · 그 아래 파랑",
+          gr["top"][0] >= 240 and gr["top"][1] < 30 and gr["top"][2] < 30
+          and gr["midG"][1] >= 240 and gr["midG"][0] < 30
+          and gr["midB"][2] >= 240 and gr["midB"][0] < 30, (gr["top"], gr["midG"], gr["midB"]))
+    check("스펙트럼 — 아래는 다시 빨강 · 왼쪽 1/4 은 흰색과 순색 사이",
+          gr["bottom"][0] >= 240 and gr["bottom"][2] < 40
+          and 90 <= gr["pink"][1] <= 200 and gr["pink"][0] >= 240, (gr["bottom"], gr["pink"]))
 
     # ==================================================================
     # 4. 판을 톡 누르면 그 자리 색 · 끌면 따라 바뀜
@@ -382,8 +389,8 @@ with sync_playwright() as p:
     pre = page.evaluate("""() => ({
       shown: !document.getElementById('d41Sp').hidden,
       swatch: (document.querySelector('#sheet .d41-dkk') || {}).style.background || ''})""")
-    check("프리셋 색 점을 누르면 칠해지고 판이 닫힘",
-          pre["shown"] is False and pre["swatch"] == "rgb(110, 110, 115)", pre)
+    check("프리셋 색 점을 누르면 칠해지고 판이 닫힘 (v47 날씨의 요정 팔레트)",
+          pre["shown"] is False and pre["swatch"] == "rgb(244, 107, 98)", pre)
 
     # ==================================================================
     # 6. 글씨 도구 — 스펙트럼 · 글씨 크기 숫자

@@ -2119,7 +2119,17 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 /* v45: 도구(펜·T·사진)는 왼쪽, 되돌리기·다시 실행은 오른쪽 끝 */
 /* v46: ↶ ↷ 가 왼쪽 끝, 펜·T·사진이 오른쪽 — 사이를 이 간격이 벌려요 */
 .d41-tools-gap{flex:1 1 auto}
-.d41-tools .d41-ub{width:34px; height:34px; flex:0 0 34px; margin:0 1px}
+/* v47: 보기(스크롤) 화면에서는 도구 줄·도구 판을 «완전히» 감춰 모눈종이가 화면을 꽉 채우게
+   (.d41-tools 는 display:flex 라서 hidden 속성만으로는 안 사라졌어요) */
+#sheet .d41-tools[hidden], #sheet .d41-panel[hidden]{display:none !important}
+/* 종이를 톡 누르면 도구 줄이 위에서 부드럽게 내려와요 (.tools-in 은 그때만 — 도구를 바꿀 때는 가만히) */
+@keyframes d41ToolsIn{from{opacity:0; transform:translateY(-10px)} to{opacity:1; transform:translateY(0)}}
+#sheet .d41-tools.tools-in{animation:d41ToolsIn .18s ease-out}
+/* v47: 되돌리기·다시 실행을 눈에 띄게 크게 — 펜·T·사진(46px·22px)보다 조금 더 (44px·27px·획 조금 굵게) */
+.d41-tools .d41-ub{width:44px; height:44px; flex:0 0 44px; margin:0 1px 0 0}
+.d41-tools .d41-ub svg{width:27px; height:27px}
+.d41-tools .d41-ub svg path{stroke-width:2.05}
+.d41-tools .d41-ub:disabled svg path{stroke-width:2.05}
 /* v45: 위 줄은 ‹ 뒤로가기 + 가운데 제목만 — 오른쪽에 같은 폭의 빈 자리를 둬 제목을 꼭 가운데로 */
 .d41-top-sp{flex:0 0 40px; width:40px; pointer-events:none}
 /* v44: 아이콘바를 위로 올림 — 종이 위쪽 경계선 */
@@ -2275,7 +2285,8 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
   box-shadow:inset 0 0 0 1px rgba(120,120,130,.35)
 }
 .d41-sp-hex{font-size:13px; font-weight:700; color:var(--ink-2); letter-spacing:.02em; font-variant-numeric:tabular-nums}
-.d41-sp-dots{display:flex; align-items:center; gap:10px; flex-wrap:nowrap}
+/* v47: 프리셋 9색 — 한 줄에 가지런히, 좁은 화면에서는 깔끔하게 다음 줄로 */
+.d41-sp-dots{display:flex; align-items:center; gap:8px 12px; flex-wrap:wrap}
 .d41-sp-dotb{
   width:24px; height:24px; flex:0 0 24px; padding:0;
   border:1px solid rgba(120,120,130,.35) !important; border-radius:50% !important; cursor:pointer
@@ -2377,9 +2388,17 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 #sheet .d41-date{position:absolute; left:0; top:0; z-index:5; padding:16px 20px 0; pointer-events:none}
 #sheet .d41-date .d41-datein{pointer-events:auto}
 #sheet .d41-nodes{position:absolute; inset:0; z-index:2; pointer-events:none}
+/* v47: 글 상자 끌기 — 손가락이 스크롤·글자 고르기에 뺏기지 않게 touch-action 을 끄고,
+   끄는 동안에는 글자 고르기·길게 누르기 메뉴도 막아요 (글을 쓸 때만 글자 고르기 허용) */
 #sheet .d41-tx{position:absolute; max-width:90%; min-width:84px; pointer-events:auto; z-index:2;
-  -webkit-user-select:text; user-select:text}
-#sheet .d41-tx.drag{cursor:grabbing; opacity:.92}
+  touch-action:none; -webkit-user-select:none; user-select:none;
+  -webkit-touch-callout:none; cursor:grab}
+#sheet .d41-tx.drag{cursor:grabbing; opacity:.92; z-index:4; will-change:transform}
+#sheet .d41-tx:focus-within, #sheet .d41-tx.editing{
+  -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; cursor:text}
+/* 보기(스크롤) 모드에서는 화면을 그대로 밀어 넘기고 글자를 골라 복사할 수 있게 */
+#sheet .d41-paper.view .d41-tx{
+  touch-action:auto; -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; cursor:default}
 #sheet .d41-txt{outline:none; padding:1px 4px; min-height:1.5em; line-height:1.7;
   white-space:pre-wrap; word-break:break-word; letter-spacing:-.01em; caret-color:var(--ink)}
 #sheet .d41-txt:empty:before{content:attr(data-ph); color:var(--ink-3)}

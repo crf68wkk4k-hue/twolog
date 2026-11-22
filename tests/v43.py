@@ -1,6 +1,6 @@
 """투로그 v43 확인 — 모눈 다이어리 손보기.
 
-1) 버전: sw.js 캐시 twolog-v46 · APP_VERSION v46 · My 탭 「버전 v46」
+1) 버전: sw.js 캐시 twolog-v47 · APP_VERSION v47 · My 탭 「버전 v47」
 2) 글 상자
    - 종이를 톡 누르면 그 자리에 상자가 생기고 바로 입력(포커스)
    - 이미 있는 상자를 한 번 톡 누르면 «고르기»만 — 입력 포커스가 풀려(blur) 아이폰 키보드가 내려가고
@@ -175,9 +175,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v46", 'const VERSION = "twolog-v46"' in sw,
+    check("sw.js 캐시 버전 twolog-v47", 'const VERSION = "twolog-v47"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v46"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v47"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v42 문자열이 남아 있지 않음",
           "twolog-v42" not in sw and 'APP_VERSION = "v42"' not in app_js)
@@ -191,7 +191,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(900)
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v46」", ver.strip() == "버전 v46", ver)
+    check("My 탭 맨 위에 「버전 v47」", ver.strip() == "버전 v47", ver)
     tab(page, 0, 520)
 
     # ==================================================================

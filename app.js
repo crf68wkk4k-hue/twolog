@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v46";
+  var APP_VERSION = "v47";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -2129,7 +2129,9 @@
   var D41_SIZES = [0, 14, 16.5, 19];
   var D41_COLORS = ["", "#6E6E73", "#B4564E", "#3D6E8A", "#5E7A52"];
   /* v45: 글씨 색 «전체 컬러판» — 색 동그라미를 누르면 이 판이 펼쳐져요 */
-  var D41_TCOLORS = ["#111111", "#6E6E73", "#B4564E", "#C25C45", "#3D6E8A", "#2F6F62", "#5E7A52", "#7A5C9E", "#A8762F"];
+  /* v47: 프리셋 9색 — 날씨의 요정 팔레트(코랄·핑크·보라·파랑·초록·노랑·주황·갈색) + 검정.
+     (v46 까지의 차분한 9색을 대신해요) */
+  var D41_TCOLORS = ["#111111", "#F46B62", "#DC4A98", "#9268C9", "#4E8EC1", "#4FA78E", "#F7CE46", "#F69B42", "#8D6F61"];
   var diary = null;
 
   function d41Stamp(ds) {
@@ -2260,7 +2262,18 @@
     if (!diary) return;
     diary.editing = !!on;
     var tools = document.querySelector(".d41-tools");
-    if (tools) tools.hidden = !diary.editing;
+    if (tools) {
+      tools.hidden = !diary.editing;
+      /* v47: 보기 화면에서 종이를 톡 눌러 고치기로 바뀔 때 도구 줄이 부드럽게 내려와요 */
+      if (diary.editing) {
+        tools.classList.remove("tools-in");
+        void tools.offsetWidth;
+        tools.classList.add("tools-in");
+      }
+    }
+    /* v47: 보기(스크롤) 모드에서는 글 상자 위에서도 화면을 밀어 넘기고 글자를 고를 수 있어요 */
+    var paperEl = document.getElementById("d41Paper");
+    if (paperEl) paperEl.classList.toggle("view", !diary.editing);
     if (!diary.editing) {
       var panel = document.getElementById("d41Panel");
       if (panel) panel.hidden = true;
@@ -2724,9 +2737,13 @@
   }
   function d41RgbHex(r, g, b) { return "#" + d41Hex2(r) + d41Hex2(g) + d41Hex2(b); }
   function d41SpRgb(fx, fy) {
-    var h = ((((fx * 340) % 360) + 360) % 360) / 60;
-    var s = Math.min(1, Math.max(0, (fx - 0.03) / 0.72));   /* 왼쪽 가장자리는 흰색에 가깝게 */
-    var v = 1 - d41Clamp(fy, 0, 1) * 0.97;
+    /* v47: 아이폰 «스펙트럼» 과 같은 방향으로 바꿈
+       · 세로(y) = 색(hue) — 위 빨강 → 노랑 → 초록 → 하늘 → 파랑 → 자홍 → 아래 빨강
+       · 가로(x) = 왼쪽 하양 → 가운데 순색 → 오른쪽 검정 */
+    var x = d41Clamp(fx, 0, 1), y = d41Clamp(fy, 0, 1);
+    var h = (((y * 360) % 360) + 360) % 360 / 60;
+    var s = x <= 0.5 ? x * 2 : 1;
+    var v = x <= 0.5 ? 1 : Math.max(0, 1 - (x - 0.5) * 2);
     var c = v * s, xx = c * (1 - Math.abs(h % 2 - 1)), m = v - c, r, g, b;
     if (h < 1) { r = c; g = xx; b = 0; }
     else if (h < 2) { r = xx; g = c; b = 0; }
@@ -2755,9 +2772,9 @@
   /* 지금 색과 가장 가까운 판 위 자리 — 열 때 동그라미를 거기에 놓아요 */
   function d41SpFind(hex) {
     var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex || ""));
-    if (!m) return [0.72, 0.42];
+    if (!m) return [0.5, 0.02];
     var r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
-    var best = [0.72, 0.42], bd = 1e9;
+    var best = [0.5, 0.02], bd = 1e9;
     for (var fy = 0; fy <= 1.0001; fy += 0.025) {
       for (var fx = 0; fx <= 1.0001; fx += 0.025) {
         var c = d41SpRgb(fx, fy);
@@ -2911,7 +2928,7 @@
       tcolor: st.color || "", talign: st.align || "left",
       pmode: "pen", pcolor: "#111111", pw: 3.5, pcpick: false,
       tbold: false, tstrike: false, tunderline: false, cpick: false,
-      sp: null, spx: 0.72, spy: 0.42,     /* v46: 스펙트럼 색상 판 */
+      sp: null, spx: 0.5, spy: 0.02,      /* v46: 스펙트럼 색상 판 (v47: 위=빨강 · 가운데=순색) */
     };
     var h = '<form class="d41" id="sheetForm" autocomplete="off">';
     /* v44: 되돌리기·다시 실행 — 글·사진·그림 상태를 기록해 두었다가 되돌려요 */
@@ -2927,7 +2944,7 @@
     /* v46: 색상 스펙트럼 판 — 색 동그라미를 누르면 여기에 올라와요 */
     h += '<div class="d41-sp" id="d41Sp" hidden></div>';
     /* v42: 모눈은 상단 바 바로 아래부터 — 날짜도 종이 위에 얹혀요 */
-    h += '<div class="d41-canvas" id="d41Canvas"><div class="d41-paper" id="d41Paper">' +
+    h += '<div class="d41-canvas" id="d41Canvas"><div class="d41-paper' + (diary.editing === false ? " view" : "") + '" id="d41Paper">' +
       '<div class="d41-date"><span class="d41-dbig" id="d41DateBig">' + esc(d41Stamp(diary.date)) + "</span>" +
       '<input type="date" class="d41-datein" name="date" value="' + esc(diary.date) + '" aria-label="날짜"></div>' +
       '<div class="d41-nodes" id="d41Nodes">' + d41NodesHtml() + "</div>" +
@@ -2966,27 +2983,47 @@
   }
 
   /* ---------------- 손가락으로 끌기 / 크기 조절 ---------------- */
-  function d41Track(ev, onStart, onMove, onEnd, onTap) {
+  /* v47: 아이폰에서 글 상자가 뚝뚝 끊기거나 아예 멈추던 문제 —
+     · 상자가 손가락을 붙잡아(setPointerCapture) 스크롤·글자 고르기에 뺏기지 않게
+     · 4px만 움직여도 곧바로 따라가기 (예전 6px · 그동안은 꿈쩍도 안 했어요)
+     · 자리는 화면에서만(transform) 옮기고 화면 주사율에 맞춰 한 번에 그리기(rAF)
+     · 저장·동기화는 손을 뗄 때 딱 한 번 (끄는 동안 화면을 다시 그리지 않아요) */
+  function d41Track(ev, onStart, onMove, onEnd, onTap, capEl) {
     var sx = ev.clientX, sy = ev.clientY, moved = false;
+    var pid = ev.pointerId, cap = capEl || null;
+    /* 끌기 시작한 그 손가락만 따라가요 — 다른 손가락·마우스가 섞이지 않게 */
+    function mine(e) { return pid == null || e.pointerId == null || e.pointerId === pid; }
+    if (cap && cap.setPointerCapture) {
+      try { cap.setPointerCapture(pid); } catch (e) { cap = null; }
+    }
     function mv(e) {
+      if (!mine(e)) return;
       if (!moved) {
-        if (Math.abs(e.clientX - sx) < 6 && Math.abs(e.clientY - sy) < 6) return;
+        if (Math.abs(e.clientX - sx) < 4 && Math.abs(e.clientY - sy) < 4) return;
         moved = true;
         onStart && onStart(e);
       }
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
       onMove && onMove(e);
     }
     function up(e) {
+      if (!mine(e)) return;
       document.removeEventListener("pointermove", mv, true);
       document.removeEventListener("pointerup", up, true);
       document.removeEventListener("pointercancel", up, true);
-      if (moved) { try { e.preventDefault(); } catch (err) {} onEnd && onEnd(e); }
-      else if (onTap) { try { e.preventDefault(); } catch (err) {} onTap(e); }
+      window.removeEventListener("pointermove", mv, true);
+      window.removeEventListener("pointerup", up, true);
+      window.removeEventListener("pointercancel", up, true);
+      if (cap && cap.releasePointerCapture) { try { cap.releasePointerCapture(pid); } catch (err) {} }
+      if (moved) { try { if (e.cancelable) e.preventDefault(); } catch (err) {} onEnd && onEnd(e); }
+      else if (onTap) { try { if (e.cancelable) e.preventDefault(); } catch (err) {} onTap(e); }
     }
     document.addEventListener("pointermove", mv, true);
     document.addEventListener("pointerup", up, true);
     document.addEventListener("pointercancel", up, true);
+    window.addEventListener("pointermove", mv, true);
+    window.addEventListener("pointerup", up, true);
+    window.addEventListener("pointercancel", up, true);
   }
   function d41StartMove(node, kind, id, ev, onTap) {
     var paper = document.getElementById("d41Paper");
@@ -2994,25 +3031,43 @@
     var W = d41WPx();
     var r = node.getBoundingClientRect();
     var pr = paper.getBoundingClientRect();
+    /* 잡은 지점이 상자 안 어디였는지 — 그래야 손가락 아래에서 상자가 튀지 않아요 */
     var offX = ev.clientX - r.left, offY = ev.clientY - r.top;
-    var nx = 0, ny = 0;
+    var baseL = r.left - pr.left, baseT = r.top - pr.top;   /* 지금 상자의 자리(px) */
+    var start = (kind === "img" ? (diary && diary.imgs) || [] : (diary && diary.texts) || [])
+      .filter(function (t) { return t.id === id; })[0];
+    var nx = start ? start.x : 0.06, ny = start ? start.y : 0;
+    var qx = 0, qy = 0;            /* 마지막으로 받은 손가락 자리 */
+    var raf = 0;
+    function paint() {
+      raf = 0;
+      if (!diary) return;
+      var x = d41Clamp((qx - offX - pr.left) / W, 0, kind === "img" ? 0.96 : 0.9);
+      var y = Math.max(0, (qy - offY - pr.top) / W);
+      nx = x; ny = y;
+      node.style.transform = "translate3d(" + (x * W - baseL).toFixed(1) + "px," +
+        (y * W - baseT).toFixed(1) + "px,0)";
+    }
+    function flush() { if (raf) { cancelAnimationFrame(raf); raf = 0; paint(); } }
     d41Track(ev, function () { node.classList.add("drag"); }, function (e) {
       if (d41Pinch) return;                       /* 두 손가락으로 크기 바꾸는 중 */
-      var x = d41Clamp((e.clientX - offX - pr.left) / W, 0, kind === "img" ? 0.96 : 0.9);
-      var y = Math.max(0, (e.clientY - offY - pr.top) / W);
-      nx = x; ny = y;
-      node.style.left = (x * 100).toFixed(2) + "%";
-      node.style.top = Math.round(y * W) + "px";
+      qx = e.clientX; qy = e.clientY;
+      if (!raf) raf = requestAnimationFrame(paint);
     }, function () {
       node.classList.remove("drag");
-      if (d41Pinch) return;
+      if (d41Pinch) { if (raf) { cancelAnimationFrame(raf); raf = 0; } node.style.transform = ""; return; }
+      flush();                                    /* 마지막 손가락 자리까지 반영 */
+      /* 옮긴 자리를 그대로 style 에 넣고 transform 은 지워요 — 다시 그리지 않아 깜빡임이 없어요 */
+      node.style.transform = "";
+      node.style.left = (nx * 100).toFixed(2) + "%";
+      node.style.top = Math.round(ny * W) + "px";
       if (!diary) return;
       var o = (kind === "img" ? diary.imgs : diary.texts).filter(function (t) { return t.id === id; })[0];
       if (o) { o.x = nx; o.y = ny; }
       d41Grow(); d41Sync();
       d41HistPush();
       d41AutoSave();
-    }, onTap);
+    }, onTap, node);
   }
   function d41StartResize(id, ev) {
     var node = document.querySelector('#d41Nodes .d41-imgb[data-img="' + id + '"]');
@@ -3035,7 +3090,7 @@
       d41Grow(); d41Sync();
       d41HistPush();
       d41AutoSave();
-    });
+    }, null, node);
   }
   /* 빈 종이를 누르면 그 자리에 글 상자 */
   function d41AddTextAt(x, y) {
@@ -3099,10 +3154,10 @@
       }
       var rz = t.closest ? t.closest(".d41-rz") : null;
       if (rz) { d41StartResize(rz.getAttribute("data-rz"), ev); return; }
-      /* v44: 그린 그림(펜 획)도 눌러서 고르고 끌어 옮겨요 */
-      var penHit = d41HitPen(ev);
-      if (penHit) { d41StartPenMove(penHit, ev); return; }
       var node = t.closest ? t.closest(".d41-tx, .d41-imgb") : null;
+      /* v47: 글·사진 상자 위에서는 상자를 먼저 잡아요 — 상자 밑에 그린 획이 끌려가지 않게 */
+      var penHit = node ? null : d41HitPen(ev);
+      if (penHit) { d41StartPenMove(penHit, ev); return; }
       if (node) {
         var isTx = node.classList.contains("d41-tx");
         var id = isTx ? node.getAttribute("data-tx") : node.getAttribute("data-img");
@@ -3111,14 +3166,16 @@
         /* v43: 처음 누르면 «고르기»만 — 키보드를 내리고 아래 T 툴바가 보이게.
            같은 상자를 짧은 사이에 한 번 더 톡 누르면(끌지 않고) 그때 입력(키보드)을 열어요. */
         var dblTap = isTx && diary.sel === key && d41TapKey === key && (now - d41TapAt) < 520;
-        d41Select(key);
+        /* v47: 이미 고른 상자는 판을 다시 그리지 않아요 — 끌기 시작에서 화면이 흔들리지 않게 */
+        if (diary.sel !== key) d41Select(key);
         if (!node.isConnected) return;
         if (isTx) {
           ev.preventDefault();
-          if (!dblTap) d41BlurAll();
           d41TapKey = key; d41TapAt = now;
+          /* v47: 키보드 내리기는 «톡» 눌렀을 때만 — 끌 때 내리면 화면이 줄어들어 상자가 튀어요 */
           d41StartMove(node, "tx", id, ev,
-            dblTap ? function (e) { d41FocusText(id, e.clientX, e.clientY); } : null);
+            dblTap ? function (e) { d41FocusText(id, e.clientX, e.clientY); }
+                   : function () { d41BlurAll(); });
         } else {
           d41StartMove(node, "img", id, ev);
         }
@@ -4758,6 +4815,19 @@
     });
     nkPaint();
   }
+  /* v47: 방금 더한 줄과 그 «속지» 판이 화면 밖이면 부드럽게 끌어와 보여 줘요 */
+  var nkKeepT = 0;
+  function nkReveal(row) {
+    if (!row) return;
+    setTimeout(function () {
+      if (!row.isConnected) return;
+      var p = nkPanelEl();
+      var t = (p && !p.hidden) ? p : row;
+      if (!t || !t.scrollIntoView) return;
+      try { t.scrollIntoView({ block: "center", behavior: "smooth" }); }
+      catch (e) { try { t.scrollIntoView(); } catch (e2) {} }
+    }, 130);
+  }
   /* 줄을 누르면 그 줄이 선택되고 그 아래에 속지가 펼쳐져요. 같은 줄을 한 번 더 누르면 접힙니다.
      이름칸을 고치러 들어갈 때는 접히지 않고, ≡ 손잡이·삭제 버튼은 그대로 자기 일을 해요. */
   document.addEventListener("pointerdown", function (ev) {
@@ -4770,12 +4840,14 @@
       nkSelectRow(row.classList.contains("active") ? null : row);
       return;
     }
-    if (t.closest("#sheet .nord-new") || t.closest("#sheet .nord-add-btn")) nkSelectRow(null);
+    if (t.closest("#sheet .nord-new") || t.closest("#sheet .nord-add-btn")) {
+      if (Date.now() >= nkKeepT) nkSelectRow(null);   /* v47: 방금 더한 줄은 접지 않아요 */
+    }
   }, true);
   document.addEventListener("focusin", function (ev) {
     var t = ev.target;
     if (!t || !t.closest || !t.closest("#sheet")) return;
-    if (t.closest("#sheet .nord-new")) { nkSelectRow(null); return; }
+    if (t.closest("#sheet .nord-new")) { if (Date.now() >= nkKeepT) nkSelectRow(null); return; }
     var row = t.closest("#sheet #noteOrderList .nord-row");
     if (row && t.classList && t.classList.contains("nord-nm")) nkSelectRow(row);
   }, true);
@@ -5063,12 +5135,16 @@
     if (LIST_KINDS.indexOf(kind0) < 0) kind0 = "check";
     box.insertAdjacentHTML("beforeend", noteOrderRow(key, nm, kind0));
     inp.value = "";
-    inp.focus();
+    /* v47: 이름 칸에 커서를 남겨 두면 아이폰 키보드가 속지 판을 가리고,
+       늦게 오는 focusin 이 방금 고른 줄을 접어 버려요 — 커서를 놓고 새 줄로 넘어갑니다. */
+    try { if (inp.blur) inp.blur(); } catch (e) {}
+    nkKeepT = Date.now() + 900;       /* 곷 붙인 직후에는 새 줄의 속지 판을 접지 않아요 */
     var rows = nordRowsOf(box);
     var last = rows[rows.length - 1];
-    /* v39: 방금 붙인 줄을 그대로 선택 — 이름을 확인하고 바로 속지를 고를 수 있게 */
+    /* v39: 방금 붙인 줄을 그대로 선택 — 이름을 확인하고 바로 속지를 고를 수 있게
+       v47: 그 줄의 «속지» 판까지 화면 안으로 부드럽게 끌어와 바로 고를 수 있게 */
     if (last) nkSelectRow(last);
-    if (last && last.scrollIntoView) { try { last.scrollIntoView({ block: "nearest" }); } catch (e) {} }
+    nkReveal(last);
     return true;
   }
   /* 입력칸에서 엔터 → 바로 목록에 추가 (폼이 제출되어 시트가 닫히지 않게) */
