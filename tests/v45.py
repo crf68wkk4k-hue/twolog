@@ -1,6 +1,6 @@
 """투로그 v45 확인 — 지출·정산 가계부 개편 (함께 쓰는 돈 · 내역/달력 · 입금/지출 시트).
 
-1) 버전: sw.js 캐시 twolog-v45 · APP_VERSION v45 · My 탭 「버전 v45」
+1) 버전: sw.js 캐시 twolog-v46 · APP_VERSION v46 · My 탭 「버전 v46」
 2) 함께 쓰는 돈 카드 — 이번 달 총 입금 · 사용 금액 · 잔액 · 사용률 막대
    소영·준영 입금 두 칸 (함께 넣은 돈은 따로 한 줄)
 3) 내역 — 날짜 최신순 · 카테고리 아이콘 · 카테고리/메모/날짜/누가 · +입금 / -지출
@@ -194,9 +194,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
+    check("sw.js 캐시 버전 twolog-v46", 'const VERSION = "twolog-v46"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v45", 'var APP_VERSION = "v45"' in app_js,
+    check("app.js 버전 상수 v46", 'var APP_VERSION = "v46"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v44 문자열이 남아 있지 않음",
           "twolog-v44" not in sw and 'APP_VERSION = "v44"' not in app_js)
@@ -204,7 +204,7 @@ with sync_playwright() as p:
     seed_expense(page)
     tab(page, 4, 620)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v45」", ver.strip() == "버전 v45", ver)
+    check("My 탭 맨 위에 「버전 v46」", ver.strip() == "버전 v46", ver)
     tab(page, 2, 620)
     page.locator("#s-diary .lchip", has_text="우리 통장").first.click()
     page.wait_for_timeout(560)
@@ -850,13 +850,13 @@ with sync_playwright() as p:
       redoInTools: !!document.querySelector('#sheet .d41-tools #d41RedoBtn'),
       undoInTop: !!document.querySelector('#sheet .d41-top #d41UndoBtn'),
       order: [...document.querySelectorAll('#sheet .d41-tools > *')].map(e => e.id || e.getAttribute('aria-label') || e.className),
-      undoRight: (() => { const u = document.querySelector('#sheet .d41-tools #d41UndoBtn');
+      undoLeft: (() => { const u = document.querySelector('#sheet .d41-tools #d41UndoBtn');
         const p = document.querySelector('#sheet .d41-tool[aria-label="사진 넣기"]');
-        return !!(u && p) && u.getBoundingClientRect().left > p.getBoundingClientRect().left; })()
+        return !!(u && p) && u.getBoundingClientRect().left < p.getBoundingClientRect().left; })()
     })""")
     check("위 줄(.d41-top)은 ‹ 뒤로가기와 가운데 제목만", top["topBtns"] == ["뒤로"] and top["title"], top)
-    check("되돌리기·다시 실행은 펜 옆 도구 줄 오른쪽으로", top["undoInTools"] and top["redoInTools"]
-          and not top["undoInTop"] and top["undoRight"], top)
+    check("되돌리기·다시 실행은 도구 줄 왼쪽 끝 · 펜·T·사진은 오른쪽 (v46)", top["undoInTools"] and top["redoInTools"]
+          and not top["undoInTop"] and top["undoLeft"], top)
 
     pageR.locator("#sheet .d41-tool[aria-label='펜 그리기']").click()
     pageR.wait_for_timeout(360)
@@ -905,15 +905,17 @@ with sync_playwright() as p:
           [t.get("w") for t in thick])
 
     pageR.locator("#sheet .d41-dk[aria-label='펜 색']").click()
-    pageR.wait_for_timeout(300)
-    pick = pageR.evaluate("""() => ({dots: document.querySelectorAll('#sheet .d41-dot').length,
+    pageR.wait_for_timeout(380)
+    pick = pageR.evaluate("""() => ({sp: !document.getElementById('d41Sp').hidden,
+      presets: document.querySelectorAll('#sheet .d41-sp-dotb').length,
       on: document.querySelectorAll('#sheet .d41-dk[aria-label="펜 색"].on').length})""")
-    check("색 동그라미를 누르면 색 점 줄이 펼쳐짐", pick["dots"] == 5 and pick["on"] == 1, pick)
-    pageR.locator("#sheet .d41-dot").nth(1).click()
-    pageR.wait_for_timeout(320)
-    colored = pageR.evaluate("""() => ({dots: document.querySelectorAll('#sheet .d41-dot').length,
+    check("색 동그라미를 누르면 색상 스펙트럼 판이 열림 (프리셋 9색)",
+          pick["sp"] and pick["presets"] == 9 and pick["on"] == 1, pick)
+    pageR.locator("#sheet .d41-sp-dotb").nth(2).click()
+    pageR.wait_for_timeout(340)
+    colored = pageR.evaluate("""() => ({sp: !document.getElementById('d41Sp').hidden,
       swatch: (document.querySelector('#sheet .d41-dkk') || {}).style ? document.querySelector('#sheet .d41-dkk').style.background : ''})""")
-    check("색을 고르면 색 점 줄이 접히고 동그라미 색이 바뀜", colored["dots"] == 0
+    check("색을 고르면 판이 접히고 동그라미 색이 바뀜", colored["sp"] is False
           and colored["swatch"] in ("rgb(180, 86, 78)", "#B4564E"), colored)
     pageR.locator("#sheet .d41-dk[aria-label='형광펜']").click()
     pageR.wait_for_timeout(260)
@@ -970,20 +972,20 @@ with sync_playwright() as p:
           and "글 수정" not in tp["panelText"] and "키보드 내리기" not in tp["panelText"]
           and "한 번 더" not in tp["panelText"], tp["panelText"])
     pageR.locator("#sheet .d41-tc[data-act=d41ColorPick]").click()
-    pageR.wait_for_timeout(320)
-    pal = pageR.evaluate("""() => ({dots: document.querySelectorAll('#sheet #d41Panel .d41-dot').length,
-      colors: [...document.querySelectorAll('#sheet #d41Panel .d41-dot')].map(d => d.getAttribute('data-color')),
-      rowTop: (() => { const d = document.querySelector('#sheet #d41Panel .d41-dot');
+    pageR.wait_for_timeout(380)
+    pal = pageR.evaluate("""() => ({presets: document.querySelectorAll('#sheet .d41-sp-dotb').length,
+      colors: [...document.querySelectorAll('#sheet .d41-sp-dotb')].map(d => d.getAttribute('data-color')),
+      cvTop: (() => { const c = document.getElementById('d41SpCv');
         const t = document.querySelector('#sheet #d41Panel .d41-trow');
-        return d && t ? Math.round(d.getBoundingClientRect().top) > Math.round(t.getBoundingClientRect().top) : false; })()})""")
-    check("색 동그라미를 누르면 전체 컬러판(9색)이 아래에 펼쳐짐",
-          pal["dots"] == 9 and len(set(pal["colors"])) == 9 and pal["rowTop"], pal)
-    pageR.locator("#sheet #d41Panel .d41-dot").nth(3).click()
-    pageR.wait_for_timeout(320)
-    picked = pageR.evaluate("""() => ({dots: document.querySelectorAll('#sheet #d41Panel .d41-dot').length,
+        return c && t ? Math.round(c.getBoundingClientRect().top) > Math.round(t.getBoundingClientRect().top) : false; })()})""")
+    check("색 동그라미를 누르면 색상 스펙트럼 판(프리셋 9색)이 아래에 펼쳐짐",
+          pal["presets"] == 9 and len(set(pal["colors"])) == 9 and pal["cvTop"], pal)
+    pageR.locator("#sheet .d41-sp-dotb").nth(3).click()
+    pageR.wait_for_timeout(340)
+    picked = pageR.evaluate("""() => ({sp: !document.getElementById('d41Sp').hidden,
       swatch: (document.querySelector('#sheet .d41-tc') || {}).style ? document.querySelector('#sheet .d41-tc').style.background : ''})""")
-    check("색을 고르면 컬러판이 접히고 동그라미에 그 색",
-          picked["dots"] == 0 and picked["swatch"] in ("rgb(194, 92, 69)", "#C25C45"), picked)
+    check("색을 고르면 판이 접히고 동그라미에 그 색",
+          picked["sp"] is False and picked["swatch"] in ("rgb(194, 92, 69)", "#C25C45"), picked)
     pageR.screenshot(path=os.path.join(SHOT, "diary-v45-textbar.png"))
     check("브라우저 콘솔/페이지 오류 없음 (다이어리 도구)", len(errsR) == 0, errsR[:4])
     ctxR.close()

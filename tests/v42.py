@@ -1,6 +1,6 @@
 """투로그 v42 확인 — 「기념일 & 생일」 시트 정리 + 프로필 편집에서 생일 고치기.
 
-1) 버전: sw.js 캐시 twolog-v45 · APP_VERSION v45 · My 탭 「버전 v45」
+1) 버전: sw.js 캐시 twolog-v46 · APP_VERSION v46 · My 탭 「버전 v46」
 2) 기념일 & 생일 시트 (홈 D-day 카드를 눌러 열기)
    - 「홈 D-day 위에 이 문구가 그대로 보여요.」 안내 문구가 사라짐
    - 아래쪽 생일 달력 입력칸(.bd-in.js-bday) 두 개가 사라짐 · 「고른 생일은 바로 위에 …」 안내도 사라짐
@@ -129,9 +129,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
+    check("sw.js 캐시 버전 twolog-v46", 'const VERSION = "twolog-v46"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v45"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v46"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -144,7 +144,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v45」", ver.strip() == "버전 v45", ver)
+    check("My 탭 맨 위에 「버전 v46」", ver.strip() == "버전 v46", ver)
 
     tab(page, 0, 520)
 

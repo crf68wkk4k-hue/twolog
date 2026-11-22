@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v45";
+  var APP_VERSION = "v46";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -2550,9 +2550,11 @@
     var cur = d41SelText();
     if (cur) { cur.color = c; d41RenderNodes(); } else diary.tcolor = c;
     diary.cpick = false;
+    d41SpShut();            /* v46: 프리셋을 고르면 스펙트럼 판도 따라 닫혀요 */
     d41PanelRefresh();
     d41Sync();
     d41HistPush();
+    d41AutoSave();
   }
   /* v44: 글 상자 모양 — 굵게·취소선·밑줄 · 정렬은 왼쪽→가운데→오른쪽으로 돌아가요 */
   function d41SetTFlag(flag) {
@@ -2582,14 +2584,15 @@
 
   function d41ToolsHtml() {
     var mode = diary ? diary.mode : "text";
+    /* v46: ↶ ↷ 는 도구 줄 «맨 왼쪽», 펜·T·사진은 «오른쪽»으로 (예전엔 반대였어요) */
     /* v44: 이미 쓴 다이어리는 처음에 보기(스크롤)로 열려요 — 도구 바는 고칠 때 나타나요 */
     return '<div class="d41-tools"' + (diary && diary.editing === false ? " hidden" : "") + '>' +
+      '<button type="button" class="d41-ub" id="d41UndoBtn" data-act="d41Undo" aria-label="되돌리기" title="되돌리기" disabled>' + IC.undo + "</button>" +
+      '<button type="button" class="d41-ub" id="d41RedoBtn" data-act="d41Redo" aria-label="다시 실행" title="다시 실행" disabled>' + IC.redo + "</button>" +
+      '<span class="d41-tools-gap"></span>' +
       '<button type="button" class="d41-tool' + (mode === "pen" ? " on" : "") + '" data-act="d41Pen" aria-label="펜 그리기">' + IC.pencil + "</button>" +
       '<button type="button" class="d41-tool d41-tool-t' + (mode === "text" ? " on" : "") + '" data-act="d41Text" aria-label="글씨">T</button>' +
       '<button type="button" class="d41-tool" data-act="d41Img" aria-label="사진 넣기">' + IC.photo + "</button>" +
-      '<span class="d41-tools-gap"></span>' +
-      '<button type="button" class="d41-ub" id="d41UndoBtn" data-act="d41Undo" aria-label="되돌리기" title="되돌리기" disabled>' + IC.undo + "</button>" +
-      '<button type="button" class="d41-ub" id="d41RedoBtn" data-act="d41Redo" aria-label="다시 실행" title="다시 실행" disabled>' + IC.redo + "</button>" +
       "</div>";
   }
   /* v44: T 도구 — 누르면 새 글 상자를 만들어요 (배경을 누르면 이제 글쓰기가 끝나요).
@@ -2638,17 +2641,9 @@
       '<span class="d41-pv">' + Math.round(size) + "</span>" +
       '<button type="button" class="d41-tb d41-tb-sm" data-act="d41SizeStep" data-d="1" aria-label="글씨 크게">+</button>' +
       '<span class="d41-trow-gap"></span>' +
-      '<button type="button" class="d41-tc d41-tc-sm' + (diary.cpick ? " on" : "") + '" data-act="d41ColorPick" aria-label="글씨 색 고르기" ' +
+      '<button type="button" class="d41-tc d41-tc-sm' + (diary.sp === "text" ? " on" : "") + '" data-act="d41ColorPick" aria-label="글씨 색 고르기" ' +
         'style="background:' + (color || "#111111") + '"></button>' +
       "</div>";
-    if (diary.cpick) {
-      h += '<div class="d41-prow d41-pal"><div class="d41-dots d41-pal-dots">';
-      D41_TCOLORS.forEach(function (c, i) {
-        h += '<button type="button" class="d41-dot d41-dot-lg' + ((color || "#111111") === c ? " on" : "") +
-          '" data-act="d41Color" data-color="' + esc(c) + '" aria-label="글씨 색 ' + (i + 1) + '" style="background:' + c + '"></button>';
-      });
-      h += "</div></div>";
-    }
     return h;
   }
   function d41ImgPanel() {
@@ -2690,18 +2685,10 @@
     h += '<button type="button" class="d41-dk' + (diary.pmode === "erase" ? " on" : "") + '" data-act="d41PenMode" data-mode="erase" aria-label="지우개" title="지우개">' +
       IC.eraser + "</button>";
     h += '<span class="d41-dock-gap"></span>';
-    h += '<button type="button" class="d41-dk d41-dk-color' + (diary.pcpick ? " on" : "") + '" data-act="d41PenColorPick" aria-label="펜 색" title="펜 색">' +
+    h += '<button type="button" class="d41-dk d41-dk-color' + (diary.sp === "pen" ? " on" : "") + '" data-act="d41PenColorPick" aria-label="펜 색" title="펜 색">' +
       '<span class="d41-dkk" style="background:' + diary.pcolor + '"></span></button>';
     h += '<button type="button" class="d41-dk d41-dk-x" data-act="d41Clear" aria-label="전체 지우기" title="전체 지우기">' + IC.x + "</button>";
     h += "</div></div>";
-    if (diary.pcpick) {
-      h += '<div class="d41-prow d41-prow-cp d41-prow-dotpick"><div class="d41-dots">';
-      ["#111111", "#B4564E", "#3D6E8A", "#5E7A52", "#C9A227"].forEach(function (c, i) {
-        h += '<button type="button" class="d41-dot' + (diary.pcolor === c ? " on" : "") + '" data-act="d41PenColor" data-color="' + esc(c) +
-          '" aria-label="펜 색 ' + (i + 1) + '" style="background:' + c + '"></button>';
-      });
-      h += "</div></div>";
-    }
     return h;
   }
   function d41PanelHtml() {
@@ -2723,6 +2710,192 @@
     if (tools) Array.prototype.forEach.call(tools.querySelectorAll(".d41-tool.on"), function (el) { el.classList.remove("on"); });
   }
 
+  /* ========================================================================
+     v46 — 색상 스펙트럼 판 (아이폰 메모의 «색상 · 스펙트럼» 과 같은 모양)
+     · 펜 도크의 색 동그라미, 글씨 도구의 색 동그라미를 누르면 아래에서 올라와요
+     · 가로 = 색(hue) · 세로 = 밝기 — 왼쪽은 하얗고 아래로 갈수록 어두워져요
+     · 판을 톡 누르거나 손가락으로 끌면 그 자리 색이 바로 칠해지고 위에 #색이 따라와요
+     · 아래 프리셋 색 9개 · 오른쪽 위 × 로 닫아요 (바깥을 눌러도 닫혀요)
+     ======================================================================== */
+  var d41SpDown = false;
+  function d41Hex2(n) {
+    var q = d41Clamp(Math.round(n), 0, 255).toString(16).toUpperCase();
+    return q.length < 2 ? "0" + q : q;
+  }
+  function d41RgbHex(r, g, b) { return "#" + d41Hex2(r) + d41Hex2(g) + d41Hex2(b); }
+  function d41SpRgb(fx, fy) {
+    var h = ((((fx * 340) % 360) + 360) % 360) / 60;
+    var s = Math.min(1, Math.max(0, (fx - 0.03) / 0.72));   /* 왼쪽 가장자리는 흰색에 가깝게 */
+    var v = 1 - d41Clamp(fy, 0, 1) * 0.97;
+    var c = v * s, xx = c * (1 - Math.abs(h % 2 - 1)), m = v - c, r, g, b;
+    if (h < 1) { r = c; g = xx; b = 0; }
+    else if (h < 2) { r = xx; g = c; b = 0; }
+    else if (h < 3) { r = 0; g = c; b = xx; }
+    else if (h < 4) { r = 0; g = xx; b = c; }
+    else if (h < 5) { r = xx; g = 0; b = c; }
+    else { r = c; g = 0; b = xx; }
+    return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+  }
+  function d41SpDraw(cv) {
+    var box = cv.getContext("2d");
+    if (!box) return;
+    var w = cv.width, h = cv.height;
+    if (!w || !h) return;
+    var img = box.createImageData(w, h), d = img.data, i = 0;
+    for (var y = 0; y < h; y++) {
+      var fy = h > 1 ? y / (h - 1) : 0;
+      for (var x = 0; x < w; x++) {
+        var c = d41SpRgb(w > 1 ? x / (w - 1) : 0, fy);
+        d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+        i += 4;
+      }
+    }
+    box.putImageData(img, 0, 0);
+  }
+  /* 지금 색과 가장 가까운 판 위 자리 — 열 때 동그라미를 거기에 놓아요 */
+  function d41SpFind(hex) {
+    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex || ""));
+    if (!m) return [0.72, 0.42];
+    var r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+    var best = [0.72, 0.42], bd = 1e9;
+    for (var fy = 0; fy <= 1.0001; fy += 0.025) {
+      for (var fx = 0; fx <= 1.0001; fx += 0.025) {
+        var c = d41SpRgb(fx, fy);
+        var dd = Math.pow(c[0] - r, 2) + Math.pow(c[1] - g, 2) + Math.pow(c[2] - b, 2);
+        if (dd < bd) { bd = dd; best = [fx, fy]; }
+      }
+    }
+    return best;
+  }
+  function d41SpCur() {
+    if (!diary) return "#111111";
+    if (diary.sp === "pen") return diary.pcolor || "#111111";
+    var cur = d41SelText();
+    return (cur ? cur.color : diary.tcolor) || "#111111";
+  }
+  function d41SpectrumHtml() {
+    var color = String(d41SpCur()).toUpperCase();
+    var pen = diary && diary.sp === "pen";
+    var h = '<div class="d41-sp-bg" data-act="d41SpClose"></div>' +
+      '<div class="d41-sp-card" role="dialog" aria-label="색상">' +
+      '<div class="d41-sp-hd"><span class="d41-sp-tt">색상</span>' +
+      '<button type="button" class="d41-sp-x" data-act="d41SpClose" aria-label="색상 닫기">' + IC.x + "</button></div>" +
+      '<div class="d41-sp-box"><canvas class="d41-sp-cv" id="d41SpCv" aria-label="색상 스펙트럼"></canvas>' +
+      '<span class="d41-sp-dot" id="d41SpDot" aria-hidden="true"></span></div>' +
+      '<div class="d41-sp-ft"><span class="d41-sp-pv" id="d41SpPv" style="background:' + esc(color) + '"></span>' +
+      '<span class="d41-sp-hex" id="d41SpHex">' + esc(color) + "</span></div>" +
+      '<div class="d41-sp-dots">';
+    D41_TCOLORS.forEach(function (c, i) {
+      h += '<button type="button" class="d41-sp-dotb' + (color === c ? " on" : "") + '" data-act="' +
+        (pen ? "d41PenColor" : "d41Color") + '" data-color="' + esc(c) + '" aria-label="색 ' + (i + 1) + '" style="background:' + c + '"></button>';
+    });
+    h += "</div></div>";
+    return h;
+  }
+  function d41SpRing(fx, fy) {
+    var dot = document.getElementById("d41SpDot");
+    if (!dot) return;
+    dot.style.left = (d41Clamp(fx, 0, 1) * 100).toFixed(2) + "%";
+    dot.style.top = (d41Clamp(fy, 0, 1) * 100).toFixed(2) + "%";
+  }
+  function d41PaintTx(t) {
+    var el = document.querySelector('#d41Nodes .d41-tx[data-tx="' + t.id + '"]');
+    if (el) el.style.color = t.color || "";
+  }
+  function d41SpApply(hex, live) {
+    if (!diary) return;
+    hex = String(hex || "").toUpperCase();
+    if (diary.sp === "pen") diary.pcolor = hex;
+    else {
+      var cur = d41SelText();
+      if (cur) { cur.color = hex; if (live) d41PaintTx(cur); }
+      else diary.tcolor = hex;
+    }
+    var sw = document.querySelector(diary.sp === "pen" ? "#d41Panel .d41-dkk" : "#d41Panel .d41-tc");
+    if (sw) sw.style.background = hex;
+  }
+  function d41SpAt(ev, cv) {
+    var b = cv.getBoundingClientRect();
+    var fx = d41Clamp((ev.clientX - b.left) / Math.max(1, b.width), 0, 1);
+    var fy = d41Clamp((ev.clientY - b.top) / Math.max(1, b.height), 0, 1);
+    var c = d41SpRgb(fx, fy);
+    var hex = d41RgbHex(c[0], c[1], c[2]);
+    if (diary) { diary.spx = fx; diary.spy = fy; }
+    d41SpRing(fx, fy);
+    var hx = document.getElementById("d41SpHex");
+    if (hx) hx.textContent = hex;
+    var pv = document.getElementById("d41SpPv");
+    if (pv) pv.style.background = hex;
+    d41SpApply(hex, true);
+  }
+  function d41SpWire() {
+    var cv = document.getElementById("d41SpCv");
+    if (!cv) return;
+    var dpr = Math.min(2.5, window.devicePixelRatio || 1);
+    var b = cv.getBoundingClientRect();
+    cv.width = Math.max(1, Math.round((b.width || 320) * dpr));
+    cv.height = Math.max(1, Math.round((b.height || 150) * dpr));
+    d41SpDraw(cv);
+    var f = d41SpFind(d41SpCur());
+    if (diary) { diary.spx = f[0]; diary.spy = f[1]; }
+    d41SpRing(f[0], f[1]);
+    d41SpDown = false;
+    cv.addEventListener("pointerdown", function (ev) {
+      d41SpDown = true;
+      try { cv.setPointerCapture(ev.pointerId); } catch (e) {}
+      if (ev.cancelable) ev.preventDefault();
+      ev.stopPropagation();
+      d41SpAt(ev, cv);
+    });
+    cv.addEventListener("pointermove", function (ev) {
+      if (!d41SpDown) return;
+      if (ev.cancelable) ev.preventDefault();
+      d41SpAt(ev, cv);
+    });
+    var end = function (ev) {
+      if (!d41SpDown) return;
+      d41SpDown = false;
+      if (ev && ev.cancelable) ev.preventDefault();
+      if (diary && diary.sp === "text") d41RenderNodes();
+      d41Sync();
+      d41HistPush();
+      d41AutoSave();
+    };
+    cv.addEventListener("pointerup", end);
+    cv.addEventListener("pointercancel", end);
+  }
+  /* 판만 닫기 (다른 일은 부르는 쪽에서) */
+  function d41SpShut() {
+    if (diary) diary.sp = null;
+    d41SpDown = false;
+    var el = document.getElementById("d41Sp");
+    if (el) { el.hidden = true; el.innerHTML = ""; }
+  }
+  function d41SpOpen(kind) {
+    if (!diary) return;
+    var k = kind === "pen" ? "pen" : "text";
+    if (diary.sp === k) { d41SpClose(); return; }
+    d41CommitTexts();
+    d41BlurAll();
+    diary.sp = k;
+    var el = document.getElementById("d41Sp");
+    if (!el) return;
+    el.hidden = false;
+    el.innerHTML = d41SpectrumHtml();
+    d41PanelRefresh();          /* 색 동그라미에 «켜짐» 표시 */
+    d41SpWire();
+  }
+  function d41SpClose() {
+    if (!diary || !diary.sp) return;
+    var was = diary.sp;
+    d41SpShut();
+    if (was === "text") d41RenderNodes();
+    d41PanelRefresh();
+    d41Sync();
+    d41HistPush();
+    d41AutoSave();
+  }
+
   function formDiary(cid, it) {
     var l = containerOf(cid);
     if (!l) return "";
@@ -2737,7 +2910,8 @@
       tsize: d41Clamp(D41_SIZES[st.size] || 16.5, D41_TXMIN, D41_TXMAX),
       tcolor: st.color || "", talign: st.align || "left",
       pmode: "pen", pcolor: "#111111", pw: 3.5, pcpick: false,
-      tbold: false, tstrike: false, tunderline: false, cpick: false
+      tbold: false, tstrike: false, tunderline: false, cpick: false,
+      sp: null, spx: 0.72, spy: 0.42,     /* v46: 스펙트럼 색상 판 */
     };
     var h = '<form class="d41" id="sheetForm" autocomplete="off">';
     /* v44: 되돌리기·다시 실행 — 글·사진·그림 상태를 기록해 두었다가 되돌려요 */
@@ -2750,6 +2924,8 @@
     /* v44: 아이콘바(펜·글씨·사진)를 아래에서 위로 — 상단 바 바로 아래, 도구 판은 그 아래 */
     h += d41ToolsHtml();
     h += '<div class="d41-panel" id="d41Panel" hidden>' + d41PanelHtml() + "</div>";
+    /* v46: 색상 스펙트럼 판 — 색 동그라미를 누르면 여기에 올라와요 */
+    h += '<div class="d41-sp" id="d41Sp" hidden></div>';
     /* v42: 모눈은 상단 바 바로 아래부터 — 날짜도 종이 위에 얹혀요 */
     h += '<div class="d41-canvas" id="d41Canvas"><div class="d41-paper" id="d41Paper">' +
       '<div class="d41-date"><span class="d41-dbig" id="d41DateBig">' + esc(d41Stamp(diary.date)) + "</span>" +
@@ -7068,7 +7244,8 @@
     if (act === "d41Size") { d41SetSize(Number(el.getAttribute("data-size")) || 16.5); return; }
     if (act === "d41SizeStep") { d41SizeStep(Number(el.getAttribute("data-d")) || 0); return; }
     if (act === "d41Color") { d41SetColor(el.getAttribute("data-color") || ""); return; }
-    if (act === "d41ColorPick") { if (diary) { diary.cpick = !diary.cpick; d41PanelRefresh(); } return; }
+    if (act === "d41ColorPick") { d41SpOpen("text"); return; }
+    if (act === "d41SpClose") { d41SpClose(); return; }
     if (act === "d41Bold") { d41SetTFlag("bold"); return; }
     if (act === "d41Strike") { d41SetTFlag("strike"); return; }
     if (act === "d41Underline") { d41SetTFlag("underline"); return; }
@@ -7104,15 +7281,14 @@
       return;
     }
     if (act === "d41PenColorPick") {
-      if (!diary) return;
-      diary.pcpick = !diary.pcpick;
-      d41PanelRefresh();
+      d41SpOpen("pen");
       return;
     }
     if (act === "d41PenColor") {
       if (!diary) return;
       diary.pcolor = el.getAttribute("data-color") || "#111111";
       diary.pcpick = false;
+      d41SpShut();
       d41PanelRefresh();
       return;
     }

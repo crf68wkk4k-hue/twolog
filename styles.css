@@ -2117,6 +2117,7 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
   padding:4px 14px 6px; background:var(--surface)
 }
 /* v45: 도구(펜·T·사진)는 왼쪽, 되돌리기·다시 실행은 오른쪽 끝 */
+/* v46: ↶ ↷ 가 왼쪽 끝, 펜·T·사진이 오른쪽 — 사이를 이 간격이 벌려요 */
 .d41-tools-gap{flex:1 1 auto}
 .d41-tools .d41-ub{width:34px; height:34px; flex:0 0 34px; margin:0 1px}
 /* v45: 위 줄은 ‹ 뒤로가기 + 가운데 제목만 — 오른쪽에 같은 폭의 빈 자리를 둬 제목을 꼭 가운데로 */
@@ -2174,7 +2175,7 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 .d41-dk:active{background:var(--surface-2)}
 /* 색 단추 — 지금 펜 색 동그라미 (고르는 동안만 아래에 색 점 줄이 펼쳐져요) */
 .d41-dk-color .d41-dkk{
-  display:block; width:24px; height:24px; border-radius:50% !important;
+  display:block; width:22px; height:22px; border-radius:50% !important;
   box-shadow:0 0 0 2px var(--surface), 0 0 0 3.4px rgba(120,120,130,.55)
 }
 .d41-dk-color.on .d41-dkk{box-shadow:0 0 0 2px var(--surface), 0 0 0 3.4px var(--ink)}
@@ -2219,9 +2220,10 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 .d41-tb-lg svg{width:22px; height:22px}
 .d41-tb-sm{min-width:32px; height:40px; padding:0 4px; font-size:21px; font-weight:600; border-radius:10px !important}
 .d41-tsep{flex:0 0 1px; width:1px; height:22px; margin:0 6px; background:var(--line)}
-.d41-trow .d41-pv{
-  flex:0 0 auto; min-width:34px; height:40px; display:flex; align-items:center; justify-content:center;
-  text-align:center; font-size:15px; font-weight:700; line-height:1;
+/* v46: 글씨 크기 숫자를 검정 글씨로 더 크게 (회색 작은 숫자 → 17px 굵게) */
+#sheet .d41-trow .d41-pv{
+  flex:0 0 auto; min-width:40px; height:40px; display:flex; align-items:center; justify-content:center;
+  text-align:center; font-size:17px; font-weight:800; line-height:1;
   color:var(--ink); font-variant-numeric:tabular-nums
 }
 .d41-trow-gap{flex:1 1 auto}
@@ -2233,6 +2235,52 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 .d41-pal{padding:8px 2px 2px; min-height:0}
 .d41-pal-dots{display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-start}
 .d41-dot-lg{width:24px; height:24px}
+
+/* ==========================================================================
+   v46 — 색 동그라미를 누르면 «색상 스펙트럼 판» (아이폰 색상 스펙트럼 모양)
+   · 아래에서 올라오는 흰 카드: «색상» · × · 스펙트럼 캔버스 · 색 견본/코드 · 프리셋 9색
+   · 캔버스는 손가락으로 톡 누르거나 끌어서 골라요 (touch-action:none)
+   ========================================================================== */
+.d41{position:relative}
+.d41-sp{position:absolute; inset:0; z-index:40; display:flex; align-items:flex-end}
+.d41-sp[hidden]{display:none}
+.d41-sp-bg{position:absolute; inset:0; background:rgba(0,0,0,.16)}
+.d41-sp-card{
+  position:relative; width:100%; margin:0; padding:12px 16px calc(18px + env(safe-area-inset-bottom,0px));
+  background:var(--surface); border-radius:20px 20px 0 0 !important;
+  box-shadow:0 -10px 30px rgba(0,0,0,.16)
+}
+.d41-sp-hd{display:flex; align-items:center; justify-content:space-between; padding:0 0 10px}
+.d41-sp-tt{font-size:14px; font-weight:700; letter-spacing:-.01em; color:var(--ink)}
+.d41-sp-x{
+  width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+  border:0 !important; border-radius:50% !important; background:var(--surface-2); color:var(--ink-2);
+  padding:0; cursor:pointer
+}
+.d41-sp-x svg{width:14px; height:14px}
+.d41-sp-box{position:relative; margin:0 0 12px}
+.d41-sp-cv{
+  display:block; width:100%; height:154px; border-radius:12px !important;
+  touch-action:none; cursor:crosshair
+}
+.d41-sp-dot{
+  position:absolute; left:72%; top:42%; width:22px; height:22px; display:block; margin:0;
+  border:3px solid #fff !important; border-radius:50% !important;
+  box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.22);
+  transform:translate(-50%,-50%); pointer-events:none
+}
+.d41-sp-ft{display:flex; align-items:center; gap:10px; padding:0 0 12px}
+.d41-sp-pv{
+  display:block; width:30px; height:30px; flex:0 0 30px; border-radius:9px !important;
+  box-shadow:inset 0 0 0 1px rgba(120,120,130,.35)
+}
+.d41-sp-hex{font-size:13px; font-weight:700; color:var(--ink-2); letter-spacing:.02em; font-variant-numeric:tabular-nums}
+.d41-sp-dots{display:flex; align-items:center; gap:10px; flex-wrap:nowrap}
+.d41-sp-dotb{
+  width:24px; height:24px; flex:0 0 24px; padding:0;
+  border:1px solid rgba(120,120,130,.35) !important; border-radius:50% !important; cursor:pointer
+}
+.d41-sp-dotb.on{box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--ink-3)}
 
 /* ==========================================================================
    v41 — 날짜(챕터) 댓글: 사진마다 카드 대신 그날 사진 전체에 «한 칸»

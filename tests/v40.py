@@ -1,6 +1,6 @@
 """투로그 v40 확인 — 투두리스트 속지의 2열 카드 묶음 + 카테고리 줄 아래 속지 아코디언 + 모눈 메모.
 
-1) 버전: sw.js 캐시 twolog-v45 · APP_VERSION v45 · My 탭 「버전 v45」
+1) 버전: sw.js 캐시 twolog-v46 · APP_VERSION v46 · My 탭 「버전 v46」
 2) + 시트 — 속지 레이아웃이 목록 맨 아래가 아니라 «카테고리 줄 바로 아래»로 펼쳐짐
    - 처음엔 접힘 · 줄을 누르면 그 줄 바로 아래에 2×2 · 다른 줄을 누르면 이전 줄은 접힘
    - 같은 줄을 한 번 더 누르면 접힘 · 「추가」로 붙인 줄은 바로 펼쳐짐
@@ -189,9 +189,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
+    check("sw.js 캐시 버전 twolog-v46", 'const VERSION = "twolog-v46"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v45"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v46"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -204,7 +204,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v45」", ver.strip() == "버전 v45", ver)
+    check("My 탭 맨 위에 「버전 v46」", ver.strip() == "버전 v46", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄 아래로 펼쳐지는 속지 레이아웃 (아코디언)

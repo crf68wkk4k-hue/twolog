@@ -1,6 +1,6 @@
 """투로그 v44 확인 — 동기화 오류 덮어쓰기 방지 · 기념일·프로필 시트 손보기.
 
-1) 버전: sw.js 캐시 twolog-v45 · APP_VERSION v45 · My 탭 「버전 v45」
+1) 버전: sw.js 캐시 twolog-v46 · APP_VERSION v46 · My 탭 「버전 v46」
 2) 동기화 오류 덮어쓰기 방지 (v44 핵심)
    - 서버 표(events/notes/photos/settings) 읽기가 하나라도 실패하면 load() 가 실패로 끝나고
      빈 배열로 화면을 덮어쓰지 않음 — Realtime 재읽기(scheduleReload)·당겨오기(store.pull) 뒤에도
@@ -163,9 +163,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v45", 'const VERSION = "twolog-v45"' in sw,
+    check("sw.js 캐시 버전 twolog-v46", 'const VERSION = "twolog-v46"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v44", 'var APP_VERSION = "v45"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v46"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v44 문자열이 남아 있지 않음",
           "twolog-v44" not in sw and 'APP_VERSION = "v44"' not in app_js)
@@ -173,7 +173,7 @@ with sync_playwright() as p:
     seed_demo(page)
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v45」", ver.strip() == "버전 v45", ver)
+    check("My 탭 맨 위에 「버전 v46」", ver.strip() == "버전 v46", ver)
     ctx.close()
 
     # ==================================================================
@@ -420,10 +420,10 @@ with sync_playwright() as p:
     pageB.locator("#sheet .d41-tb[data-act=d41Align]").click()
     pageB.wait_for_timeout(160)
     pageB.locator("#sheet .d41-tc[data-act=d41ColorPick]").click()
-    pageB.wait_for_timeout(180)
-    cp4 = pageB.evaluate("document.querySelectorAll('#sheet .d41-dot[data-act=d41Color]').length")
-    pageB.locator("#sheet .d41-dot[data-act=d41Color]").nth(1).click()
-    pageB.wait_for_timeout(200)
+    pageB.wait_for_timeout(320)
+    cp4 = pageB.evaluate("document.querySelectorAll('#sheet .d41-sp-dotb[data-act=d41Color]').length")
+    pageB.locator("#sheet .d41-sp-dotb[data-act=d41Color]").nth(1).click()
+    pageB.wait_for_timeout(240)
     pageB.locator("#sheet [data-act=d41SizeStep][data-d='1']").click()
     pageB.locator("#sheet [data-act=d41SizeStep][data-d='1']").click()
     pageB.wait_for_timeout(240)
