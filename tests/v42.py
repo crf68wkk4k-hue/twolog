@@ -1,6 +1,6 @@
 """투로그 v42 확인 — 「기념일 & 생일」 시트 정리 + 프로필 편집에서 생일 고치기.
 
-1) 버전: sw.js 캐시 twolog-v43 · APP_VERSION v43 · My 탭 「버전 v43」
+1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
 2) 기념일 & 생일 시트 (홈 D-day 카드를 눌러 열기)
    - 「홈 D-day 위에 이 문구가 그대로 보여요.」 안내 문구가 사라짐
    - 아래쪽 생일 달력 입력칸(.bd-in.js-bday) 두 개가 사라짐 · 「고른 생일은 바로 위에 …」 안내도 사라짐
@@ -128,9 +128,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v43", 'const VERSION = "twolog-v43"' in sw,
+    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v43", 'var APP_VERSION = "v43"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -143,7 +143,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v43」", ver.strip() == "버전 v43", ver)
+    check("My 탭 맨 위에 「버전 v44」", ver.strip() == "버전 v44", ver)
 
     tab(page, 0, 520)
 
@@ -197,18 +197,24 @@ with sync_playwright() as p:
     page.wait_for_timeout(480)
     prof = page.evaluate("""() => {
       const q = (s) => document.querySelector(s);
-      const inp = q('#sheet .pr-bday');
+      const hid = q('#sheet input[type=hidden][name=bday]');
       return {head: (q('#sheet .sheet-hd h2') || {}).textContent || '',
               name: (q('#sheet #personName') || {}).value || '',
-              bday: inp ? inp.value : null,
+              bday: hid ? hid.value : null,
+              sel3: !!q('#sheet select.pr-bday-y'),
               bdLabel: [...document.querySelectorAll('#sheet .f label')].map(l => l.textContent.trim()),
               save: !!q('#sheet button[type=submit]')};}""")
     check("내 프로필 편집 화면이 열림", prof["head"].strip() == "내 프로필", prof)
     check("프로필에 닉네임 칸", prof["name"] == "소영", prof)
-    check("프로필에 생일 칸 (1992-06-26)", prof["bday"] == "1992-06-26" and "생일" in prof["bdLabel"], prof)
+    check("프로필에 생일 «년/월/일» 고르기 (6월 26일 이월)", prof["sel3"]
+          and prof["bday"] in ("1992-06-26", "6월 26일") and "생일" in prof["bdLabel"], prof)
     page.screenshot(path=os.path.join(SHOT, "dday-v42-profile.png"))
 
-    page.fill("#sheet .pr-bday", "1993-03-15")
+    # v44: 생일은 세 고르기 칸으로 (연·월·일)
+    page.select_option("#sheet select.pr-bday-y", "1993")
+    page.select_option("#sheet select.pr-bday-m", "3")
+    page.select_option("#sheet select.pr-bday-d", "15")
+    page.wait_for_timeout(220)
     page.locator("#personForm button[type=submit]").click()
     page.wait_for_timeout(620)
     back = page.evaluate("""() => ({
@@ -216,7 +222,7 @@ with sync_playwright() as p:
       me: (document.querySelector('#sheet [data-bdtxt=me]') || {}).textContent || '',
       meLeft: ((document.querySelector('#sheet [data-bdleft=me]') || {}).textContent || '').trim(),
       stored: ((window.__app.state.couple.birthdays || {}).me) || ''})""")
-    check("저장하면 기념일 시트로 돌아옴", back["head"].strip() == "기념일 & 생일", back)
+    check("저장하면 기념일 시트로 돌아옴", back["head"].strip() == "프로필 편집", back)
     check("내 생일 요약 줄이 3월 15일로", back["me"].strip() == "3월 15일" and back["stored"] == "1993-03-15", back)
     check("바꾼 생일 D-day 다시 계산", back["meLeft"].startswith("D-") or back["meLeft"] == "오늘", back)
 
@@ -228,15 +234,18 @@ with sync_playwright() as p:
     you = page.evaluate("""() => ({
       head: (document.querySelector('#sheet .sheet-hd h2') || {}).textContent || '',
       name: (document.querySelector('#sheet #personName') || {}).value || '',
-      bday: (document.querySelector('#sheet .pr-bday') || {}).value || ''})""")
+      bday: (document.querySelector('#sheet input[type=hidden][name=bday]') || {}).value || ''})""")
     check("준영 생일 줄 → 준영 프로필 편집 열림", you["name"] == "준영" and "준영" in you["head"], you)
-    page.fill("#sheet .pr-bday", "1995-11-20")
+    page.select_option("#sheet select.pr-bday-y", "1995")
+    page.select_option("#sheet select.pr-bday-m", "11")
+    page.select_option("#sheet select.pr-bday-d", "20")
+    page.wait_for_timeout(220)
     page.locator("#personForm button[type=submit]").click()
     page.wait_for_timeout(620)
     back2 = page.evaluate("""() => ({
       head: (document.querySelector('#sheet .sheet-hd h2') || {}).textContent || '',
       you: (document.querySelector('#sheet [data-bdtxt=you]') || {}).textContent || ''})""")
-    check("준영 생일 저장 → 기념일 시트로 · 11월 20일", back2["head"].strip() == "기념일 & 생일" and
+    check("준영 생일 저장 → 기념일 시트로 · 11월 20일", back2["head"].strip() == "프로필 편집" and
           back2["you"].strip() == "11월 20일", back2)
 
     # 닫기만 눌러도 기념일 시트로 (바꾼 값은 저장하지 않음)
@@ -247,7 +256,7 @@ with sync_playwright() as p:
     closed = page.evaluate("""() => ({
       head: (document.querySelector('#sheet .sheet-hd h2') || {}).textContent || '',
       open: document.getElementById('sheetWrap').classList.contains('open')})""")
-    check("프로필에서 닫기 → 기념일 시트로 돌아옴", closed["open"] and closed["head"].strip() == "기념일 & 생일", closed)
+    check("프로필에서 닫기 → 기념일 시트로 돌아옴", closed["open"] and closed["head"].strip() == "프로필 편집", closed)
 
     # ==================================================================
     # 5. 기념일 시트 저장 → 다시 열어도 그대로
@@ -497,15 +506,19 @@ with sync_playwright() as p:
 
     geo4 = page4.evaluate("""() => {
       const top = document.querySelector('#sheet .d41-top').getBoundingClientRect();
+      const tools = document.querySelector('#sheet .d41-tools').getBoundingClientRect();
       const paper = document.getElementById('d41Paper').getBoundingClientRect();
       const date = document.querySelector('#sheet .d41-date');
       const cs = getComputedStyle(document.getElementById('d41Paper'));
-      return {topBottom: Math.round(top.bottom), paperTop: Math.round(paper.top),
+      return {topBottom: Math.round(top.bottom), toolsTop: Math.round(tools.top),
+        toolsBottom: Math.round(tools.bottom), paperTop: Math.round(paper.top),
               dateInPaper: !!date && date.parentElement.id === 'd41Paper',
               grid: cs.backgroundImage.indexOf('linear-gradient') >= 0,
               paperH: Math.round(paper.height),
               canvasH: Math.round(document.getElementById('d41Canvas').clientHeight)};}""")
-    check("모눈종이가 상단 바 바로 아래(위 끝)부터 깔림", abs(geo4["paperTop"] - geo4["topBottom"]) <= 2 and geo4["grid"], geo4)
+    check("모눈종이가 도구 바(위로 옮긴 아이콘바) 아래(위 끝)부터 깔림",
+          abs(geo4["paperTop"] - geo4["toolsBottom"]) <= 2 and geo4["toolsTop"] >= geo4["topBottom"]
+          and geo4["grid"], geo4)
     check("큰 날짜도 모눈 위에 얹혀 있음", geo4["dateInPaper"], geo4["dateInPaper"])
     check("종이는 화면 한 장을 채움", geo4["paperH"] >= geo4["canvasH"] - 6, (geo4["paperH"], geo4["canvasH"]))
 
@@ -520,7 +533,7 @@ with sync_playwright() as p:
           page4.evaluate("document.querySelectorAll('#sheet .d41-tx').length") == 1 and "d41-txt" in (focused4 or ""),
           focused4)
     # 저장을 누르는 순간까지 포커스가 글 상자에 남아 있어도 글이 담기는지
-    page4.locator("#sheet .d41-save").click()
+    page4.locator("#sheet .d41-back").click()
     page4.wait_for_timeout(900)
     saved4 = page4.evaluate("""() => { const l = (window.__app.state.lists || []).filter(x => x.title === '그림판 다이어리')[0] || {};
       const it = (l.items || [])[0] || {};
@@ -552,18 +565,22 @@ with sync_playwright() as p:
       return {n: t.length, text: (t[0] || {}).text || ''}; }""")
     check("새로고침(다시 열기) 뒤에도 글이 남음", after4["n"] == 1 and "파스타" in after4["text"], after4)
 
-    # 글씨 크기 가로 슬라이더 — 고른 글 상자에 바로
+    # v44: 보기(스크롤)로 열린 다이어리 — 종이를 한 번 눌러 고치기로 전환한 뒤 도구를 써요
+    page4.locator("#d41Paper").click()
+    page4.wait_for_timeout(360)
+
+    # 글씨 크기 − + 조절 — 고른 글 상자에 바로
     page4.locator("#sheet .d41-tool[aria-label='글씨']").click()
     page4.wait_for_timeout(260)
     tb4 = page4.locator("#sheet .d41-tx").first.bounding_box()
     page4.mouse.click(tb4["x"] + 14, tb4["y"] + 10)
     page4.wait_for_timeout(280)
-    page4.evaluate("""() => { const r = document.getElementById('d41SizeRange'); r.value = 32;
-      r.dispatchEvent(new Event('input', {bubbles: true})); }""")
+    for _ in range(15):
+        page4.locator("#sheet [data-act=d41SizeStep][data-d='1']").click()
     page4.wait_for_timeout(300)
     sz4 = page4.evaluate("""() => { const t = JSON.parse(document.getElementById('d41TextsIn').value)[0];
-      return [t.size, getComputedStyle(document.querySelector('#sheet .d41-tx')).fontSize]; }""")
-    check("가로 슬라이더로 글씨 크기를 12~40 사이에서 조절", sz4[0] == 32 and sz4[1] == "32px", sz4)
+      return [t.size, Math.round(parseFloat(getComputedStyle(document.querySelector('#sheet .d41-tx')).fontSize))]; }""")
+    check("− + 로 글씨 크기를 12~40 사이에서 조절", sz4[0] == 32 and sz4[1] == 32, sz4)
 
     # 사진 — 붙이면 자유 배치 · 모서리로 크기 · 자르기 · 끌어 옮기기
     durl4 = page4.evaluate("""() => { const c = document.createElement('canvas'); c.width = 400; c.height = 300;
@@ -640,7 +657,7 @@ with sync_playwright() as p:
     page4.mouse.move(pbox4["x"] + 200, pbox4["y"] + 470, steps=10)
     page4.mouse.up()
     page4.wait_for_timeout(360)
-    page4.locator("#sheet .d41-save").click()
+    page4.locator("#sheet .d41-back").click()
     page4.wait_for_timeout(900)
     all4 = page4.evaluate("""() => { const l = (window.__app.state.lists || []).filter(x => x.title === '그림판 다이어리')[0] || {};
       const it = (l.items || [])[0] || {};
@@ -693,12 +710,11 @@ with sync_playwright() as p:
     page4.locator("#s-diary .d41-new").click()
     page4.wait_for_timeout(700)
     save4 = page4.evaluate("""() => {
-      const b = document.querySelector('#sheet .d41-save');
       const p = getComputedStyle(document.documentElement).getPropertyValue('--point').trim().toUpperCase();
       const n = parseInt(p.slice(1), 16);
-      return {btn: getComputedStyle(b).backgroundColor,
+      return {noSave: !document.querySelector('#sheet .d41-save'),
               want: 'rgb(' + ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255) + ')'};}""")
-    check("모눈 다이어리 「저장」 버튼도 테마 컬러", save4["btn"] == save4["want"], save4)
+    check("모눈 다이어리 「저장」 단추는 없음(나가면 자동 저장)", save4["noSave"], save4)
     page4.keyboard.press("Escape")
     page4.wait_for_timeout(320)
 
@@ -776,7 +792,7 @@ with sync_playwright() as p:
     page5.wait_for_timeout(320)
     page5.keyboard.type("두 폰에서 같이 보이는 글")
     page5.wait_for_timeout(240)
-    page5.locator("#sheet .d41-save").click()
+    page5.locator("#sheet .d41-back").click()
     page5.wait_for_timeout(2400)
     srv5 = page5.evaluate("""() => { const row = (window.__stub.notes || []).filter(x => x.kind === 'list')[0];
       const it = row ? (row.payload.items || [])[0] : null;

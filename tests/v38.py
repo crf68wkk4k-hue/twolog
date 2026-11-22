@@ -1,6 +1,6 @@
 """투로그 v38 확인 — 노트 + 시트 속지 레이아웃 4종 (투두리스트 · 모눈 메모 · 별점 리뷰 · 지출·정산).
 
-1) 버전: sw.js 캐시 twolog-v43 · APP_VERSION v43 · My 탭 「버전 v43」
+1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
 2) + 시트 하단 「속지 레이아웃」
    - 노트 카테고리 목록(#noteOrderList) 아래 · 「저장하기」 버튼 위
    - 카드 4개 · 2×2 (첫 두 장 같은 줄, 셋째 줄에 두 장) · 각진 네모 · 제목 + 한 줄 설명
@@ -186,9 +186,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v43", 'const VERSION = "twolog-v43"' in sw,
+    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v43", 'var APP_VERSION = "v43"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -201,7 +201,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v43」", ver.strip() == "버전 v43", ver)
+    check("My 탭 맨 위에 「버전 v44」", ver.strip() == "버전 v44", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄 아래로 펼쳐지는 속지 레이아웃 (v40 아코디언)
@@ -418,7 +418,7 @@ with sync_playwright() as p:
     page.keyboard.press("Enter")
     page.keyboard.type("사진도 한 장씩 남기기.")
     page.wait_for_timeout(200)
-    page.locator("#sheet .d41-save").click()
+    page.locator("#sheet .d41-back").click()
     page.wait_for_timeout(700)
     mm = page.evaluate("""() => ({
       seg: document.querySelector('#s-diary .lchip.active').textContent.trim(),
@@ -436,7 +436,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(580)
     check("모눈 메모 — 눌러서 모눈종이 다이어리로 이어서 쓰기",
           page.evaluate("""() => !!document.querySelector('#sheet .d41-paper') &&
-            !!document.querySelector('#sheet .d41-save') &&
+            !document.querySelector('#sheet .d41-save') &&
             document.getElementById('sheetWrap').classList.contains('sheet-full')""") is True)
     page.locator("#sheet .d41-back").click()
     page.wait_for_timeout(480)

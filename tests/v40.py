@@ -1,6 +1,6 @@
 """투로그 v40 확인 — 투두리스트 속지의 2열 카드 묶음 + 카테고리 줄 아래 속지 아코디언 + 모눈 메모.
 
-1) 버전: sw.js 캐시 twolog-v43 · APP_VERSION v43 · My 탭 「버전 v43」
+1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
 2) + 시트 — 속지 레이아웃이 목록 맨 아래가 아니라 «카테고리 줄 바로 아래»로 펼쳐짐
    - 처음엔 접힘 · 줄을 누르면 그 줄 바로 아래에 2×2 · 다른 줄을 누르면 이전 줄은 접힘
    - 같은 줄을 한 번 더 누르면 접힘 · 「추가」로 붙인 줄은 바로 펼쳐짐
@@ -189,9 +189,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v43", 'const VERSION = "twolog-v43"' in sw,
+    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v43", 'var APP_VERSION = "v43"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -204,7 +204,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v43」", ver.strip() == "버전 v43", ver)
+    check("My 탭 맨 위에 「버전 v44」", ver.strip() == "버전 v44", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄 아래로 펼쳐지는 속지 레이아웃 (아코디언)
@@ -511,7 +511,7 @@ with sync_playwright() as p:
     page3.wait_for_timeout(320)
     page3.keyboard.type("아침에 창문을 열었더니 바람이 차가웠다.")
     page3.wait_for_timeout(200)
-    page3.locator("#sheet .d41-save").click()
+    page3.locator("#sheet .d41-back").click()
     page3.wait_for_timeout(760)
     memo = page3.evaluate("""() => {
       const cards = [...document.querySelectorAll('#s-diary .nmemo-card')];
@@ -544,7 +544,7 @@ with sync_playwright() as p:
     page3.wait_for_timeout(620)
     page3.set_input_files("#d41ImgIn", [memo_jpg])
     page3.wait_for_timeout(1300)
-    page3.locator("#sheet .d41-save").click()
+    page3.locator("#sheet .d41-back").click()
     page3.wait_for_timeout(820)
     pimg = page3.evaluate("""() => { const l = window.__app.state.lists.filter(x => x.title === '오늘의 기록')[0] || {items: []};
       return {img: String((((l.items[0] || {}).imgs) || [{}])[0].src || '').slice(0, 20),

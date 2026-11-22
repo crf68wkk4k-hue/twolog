@@ -1,6 +1,6 @@
 """투로그 v34 확인 — 노트 탭은 늘 「메모」부터, + 시트 한 장에서 카테고리 추가·이름·순서까지.
 
-1) 버전: sw.js 캐시 twolog-v43 · APP_VERSION v43 · My 탭 「버전 v43」
+1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
 2) 노트 탭에 들어올 때마다 늘 「메모」가 먼저 — 안에서 고른 탭은 그 화면에 머무는 동안만 유지
    (다른 노트 탭 → 홈/캘린더 → 노트 : 메모 / 새로고침 뒤 노트 : 메모)
 3) + 시트 개편
@@ -11,7 +11,7 @@
 4) 새 카테고리 추가 · 기존 탭 이름 수정 · 삭제가 이 시트에서 됨
 5) ≡ 를 끌어 순서를 바꾸면 노트 상단 탭 순서가 바뀌고, 새로고침해도 유지
    (키보드 ↑ ↓ 로도 옮겨짐)
-6) My 탭 「버전 v43」 · 콘솔/페이지 오류 없음
+6) My 탭 「버전 v44」 · 콘솔/페이지 오류 없음
 
     python3 tests/v34.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
 """
@@ -186,11 +186,11 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v43", 'const VERSION = "twolog-v43"' in sw,
+    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v43", 'var APP_VERSION = "v43"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v43", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v44", 'const SHELL = "shell-" + VERSION' in sw)
 
     # ==================================================================
     # 2. 노트 탭에 들어오면 늘 「메모」부터
@@ -369,7 +369,7 @@ with sync_playwright() as p:
     # ==================================================================
     tab(page, 4, 600)
     ver = page.evaluate("((document.querySelector('#s-set .app-ver') || {}).textContent || '').trim()")
-    check("My 탭 맨 위에 「버전 v43」", ver == "버전 v43", ver)
+    check("My 탭 맨 위에 「버전 v44」", ver == "버전 v44", ver)
     for idx, name, sid in ((0, "홈", "s-home"), (1, "캘린더", "s-cal"), (3, "사진첩", "s-photo")):
         tab(page, idx, 550)
         ok = page.evaluate("(id) => { const el = document.getElementById(id);"

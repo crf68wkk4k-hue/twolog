@@ -2058,11 +2058,6 @@ html[data-mode="dark"] .d41-empty{background:rgba(29,29,32,.7)}
   text-align:center; font-family:inherit; font-size:16px; font-weight:700; letter-spacing:-.025em; color:var(--ink)
 }
 .d41-title::placeholder{color:var(--ink-3); font-weight:600}
-.d41-save{
-  flex:0 0 auto; height:36px; padding:0 14px; border:0 !important; border-radius:10px !important;
-  background:var(--ink); color:var(--bg); font-family:inherit; font-size:13.5px; font-weight:700;
-  letter-spacing:-.02em; cursor:pointer
-}
 .d41-date{position:relative; flex:0 0 auto; padding:2px 20px 14px}
 .d41-dbig{font-size:27px; font-weight:800; letter-spacing:-.035em; color:var(--ink); font-variant-numeric:tabular-nums}
 .d41-datein{
@@ -2113,7 +2108,34 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 .d41-szb.on{background:var(--ink); color:var(--bg); border-color:var(--ink) !important}
 .d41-pen{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:3; overflow:visible}
 .d41-pen.on{pointer-events:auto; touch-action:none; cursor:crosshair}
-.d41-panel{flex:0 0 auto; padding:8px 14px 4px; border-top:1px solid var(--line); background:var(--surface)}
+.d41-tools{
+  flex:0 0 auto; display:flex; align-items:center; justify-content:center; gap:28px;
+  padding:4px 16px 6px; background:var(--surface)
+}
+/* v44: 아이콘바를 위로 올림 — 종이 위쪽 경계선 */
+.d41-tools{border-bottom:1px solid var(--line); border-top:0}
+.d41-panel{
+  flex:0 0 auto; padding:8px 14px 8px; background:var(--surface);
+  border-top:0; border-bottom:1px solid var(--line)
+}
+.d41-tool{
+  width:46px; height:46px; display:flex; align-items:center; justify-content:center;
+  border:0 !important; border-radius:12px !important; background:none; color:var(--ink);
+  font-family:inherit; font-size:20px; font-weight:800; cursor:pointer
+}
+.d41-tool.on{background:var(--surface-2)}
+.d41-tool svg{width:22px; height:22px}
+.d41-tool-t{font-size:19px; font-weight:800; letter-spacing:-.03em; padding-bottom:2px}
+/* ==========================================================================
+   v44 — 모눈 다이어리: 되돌리기·다시 실행 · 그리기 도크 · 고른 그림
+   ========================================================================== */
+.d41-ub{
+  flex:0 0 34px; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+  border:0 !important; border-radius:8px !important; background:none; color:var(--ink);
+  cursor:pointer; padding:0
+}
+.d41-ub:disabled{color:var(--ink-3); opacity:.4; cursor:default}
+.d41-ub svg{width:19px; height:19px}
 .d41-prow{display:flex; align-items:center; gap:10px; padding:3px 0; min-height:34px}
 .d41-pl{flex:0 0 56px; font-size:11.5px; color:var(--ink-3); letter-spacing:-.01em}
 .d41-pbtns{display:flex; flex-wrap:wrap; gap:6px}
@@ -2128,18 +2150,41 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
   border-radius:50% !important; cursor:pointer
 }
 .d41-dot.on{box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--ink-3)}
-.d41-tools{
-  flex:0 0 auto; display:flex; align-items:center; justify-content:center; gap:28px;
-  padding:8px 16px 16px; border-top:1px solid var(--line); background:var(--surface)
+/* v44: 그리기 도크 — 펜·형광펜·지우개 아이콘 */
+.d41-prow-pens{padding:2px 0}
+.d41-pens{display:flex; align-items:center; gap:8px; flex:1 1 auto}
+.d41-pens-gap{flex:1 1 auto}
+.d41-penb{
+  width:40px; height:40px; display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--line) !important; border-radius:10px !important;
+  background:var(--surface); color:var(--ink); cursor:pointer; padding:0
 }
-.d41-tool{
-  width:46px; height:46px; display:flex; align-items:center; justify-content:center;
-  border:0 !important; border-radius:12px !important; background:none; color:var(--ink);
-  font-family:inherit; font-size:20px; font-weight:800; cursor:pointer
+.d41-penb svg{width:20px; height:20px}
+.d41-penb.on{background:var(--ink); color:var(--bg); border-color:var(--ink) !important}
+.d41-penb-clear{color:#B4564E}
+/* v44: 고른 그림의 × 지우기 단추 (점선 테두리 왼쪽 위) */
+#sheet .d41-penx{display:flex !important; top:0; left:0; z-index:6}
+/* v44: 글씨 도구 — 정렬·B·S·U·색 동그라미 / − 크기 + 두 줄 */
+.d41-tbar{display:flex; align-items:center; gap:8px; flex:1 1 auto}
+.d41-tbar-gap{flex:1 1 auto}
+.d41-tb{
+  min-width:36px; height:34px; padding:0 8px; display:flex; align-items:center; justify-content:center;
+  border:0 !important; border-radius:8px !important; background:none; color:var(--ink);
+  font-family:inherit; font-size:14px; font-weight:700; cursor:pointer
 }
-.d41-tool.on{background:var(--surface-2)}
-.d41-tool svg{width:22px; height:22px}
-.d41-tool-t{font-size:19px; font-weight:800; letter-spacing:-.03em; padding-bottom:2px}
+.d41-tb.on{background:var(--surface-2); color:var(--ink)}
+.d41-tb svg{width:18px; height:18px}
+.d41-tb-s{text-decoration:line-through}
+.d41-tb-u{text-decoration:underline}
+.d41-tc{
+  width:30px; height:30px; padding:0; border:2px solid var(--surface) !important;
+  border-radius:50% !important; cursor:pointer;
+  box-shadow:0 0 0 1px rgba(120,120,130,.45)
+}
+.d41-tc.on{box-shadow:0 0 0 2px var(--surface), 0 0 0 3.5px var(--ink)}
+.d41-prow-t{padding:2px 0}
+.d41-prow-cp{padding:0 0 2px}
+.d41-prow-cp .d41-dots{flex:1 1 auto; justify-content:flex-start}
 
 /* ==========================================================================
    v41 — 날짜(챕터) 댓글: 사진마다 카드 대신 그날 사진 전체에 «한 칸»
@@ -2332,12 +2377,11 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 #s-diary .lchip.active i{background:var(--point-ink, var(--bg))}
 #s-diary .segs .seg-btn.active{background:var(--point, var(--ink)); border-color:var(--point, var(--ink)); color:var(--point-ink, var(--bg)); box-shadow:none}
 .d41-new{background:var(--point, var(--ink)); color:var(--point-ink, var(--bg))}
-.d41-save{background:var(--point, var(--ink)); color:var(--point-ink, var(--bg))}
 .dg-moren{background:rgba(20,20,22,.62)}
 .cmt-send,.dcmt-day .cmt-send{background:var(--point, var(--ink)); color:var(--point-ink, var(--bg))}
 html[data-mode="dark"] .cmt-send{background:var(--point, #F2F2F4); color:var(--point-ink, #111111)}
 html[data-mode="dark"] .lchip.active{background:var(--point, #F2F2F4); color:var(--point-ink, #111111); border-color:var(--point, #F2F2F4)}
-html[data-mode="dark"] .d41-new,html[data-mode="dark"] .d41-save{background:var(--point, #F2F2F4); color:var(--point-ink, #111111)}
+html[data-mode="dark"] .d41-new{background:var(--point, #F2F2F4); color:var(--point-ink, #111111)}
 
 /* v42: 노트 카드 미리보기 — 5개까지, 넘치면 「+N개 더」 */
 .ncard .nc-items .nc-more{font-size:11px; font-weight:700; color:var(--ink-3); letter-spacing:-.01em; margin-top:6px}
@@ -2349,9 +2393,24 @@ html[data-mode="dark"] .d41-new,html[data-mode="dark"] .d41-save{background:var(
 /* 프로필 편집 버튼 앞에 각자 동그라미 프사 */
 #sheet .dday-prof{display:flex; align-items:center; justify-content:center; gap:7px}
 #sheet .dday-av{width:22px; height:22px; flex:0 0 auto; font-size:10px}
-#sheet .dday-row{display:flex; align-items:flex-end; gap:8px}
+/* v44 — 상단 문구 · 처음 만난 날 줄을 가운데로 맞춰요 (두 칸 폭을 같게 · 글자 가운데 정렬) */
+#sheet .dday-row{display:flex; align-items:flex-end; justify-content:center; gap:12px}
 #sheet .dday-row .f{margin:0; min-width:0}
-#sheet .dday-ph-f{flex:1 1 auto}
-#sheet .dday-since-f{flex:0 0 128px}
+#sheet .dday-ph-f{flex:1 1 0}
+#sheet .dday-since-f{flex:1 1 0}
+#sheet .dday-row .field{text-align:center; height:44px}
 /* 최대 14자가 한 번에 다 보이도록 문구 칸만 글씨를 살짝 줄여요 */
-#sheet .dday-ph-f .field{font-size:13px; padding:0 10px; letter-spacing:-.02em}
+#sheet .dday-ph-f .field{font-size:13px; padding:0 6px; letter-spacing:-.02em}
+/* v44: 상단 문구 라벨 옆 «최대 14자 · 남은 글자» — 쓰는 동안 줄어드는 숫자 */
+#sheet .dday-cnt{font-size:10.5px; font-weight:600; color:var(--ink-3); letter-spacing:-.01em; margin-left:4px}
+
+/* ==========================================================================
+   v44 — 프로필 생일 «년 / 월 / 일» 세 칸 고르기 (아이폰 날짜 팝업 대신)
+   ========================================================================== */
+#sheet .pr-bday-row{display:flex; gap:8px}
+#sheet .pr-bday-row select.field{flex:1 1 0; min-width:0; text-align:center;
+  background-position:right 8px center; padding-right:20px}
+#sheet .pr-bday-row select.field:focus{border-bottom-color:var(--ink)}
+/* v44: 닉네임 라벨은 «생일»·«컬러» 라벨과 맞먹게 크고 진하게, 글씨도 크게 */
+.pr-lbl{font-size:14px; font-weight:700; color:var(--ink); letter-spacing:-.01em}
+#sheet .pr-nm .field{font-size:20px; font-weight:700; height:44px}

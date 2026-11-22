@@ -1,6 +1,6 @@
 """투로그 v43 확인 — 모눈 다이어리 손보기.
 
-1) 버전: sw.js 캐시 twolog-v43 · APP_VERSION v43 · My 탭 「버전 v43」
+1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
 2) 글 상자
    - 종이를 톡 누르면 그 자리에 상자가 생기고 바로 입력(포커스)
    - 이미 있는 상자를 한 번 톡 누르면 «고르기»만 — 입력 포커스가 풀려(blur) 아이폰 키보드가 내려가고
@@ -175,9 +175,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v43", 'const VERSION = "twolog-v43"' in sw,
+    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v43", 'var APP_VERSION = "v43"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v42 문자열이 남아 있지 않음",
           "twolog-v42" not in sw and 'APP_VERSION = "v42"' not in app_js)
@@ -191,7 +191,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(900)
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v43」", ver.strip() == "버전 v43", ver)
+    check("My 탭 맨 위에 「버전 v44」", ver.strip() == "버전 v44", ver)
     tab(page, 0, 520)
 
     # ==================================================================
@@ -387,7 +387,7 @@ with sync_playwright() as p:
     # ==================================================================
     # 5. 저장 → 카드 → 다시 열기 (글·사진·폭 그대로)
     # ==================================================================
-    pageA.locator("#sheet .d41-save").click()
+    pageA.locator("#sheet .d41-back").click()
     pageA.wait_for_timeout(900)
     cardA = pageA.evaluate("""() => { const c = document.querySelector('#s-diary .d41-card');
       return c ? {date: (c.querySelector('.nmemo-date') || {}).textContent,
@@ -447,7 +447,7 @@ with sync_playwright() as p:
     pageB.wait_for_timeout(200)
     pageB.set_input_files("#d41ImgIn", [imgB])
     pageB.wait_for_timeout(1700)
-    pageB.locator("#sheet .d41-save").click()
+    pageB.locator("#sheet .d41-back").click()
     pageB.wait_for_timeout(1000)
     baseCard = pageB.evaluate("""() => { const c = document.querySelector('#s-diary .d41-card');
       return c ? {title: (c.querySelector('.nmemo-t') || {}).textContent,
@@ -457,9 +457,10 @@ with sync_playwright() as p:
           baseCard and "미정 탭 다이어리" == (baseCard["title"] or "")
           and "기본 카테고리에도" in (baseCard["body"] or "") and baseCard["thumbs"] == 1, baseCard)
     baseSaved = pageB.evaluate("""() => { const l = (window.__app.state.logs || [])[0] || {};
-      return {texts: (l.texts || []).length, imgs: (l.imgs || []).length, memo: l.memo || ''}; }""")
+      return {texts: (l.texts || []).length, imgs: (l.imgs || []).length, memo: l.memo || l.review || ''}; }""")
     check("기본 카테고리 저장값(S.logs)에 texts·imgs 가 들어 있음",
-          baseSaved["texts"] == 1 and baseSaved["imgs"] == 1 and "기본 카테고리에도" in (baseSaved["memo"] or ""), baseSaved)
+          baseSaved["texts"] == 1 and baseSaved["imgs"] == 1
+          and "기본 카테고리에도" in (baseSaved["memo"] or ""), baseSaved)
     pageB.reload(wait_until="networkidle")
     pageB.wait_for_timeout(900)
     tab(pageB, 2, 660)
@@ -535,9 +536,10 @@ with sync_playwright() as p:
     check("프로필 편집 버튼 앞에 각자 동그라미 프사 (2개, 왼쪽)",
           dd["avs"] == 2 and 18 <= dd["avSize"] <= 30
           and dd["btnFirst"] <= dd["avFirst"] <= dd["btnFirst"] + 40, dd)
-    check("「우리는」 대신 「상단 문구」 라벨", dd["labels"] == ["상단 문구", "처음 만난 날"]
+    check("「우리는」 대신 「상단 문구」 라벨", dd["labels"][0].startswith("상단 문구")
+          and dd["labels"][1] == "우리의 시작"
           and "우리는" not in (dd["text"] or ""), dd["labels"])
-    check("「상단 문구」(왼쪽)와 「처음 만난 날」(오른쪽)이 한 줄", dd["sameRow"] and dd["phLeft"], dd)
+    check("「상단 문구」(왼쪽)와 「우리의 시작」(오른쪽)이 한 줄", dd["sameRow"] and dd["phLeft"], dd)
     check("상단 문구 칸 maxlength=14", dd["maxlen"] == "14", dd["maxlen"])
     # 14자를 넣어도 칸 안에 다 보이는지 (지금 쓴 글자수가 맥스가 되도록 맞춘 레이아웃)
     pageE.fill('#sheetForm input[name="phrase"]', "준영이가 소영이 쫓아다닌지")
@@ -728,7 +730,7 @@ with sync_playwright() as p:
     pageD.wait_for_timeout(200)
     pageD.set_input_files("#d41ImgIn", [imgD])
     pageD.wait_for_timeout(1700)
-    pageD.locator("#sheet .d41-save").click()
+    pageD.locator("#sheet .d41-back").click()
     pageD.wait_for_timeout(2600)
     srv = pageD.evaluate("""() => { const row = (window.__stub.notes || []).filter(x => x.kind === 'log')[0];
       const p = row ? (row.payload || {}) : {};
@@ -752,7 +754,7 @@ with sync_playwright() as p:
     pageD.wait_for_timeout(340)
     pageD.keyboard.type("내 카테고리 글도 남아요")
     pageD.wait_for_timeout(240)
-    pageD.locator("#sheet .d41-save").click()
+    pageD.locator("#sheet .d41-back").click()
     pageD.wait_for_timeout(2600)
     srv2 = pageD.evaluate("""() => { const row = (window.__stub.notes || []).filter(x => x.kind === 'list')[0];
       const it = row ? ((row.payload || {}).items || [])[0] : null;
@@ -787,10 +789,9 @@ with sync_playwright() as p:
     pageD.locator('#s-set [data-act="personSheet"][data-who="you"]').click()
     pageD.wait_for_timeout(600)
     prof0 = pageD.evaluate("""() => { const sh = document.querySelector('#sheet');
-      const b = sh.querySelector('input[name=bday]');
+      const b = sh.querySelector('.pr-bday-row');
       const n = sh.querySelector('input[name=name]');
-      return {type: b ? b.getAttribute('type') : null, min: b ? b.getAttribute('min') : null,
-        max: b ? b.getAttribute('max') : null, val: b ? b.value : null,
+      return {sel3: !!(sh.querySelector('select.pr-bday-y') && sh.querySelector('select.pr-bday-m') && sh.querySelector('select.pr-bday-d')),
         note: (sh.querySelector('.pr-note') || {}).textContent || '',
         belowName: (() => { if (!b || !n) return false;
           const rn = n.getBoundingClientRect(), rb = b.getBoundingClientRect();
@@ -800,8 +801,10 @@ with sync_playwright() as p:
     check("상대 프로필 시트 — 컬러 동그라미 한 줄", prof0["sws"] == 12 and prof0["colorLbl"] == 1, prof0)
     check("상대 프로필 시트 — 닉네임 아래 「프로필은 상대방이 직접 설정할 수 있어요」 안내",
           "프로필은 상대방이 직접 설정할 수 있어요" in (prof0["note"] or "") and prof0["belowName"], prof0)
-    check("생일 칸이 type=date (연·월·일 모두 고름)", prof0["type"] == "date" and prof0["min"] == "1900-01-01", prof0)
-    pageD.fill('#sheet input[name="bday"]', "1996-03-09")
+    check("생일 칸은 «년/월/일» 세 고르기 (연·월·일 모두 고름)", prof0["sel3"] and prof0["belowName"], prof0)
+    pageD.select_option('#sheet select.pr-bday-y', '1996')
+    pageD.select_option('#sheet select.pr-bday-m', '3')
+    pageD.select_option('#sheet select.pr-bday-d', '9')
     pageD.wait_for_timeout(250)
     hintNow = pageD.evaluate("(document.getElementById('prBdayTxt') || {}).textContent || ''")
     check("날짜를 고르면 연·월·일이 그 자리에 보임", "1996년 3월 9일" in hintNow, hintNow)

@@ -478,7 +478,9 @@
       x.texts = o.texts.filter(function (t) { return t && String(t.text || "").trim(); }).map(function (t) {
         return { id: String(t.id || ""), x: Number(t.x) || 0, y: Number(t.y) || 0,
           text: String(t.text || ""), size: Number(t.size) || 16.5,
-          color: String(t.color || ""), align: t.align === "center" ? "center" : "left" };
+          color: String(t.color || ""),
+          bold: t.bold ? 1 : 0, strike: t.strike ? 1 : 0, underline: t.underline ? 1 : 0,
+          align: t.align === "center" ? "center" : (t.align === "right" ? "right" : "left") };
       });
     }
     if (Array.isArray(o.imgs) && o.imgs.length) {
@@ -541,7 +543,9 @@
             x.texts = it.texts.filter(function (t) { return t && String(t.text || "").trim(); }).map(function (t) {
               return { id: String(t.id || ""), x: Number(t.x) || 0, y: Number(t.y) || 0,
                 text: String(t.text || ""), size: Number(t.size) || 16.5,
-                color: String(t.color || ""), align: t.align === "center" ? "center" : "left" };
+                color: String(t.color || ""),
+                bold: t.bold ? 1 : 0, strike: t.strike ? 1 : 0, underline: t.underline ? 1 : 0,
+                align: t.align === "center" ? "center" : (t.align === "right" ? "right" : "left") };
             });
           }
           if (Array.isArray(it.imgs) && it.imgs.length) {
@@ -749,7 +753,9 @@
                 x.texts = it.texts.filter(function (t) { return t && String(t.text || "").trim(); }).map(function (t) {
                   return { id: String(t.id || ""), x: Number(t.x) || 0, y: Number(t.y) || 0,
                     text: String(t.text || ""), size: Number(t.size) || 16.5,
-                    color: String(t.color || ""), align: t.align === "center" ? "center" : "left" };
+                    color: String(t.color || ""),
+                    bold: t.bold ? 1 : 0, strike: t.strike ? 1 : 0, underline: t.underline ? 1 : 0,
+                    align: t.align === "center" ? "center" : (t.align === "right" ? "right" : "left") };
                 });
               }
               if (Array.isArray(it.imgs) && it.imgs.length) {
@@ -1050,14 +1056,26 @@
         client.from("photos").select("*").eq("couple_id", cid),
         client.from("settings").select("*").eq("couple_id", cid)
       ]).then(function (parts) {
-        parts.forEach(function (r) { if (r.error) warn("load table failed", r.error); });
-        var doc = rowsToState(couple, parts[0].data || [], parts[1].data || [], parts[2].data || [], parts[3].data || [], !!self.swap);
+        /* v44: 표를 읽다가 하나라도 실패하면(아이폰의 순간 네트워크 끊김 등) 빈 배열로 이어 가지 않고
+           여기서 멈춥니다 — 실패한 재읽기는 현재 화면 상태(S)도 서버 앞면(self.prev)도 덮어쓰지 않고,
+           scheduleReload · pullNow · store.load 가 각자 잡아서(다시 시도·오프라인 표시·캐시로 열기) 넘어가요.
+           (예전에는 warn 만 하고 data||[] 로 doc 을 만들어 홈·사진·노트 화면을 통째로 지웠습니다) */
+        var names = ["events", "notes", "photos", "settings"];
+        for (var i = 0; i < parts.length; i++) {
+          var r = parts[i];
+          if (!r || r.error || !Array.isArray(r.data)) {
+            var lerr = (r && r.error) || new Error("load table failed: " + names[i]);
+            warn("load table failed", lerr);
+            throw lerr;
+          }
+        }
+        var doc = rowsToState(couple, parts[0].data, parts[1].data, parts[2].data, parts[3].data, !!self.swap);
         self.prev = {
           couple: JSON.parse(JSON.stringify(couple)),
-          events: index(parts[0].data || []),
-          notes: index(parts[1].data || []),
-          photos: index(parts[2].data || []),
-          settings: index(parts[3].data || [])
+          events: index(parts[0].data),
+          notes: index(parts[1].data),
+          photos: index(parts[2].data),
+          settings: index(parts[3].data)
         };
         return doc;
       });

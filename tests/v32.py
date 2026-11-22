@@ -4,7 +4,7 @@
 칠했습니다. v32 부터는 달력 칸 안의 일정 막대 글씨만 배경과 상관없이 항상
 #FFFFFF(rgb(255, 255, 255))입니다.
 
-1) 버전: sw.js 캐시 twolog-v43 · APP_VERSION v43 · My 탭 「버전 v43」
+1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
 2) 코드: app.js 의 .ebar 렌더가 color:#FFFFFF 고정, styles.css 의 .ebar 도 흰색
 3) 밝은 일정(#E8D48B · #D8C7B8 · #BFD4DB)과 어두운 일정(#3D5C82 · #625A7F · #111111)
    모두 달력 막대 글씨가 rgb(255, 255, 255) — 여러 칸에 걸친 막대도 같음
@@ -138,14 +138,14 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check("sw.js 캐시 버전 twolog-v43", 'const VERSION = "twolog-v43"' in sw,
+    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v43", 'var APP_VERSION = "v43"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     # .ebar 렌더 줄이 흰색 고정인지 (inkOn(edge) 가 사라졌는지)
     ebar_line = [l for l in app_js.splitlines() if 'class=\\"ebar' in l or "class=\"ebar" in l]
     hold = app_js.split('var mid = b.eCol > b.sCol')[1][:600]
-    check("app.js: .ebar 인라인 style 이 color:#FFFFFF 고정", '"; color:#FFFFFF" + \'">\'' in hold, hold[:220])
+    check("app.js: .ebar 인라인 style 이 color:#FFFFFF 고정", '"; color:#FFFFFF"' in hold, hold[:220])
     check("app.js: .ebar 렌더에 inkOn(edge) 가 더 이상 없음", "inkOn(edge)" not in app_js, "inkOn(edge) 발견")
     # v38: 노트 카드 제목은 띠 색과 상관없이 늘 검정 — inkOn 은 홈 섹션 제목 줄에서만 씁니다
     check("app.js: inkOn 은 홈 섹션 제목 줄에서 그대로",
@@ -301,7 +301,7 @@ with sync_playwright() as p:
                            " return !!el && el.classList.contains('active') && el.innerText.trim().length > 0; }", sid)
         check("%s 화면이 정상으로 뜸" % name, bool(ok), sid)
     ver = page.inner_text("#s-set .app-ver")
-    check("My 맨 위 버전 표시가 v36", "v43" in ver, ver)
+    check("My 맨 위 버전 표시가 v44", "v44" in ver, ver)
     page.screenshot(path=os.path.join(SHOT, "my-v32.png"))
     check("콘솔/페이지 오류 없음", len(errs) == 0, errs[:4])
     ctx.close()

@@ -1,6 +1,6 @@
 """투로그 v41 확인 — 모눈 메모가 «모눈종이 풀스크린 다이어리»로 바뀐 것 + + 시트 문구 정리.
 
-1) 버전: sw.js 캐시 twolog-v43 · APP_VERSION v43 · My 탭 「버전 v43」
+1) 버전: sw.js 캐시 twolog-v44 · APP_VERSION v44 · My 탭 「버전 v44」
 2) + 시트 문구 정리
    - 고른 카테고리 아래 패널 제목은 「속지 · 이름」 (「속지 레이아웃」 아님)
    - 기본 카테고리(메모·버킷리스트·영화·먹방)의 배지와 첫 선택지도 「투두리스트」
@@ -173,6 +173,7 @@ def editor(page):
               full: document.getElementById('sheetWrap').classList.contains('sheet-full'),
               back: !!q('#sheet .d41-back'),
               save: (q('#sheet .d41-save') || {}).textContent,
+              noSave: !q('#sheet .d41-save'),
               titlePh: (q('#sheet .d41-title') || {}).placeholder,
               date: (q('#d41DateBig') || {}).textContent,
               dateVal: (q('#sheet input[name=date]') || {}).value,
@@ -207,9 +208,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v43", 'const VERSION = "twolog-v43"' in sw,
+    check("sw.js 캐시 버전 twolog-v44", 'const VERSION = "twolog-v44"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v43", 'var APP_VERSION = "v43"' in app_js,
+    check("app.js 버전 상수 v44", 'var APP_VERSION = "v44"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -222,7 +223,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v43」", ver.strip() == "버전 v43", ver)
+    check("My 탭 맨 위에 「버전 v44」", ver.strip() == "버전 v44", ver)
 
     # ==================================================================
     # 2. + 시트 문구 — 「속지」 · 기본 카테고리도 「투두리스트」
@@ -312,7 +313,7 @@ with sync_playwright() as p:
     stamp = "%d.%02d %s" % (d.tm_mon, d.tm_mday, ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"][d.tm_wday])
     check("새 다이어리는 화면을 꽉 채움", ed["open"] and ed["full"] and ed["h"] >= int(ed["vh"] * 0.98),
           (ed["h"], ed["vh"]))
-    check("위에 ‹ 뒤로 · 가운데 「새 다이어리」 · 저장", ed["back"] and ed["save"] == "저장"
+    check("위에 ‹ 뒤로 · 가운데 「새 다이어리」 · «저장» 단추는 없음(나가면 자동 저장)", ed["back"] and ed["noSave"]
           and ed["titlePh"] == "새 다이어리", (ed["back"], ed["save"], ed["titlePh"]))
     check("큰 날짜는 「11.21 SAT」 꼴", ed["date"] == stamp, (ed["date"], stamp))
     check("날짜 줄을 눌러 바꿀 수 있는 날짜 칸이 있음",
@@ -335,40 +336,45 @@ with sync_playwright() as p:
     page.wait_for_timeout(300)
     tp = page.evaluate("""() => ({
       open: !document.getElementById('d41Panel').hidden,
-      sizes: [...document.querySelectorAll('#sheet .d41-pb[data-act=d41Size]')].map(b => b.textContent),
-      range: !!document.querySelector('#sheet #d41SizeRange'),
-      rminmax: (() => { const r = document.querySelector('#sheet #d41SizeRange');
-        return r ? [r.getAttribute('min'), r.getAttribute('max')] : null; })(),
-      colors: document.querySelectorAll('#sheet .d41-dot[data-act=d41Color]').length,
-      aligns: [...document.querySelectorAll('#sheet .d41-pb[data-act=d41Align]')].map(b => b.textContent)})""")
-    check("T 를 누르면 글씨 크기(작게·보통·크게)·색·정렬 칸이 열림",
-          tp["open"] and tp["sizes"] == ["작게", "보통", "크게"] and tp["colors"] >= 4
-          and tp["aligns"] == ["왼쪽", "가운데"], tp)
-    check("크기 옆에 가로 슬라이더(12~40)", tp["range"] and tp["rminmax"] == ["12", "40"], tp["rminmax"])
+      align: !!document.querySelector('#sheet .d41-tb[data-act=d41Align]'),
+      b: !!document.querySelector('#sheet .d41-tb[data-act=d41Bold]'),
+      s: !!document.querySelector('#sheet .d41-tb[data-act=d41Strike]'),
+      u: !!document.querySelector('#sheet .d41-tb[data-act=d41Underline]'),
+      tc: !!document.querySelector('#sheet .d41-tc[data-act=d41ColorPick]'),
+      minus: !!document.querySelector('#sheet [data-act=d41SizeStep][data-d="-1"]'),
+      plus: !!document.querySelector('#sheet [data-act=d41SizeStep][data-d="1"]'),
+      pv: (document.querySelector('#sheet .d41-pv') || {}).textContent || ''})""")
+    check("T 를 누르면 새 글 상자와 함께 글씨 도구 두 줄(정렬·B·S·U·색 / − 크기 +)이 열림",
+          tp["open"] and tp["align"] and tp["b"] and tp["s"] and tp["u"] and tp["tc"]
+          and tp["minus"] and tp["plus"], tp)
 
-    box = page.locator("#d41Paper").bounding_box()
-    page.mouse.click(box["x"] + 70, box["y"] + 230)
-    page.wait_for_timeout(400)
     page.keyboard.type("아침에 창문을 열었더니 바람이 차가웠다")
     page.wait_for_timeout(300)
     t1 = page.evaluate("""() => { const t = JSON.parse(document.getElementById('d41TextsIn').value)[0] || {};
       return {n: document.querySelectorAll('#sheet .d41-tx').length, x: t.x, y: t.y, text: t.text}; }""")
-    check("종이를 누른 자리에 글 상자가 생기고 그 자리에서 바로 써짐",
+    check("T 로 만든 글 상자에 바로 써짐",
           t1["n"] == 1 and 0 < t1["x"] < 1 and t1["y"] > 0 and "바람이 차가웠다" in (t1["text"] or ""), t1)
 
-    page.locator("#sheet .d41-pb[data-act=d41Align][data-align='center']").click()
-    page.wait_for_timeout(220)
+    page.locator("#sheet .d41-tb[data-act=d41Align]").click()
+    page.wait_for_timeout(180)
+    page.locator("#sheet .d41-tb[data-act=d41Bold]").click()
+    page.wait_for_timeout(180)
+    page.locator("#sheet .d41-tc[data-act=d41ColorPick]").click()
+    page.wait_for_timeout(180)
     page.locator("#sheet .d41-dot[data-act=d41Color]").nth(2).click()
-    page.wait_for_timeout(220)
-    page.evaluate("""() => { const r = document.getElementById('d41SizeRange'); r.value = 24;
-      r.dispatchEvent(new Event('input', {bubbles: true})); }""")
+    page.wait_for_timeout(180)
+    page.locator("#sheet [data-act=d41SizeStep][data-d='1']").click()
+    page.locator("#sheet [data-act=d41SizeStep][data-d='1']").click()
+    page.locator("#sheet [data-act=d41SizeStep][data-d='1']").click()
     page.wait_for_timeout(280)
     sty = page.evaluate("""() => { const t = JSON.parse(document.getElementById('d41TextsIn').value)[0];
       const el = document.querySelector('#sheet .d41-tx');
-      return {size: t.size, align: t.align, color: t.color,
-              fs: getComputedStyle(el).fontSize, ta: getComputedStyle(el).textAlign}; }""")
-    check("슬라이더로 고른 크기·색·정렬이 그 글 상자에 바로 반영",
-          sty["size"] == 24 and sty["fs"] == "24px" and sty["ta"] == "center" and sty["color"] != "", sty)
+      return {size: t.size, align: t.align, color: t.color, bold: t.bold,
+              fs: Math.round(parseFloat(getComputedStyle(el).fontSize)),
+              ta: getComputedStyle(el).textAlign, fw: getComputedStyle(el).fontWeight}; }""")
+    check("정렬(가운데)·굵게·색·−+ 크기가 그 글 상자에 바로 반영",
+          sty["size"] == 20 and sty["fs"] == 20 and sty["ta"] == "center"
+          and sty["color"] != "" and sty["bold"] == 1 and sty["fw"] in ("700", "bold"), sty)
     page.screenshot(path=os.path.join(SHOT, "note-v41-diary-editor.png"))
 
     # ==================================================================
@@ -458,9 +464,12 @@ with sync_playwright() as p:
     page.locator("#sheet .d41-tool[aria-label='펜 그리기']").click()
     page.wait_for_timeout(300)
     pen_on = page.evaluate("""() => ({on: document.getElementById('d41Pen').classList.contains('on'),
-      panel: [...document.querySelectorAll('#sheet .d41-pb')].map(b => b.textContent)})""")
-    check("펜을 누르면 그리기 칸(펜·지우개·되돌리기·전체 지우기)이 열림",
-          pen_on["on"] and "지우개" in pen_on["panel"] and "되돌리기" in pen_on["panel"], pen_on["panel"])
+      panel: [...document.querySelectorAll('#sheet .d41-pb')].map(b => b.textContent),
+      pens: [...document.querySelectorAll('#sheet .d41-penb')].map(b => b.getAttribute('aria-label'))})""")
+    check("펜을 누르면 그리기 도크(펜·형광펜·지우개·전체 지우기)가 열리고 되돌리기는 상단 바로",
+          pen_on["on"] and pen_on["pens"][:3] == ["펜", "형광펜", "지우개"]
+          and "전체 지우기" in pen_on["pens"]
+          and page.evaluate("!!document.getElementById('d41UndoBtn')"), pen_on["pens"])
     box = page.locator("#d41Paper").bounding_box()
     sx, sy = box["x"] + 70, box["y"] + 520
 
@@ -481,9 +490,9 @@ with sync_playwright() as p:
     check("그림 좌표는 폭 기준 (0~1 비율 · 아래로는 종이 길이만큼)",
           len(pts) >= 4 and all(0 <= pts[i] <= 1 for i in range(0, len(pts), 2))
           and all(pts[i] >= 0 for i in range(1, len(pts), 2)), pts[:6])
-    page.locator("#sheet .d41-pb[data-act=d41Undo]").click()
+    page.locator("#d41UndoBtn").click()
     page.wait_for_timeout(300)
-    check("되돌리기로 마지막 선이 지워짐",
+    check("되돌리기(상단 ↶)로 마지막 선이 지워짐",
           page.evaluate("document.querySelectorAll('#d41Pen path').length") == 0)
     draw()
     page.screenshot(path=os.path.join(SHOT, "_p41-test-pen.png"))
@@ -492,7 +501,7 @@ with sync_playwright() as p:
     # 8. 저장 — 카드에 반영 · 다시 열어 이어 쓰기
     # ==================================================================
     page.fill("#sheet .d41-title", "비 오는 목요일")
-    page.locator("#sheet .d41-save").click()
+    page.locator("#sheet .d41-back").click()
     page.wait_for_timeout(900)
     card = page.evaluate("""() => { const c = document.querySelector('#s-diary .d41-card');
       return c ? {date: (c.querySelector('.nmemo-date') || {}).textContent,
@@ -525,6 +534,17 @@ with sync_playwright() as p:
     page.screenshot(path=os.path.join(SHOT, "_p41-test-reopen.png"))
 
     # 이어 쓰기 · 사진 한 장 삭제
+    # v44: 이미 쓴 다이어리는 보기(스크롤)로 열리고, 종이를 한 번 누르면 고치기로 바뀜
+    vEdit = page.evaluate("""() => ({editing: window.TwoLogUI && !!document.querySelector('#sheet .d41-txt[contenteditable="false"]'),
+      toolsHidden: document.querySelector('#sheet .d41-tools').hidden})""")
+    check("다시 열면 보기(스크롤) 모드 — 글 상자는 고칠 수 없고 도구 바는 숨음",
+          vEdit["editing"] and vEdit["toolsHidden"], vEdit)
+    page.locator("#d41Paper").click()
+    page.wait_for_timeout(360)
+    vEdit2 = page.evaluate("""() => ({editable: document.querySelector('#sheet .d41-txt[contenteditable="true"]') !== null,
+      toolsShown: !document.querySelector('#sheet .d41-tools').hidden})""")
+    check("종이를 한 번 누르면 고치기로 바뀌어요 (도구 바가 나타남)",
+          vEdit2["editable"] and vEdit2["toolsShown"], vEdit2)
     # v43: 한 번 누르면 «고르기»만 — 한 번 더 톡 누르면 입력(키보드)
     page.locator("#sheet .d41-tx .d41-txt").first.click()
     page.wait_for_timeout(60)
@@ -538,7 +558,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(300)
     page.locator("#sheet .d41-imgb.sel .d41-imgx").first.click()
     page.wait_for_timeout(400)
-    page.locator("#sheet .d41-save").click()
+    page.locator("#sheet .d41-back").click()
     page.wait_for_timeout(800)
     edited = state_list(page, "주말 기록")["items"][0]
     check("다시 열어 고친 글·지운 사진이 저장됨",
@@ -960,7 +980,7 @@ with sync_playwright() as p:
     page3.wait_for_timeout(300)
     page3.keyboard.type("두 폰에서 같이 보이는 기록.")
     page3.wait_for_timeout(200)
-    page3.locator("#sheet .d41-save").click()
+    page3.locator("#sheet .d41-back").click()
     page3.wait_for_timeout(2400)
     srv = page3.evaluate("""() => { const row = (window.__stub.notes || []).filter(x => x.kind === 'list')[0];
       const it = row ? (row.payload.items || []).filter(i => i.text === '서버로 가는 다이어리')[0] : null;

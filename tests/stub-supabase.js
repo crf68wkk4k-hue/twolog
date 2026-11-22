@@ -81,6 +81,11 @@ class Query {
     if (window.__STUB_SCHEMA_MISSING) {
       return err("Could not find the table 'public." + this.table + "' in the schema cache");
     }
+    /* v44 테스트: window.__STUB_FAIL_TABLE 을 정해 두면 그 표 «읽기»가 실패합니다
+       (아이폰의 순간 네트워크 끊김을 재현 — 실패한 load 가 화면을 지우지 않는지 보려고) */
+    if (window.__STUB_FAIL_TABLE && this.kind === "select" && this.table === window.__STUB_FAIL_TABLE) {
+      return err("network hiccup: " + this.table);
+    }
     const rows = this.table_rows();
     if (this.kind === "select") {
       const hit = rows.filter((r) => this.match(r));
