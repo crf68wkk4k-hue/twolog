@@ -1,6 +1,6 @@
 """투로그 v42 확인 — 「기념일 & 생일」 시트 정리 + 프로필 편집에서 생일 고치기.
 
-1) 버전: sw.js 캐시 twolog-v48 · APP_VERSION v48 · My 탭 「버전 v48」
+1) 버전: sw.js 캐시 twolog-v49 · APP_VERSION v49 · My 탭 「버전 v49」
 2) 기념일 & 생일 시트 (홈 D-day 카드를 눌러 열기)
    - 「홈 D-day 위에 이 문구가 그대로 보여요.」 안내 문구가 사라짐
    - 아래쪽 생일 달력 입력칸(.bd-in.js-bday) 두 개가 사라짐 · 「고른 생일은 바로 위에 …」 안내도 사라짐
@@ -129,9 +129,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v48", 'const VERSION = "twolog-v48"' in sw,
+    check("sw.js 캐시 버전 twolog-v49", 'const VERSION = "twolog-v49"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v48", 'var APP_VERSION = "v48"' in app_js,
+    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -144,7 +144,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v48」", ver.strip() == "버전 v48", ver)
+    check("My 탭 맨 위에 「버전 v49」", ver.strip() == "버전 v49", ver)
 
     tab(page, 0, 520)
 
@@ -506,17 +506,20 @@ with sync_playwright() as p:
       const top = document.querySelector('#sheet .d41-top').getBoundingClientRect();
       const tools = document.querySelector('#sheet .d41-tools').getBoundingClientRect();
       const paper = document.getElementById('d41Paper').getBoundingClientRect();
+      const back = document.querySelector('#sheet .d41-back').getBoundingClientRect();
       const date = document.querySelector('#sheet .d41-date');
       const cs = getComputedStyle(document.getElementById('d41Paper'));
-      return {topBottom: Math.round(top.bottom), toolsTop: Math.round(tools.top),
+      return {topTop: Math.round(back.top), topBottom: Math.round(top.bottom), toolsTop: Math.round(tools.top),
         toolsBottom: Math.round(tools.bottom), paperTop: Math.round(paper.top),
               dateInPaper: !!date && date.parentElement.id === 'd41Paper',
               grid: cs.backgroundImage.indexOf('linear-gradient') >= 0,
               paperH: Math.round(paper.height),
               canvasH: Math.round(document.getElementById('d41Canvas').clientHeight)};}""")
-    check("모눈종이가 화면 맨 위(0)까지 깔리고 위 줄·도구 줄은 그 위에 떠 있음 (v48)",
+    # v49: 도구 줄이 위 줄(‹ 뒤로)과 «같은 줄»로 올라가 한 줄이 됐어요 (예전엔 위 줄 아래였습니다)
+    check("모눈종이가 화면 맨 위(0)까지 깔리고 위 줄·도구 줄은 그 위에 떠 있음 (v49)",
           geo4["paperTop"] == 0 and geo4["grid"]
-          and geo4["toolsTop"] >= geo4["topBottom"] - 1, geo4)
+          and abs(geo4["toolsTop"] - geo4["topTop"]) <= 1
+          and geo4["toolsBottom"] <= geo4["topBottom"] + 2, geo4)
     check("큰 날짜도 모눈 위에 얹혀 있음", geo4["dateInPaper"], geo4["dateInPaper"])
     check("종이는 화면 한 장을 채움", geo4["paperH"] >= geo4["canvasH"] - 6, (geo4["paperH"], geo4["canvasH"]))
 

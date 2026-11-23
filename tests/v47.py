@@ -1,6 +1,6 @@
 """투로그 v47 확인 — 모눈 다이어리 손보기 세 가지.
 
-1) 버전: sw.js 캐시 twolog-v48 · APP_VERSION v48 · My 탭 「버전 v48」
+1) 버전: sw.js 캐시 twolog-v49 · APP_VERSION v49 · My 탭 「버전 v49」
 2) ↶ 되돌리기 · ↷ 다시 실행 아이콘을 크게 — 단추 44px · 그림 27px · 획 2.05
    (v46 은 34px·19px 이었어요 — 펜/T/사진 46px·22px 보다도 조금 크게)
 3) 보기 화면은 «풀 사이즈» — 이미 쓴 다이어리를 열면 도구 줄·도구 판이 완전히 사라지고
@@ -315,9 +315,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check('sw.js 캐시 버전 twolog-v48', 'const VERSION = "twolog-v48"' in sw,
+    check('sw.js 캐시 버전 twolog-v49', 'const VERSION = "twolog-v49"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v48", 'var APP_VERSION = "v48"' in app_js,
+    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v46 문자열이 남아 있지 않음",
           "twolog-v46" not in sw and 'APP_VERSION = "v46"' not in app_js)
@@ -330,7 +330,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(900)
     tab(page, 4, 620)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v48」", ver.strip() == "버전 v48", ver)
+    check("My 탭 맨 위에 「버전 v49」", ver.strip() == "버전 v49", ver)
 
     tab(page, 2, 700)
     page.locator("#s-diary .lchip", has_text="그림판").first.click()
@@ -513,7 +513,7 @@ with sync_playwright() as p:
           (not vm["editing"]) and vm["viewClass"], (vm["editing"], vm["viewClass"]))
     check("도구 줄이 «완전히» 숨겨져 자리를 차지하지 않음 (display:none · 높이 0)",
           vm["toolsHidden"] and not vm["toolsShown"] and vm["toolsH"] == 0, (vm["toolsH"], vm["toolsShown"]))
-    check("도구 판도 숨김 · 모눈종이가 화면 맨 위(0)까지 깔려 화면을 꽉 채움 (v48)",
+    check("도구 판도 숨김 · 모눈종이가 화면 맨 위(0)까지 깔려 화면을 꽉 채움 (v49)",
           (not vm["panelShown"]) and vm["canvasTop"] == vm["paperTop"] == vm["headerTop"] == 0
           and vm["canvasH"] >= 500, (vm["canvasTop"], vm["paperTop"], vm["canvasH"]))
     page.screenshot(path=os.path.join(SHOT, "diary-v47-view.png"))

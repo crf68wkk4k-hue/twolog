@@ -2051,10 +2051,11 @@ html[data-mode="dark"] .d41-empty{background:rgba(29,29,32,.7)}
 /* ---- 화면을 꽉 채우는 모눈 다이어리 ---- */
 .sheet-wrap.sheet-full .sheet.d41sheet{padding:0 !important; overflow:hidden; border-radius:0 !important; background:var(--surface)}
 /* v48: 모눈종이가 화면 맨 위(모서리)까지 — 위 줄(‹ 뒤로)과 도구 줄은 모눈 위에 떠 있고,
-   글·사진·그림은 --d41-hd(위 줄+도구 줄) 아래부터 놓여요 */
+   글·사진·그림은 --d41-hd(위 줄+도구 줄) 아래부터 놓여요
+   v49: 도구 줄을 ‹ 뒤로와 «같은 줄»로 올려 위 줄 하나로 합쳤어요 — 머리 높이도 한 단계 위로(56px) */
 .d41{
   --d41-safe: env(safe-area-inset-top, 0px);
-  --d41-hd: calc(var(--d41-safe) + 108px);
+  --d41-hd: calc(var(--d41-safe) + 56px);
   position:relative; display:flex; flex-direction:column; flex:1 1 auto; height:100%; min-height:0;
   overflow:hidden; background:var(--surface)
 }
@@ -2068,7 +2069,9 @@ html[data-mode="dark"] .d41-empty{background:rgba(29,29,32,.7)}
 }
 .d41-back:active{background:rgba(0,0,0,.05)}
 html[data-mode="dark"] .d41-back:active{background:rgba(255,255,255,.08)}
-.d41-back svg{width:22px; height:22px}
+/* v49: ‹ 뒤로 화살표는 한눈에 보이게 크게 (22 → 28px, 획도 또렷하게 2.2) */
+.d41-back svg{width:28px; height:28px}
+.d41-back svg path{stroke-width:2.2}
 /* v48: «새 다이어리» 제목 칸은 없앴어요 (예전 제목은 저장할 때 그대로 돌려줘요) */
 .d41-date{position:relative; flex:0 0 auto; padding:2px 20px 14px}
 .d41-dbig{font-size:27px; font-weight:800; letter-spacing:-.035em; color:var(--ink); font-variant-numeric:tabular-nums}
@@ -2125,10 +2128,14 @@ html[data-mode="dark"] .d41-imgsz{background:rgba(35,35,38,.94)}
 .d41-pen.on{pointer-events:auto; touch-action:none; cursor:crosshair}
 /* v48: 도구 줄은 모눈 위에 떠 있는 얇은 줄 — 아래 선 없이 아이콘만 (배경도 없어 모눈이 그대로 비쳐요) */
 .d41-tools{
-  position:absolute; left:0; right:0; top:calc(var(--d41-safe) + 52px); z-index:6;
-  display:flex; align-items:center; justify-content:flex-start; gap:8px;
-  padding:4px 10px 6px; background:none; pointer-events:none
+  position:absolute; left:52px; right:0; top:calc(var(--d41-safe) + 4px); z-index:6;
+  display:flex; align-items:center; flex-wrap:nowrap; justify-content:flex-start; gap:6px;
+  height:44px; padding:0 8px 0 0; background:none; pointer-events:none
 }
+/* v49: ‹ 뒤로(44px) 오른쪽 같은 줄에 ↶ ↷ · 펜 · T · 사진이 한 줄로 — 좁은 폭에서도 줄바꿈 없이
+   단추는 줄지 않게(44·46px 그대로) 해요 */
+.d41-tools .d41-ub{flex:0 0 44px}
+.d41-tools .d41-tool{flex:0 0 46px}
 .d41-tools > *{pointer-events:auto}
 /* v45: 도구(펜·T·사진)는 왼쪽, 되돌리기·다시 실행은 오른쪽 끝 */
 /* v46: ↶ ↷ 가 왼쪽 끝, 펜·T·사진이 오른쪽 — 사이를 이 간격이 벌려요 */

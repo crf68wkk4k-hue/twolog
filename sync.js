@@ -31,8 +31,10 @@
 
     supabaseModule: "https://esm.sh/@supabase/supabase-js@2.45.4", // 버전 고정
     photoBucket: "photos",
-    photoMaxDim: 1800,      // 업로드 전 긴 변 최대 px
-    photoQuality: 0.82,     // JPEG 품질
+    /* v49: 폰 화면·사진첩에 보이는 크기면 충분해요 — 압축·업로드 시간과 용량을 크게 줄임
+       (1800px·0.82 → 1200px·0.78) */
+    photoMaxDim: 1200,      // 업로드 전 긴 변 최대 px
+    photoQuality: 0.78,     // JPEG 품질
     key: "twolog:v1"
   };
 
@@ -1287,27 +1289,38 @@
     this.signed[path] = true;
   };
 
-  /* 사진: Storage 업로드 (비공개 버킷 + 서명 URL) */
+  /* 사진: Storage 업로드 (비공개 버킷 + 서명 URL)
+     v49: 올린 뒤 createSignedUrl 왕복을 기다리지 않고 방금 압축한 사진(blob)으로 바로 보여 줘요.
+     (앱을 다시 열면 photoUrls()가 서명 URL을 한 번에 받아 옵니다 — 화면에 보이는 결과는 같아요)
+     v49: 일시적인 네트워크 오류로 업로드가 실패하면 한 번 더 시도합니다. */
   SupabaseBackend.prototype.addPhoto = function (file, meta) {
     var self = this;
     return compressImage(file, CONFIG.photoMaxDim, CONFIG.photoQuality).then(function (res) {
       var id = randId() + randId();
       var path = self.couple.id + "/" + id + ".jpg";
-      return self.client.storage.from(CONFIG.photoBucket)
-        .upload(path, res.blob, { contentType: "image/jpeg", upsert: true })
-        .then(function (up) {
-          if (up.error) throw up.error;
-          return self.client.storage.from(CONFIG.photoBucket).createSignedUrl(path, 60 * 60 * 24 * 6).then(function (s) {
-            return {
-              photo: {
-                id: id, date: meta.date, album: meta.album, title: meta.title || "",
-                place: "", memo: "", art: 0, capBg: null, path: path
-              },
-              url: s && !s.error ? s.data.signedUrl : "",
-              blob: res.blob, width: res.width, height: res.height
-            };
-          });
+      var bucket = self.client.storage.from(CONFIG.photoBucket);
+      function put(attempt) {
+        return bucket.upload(path, res.blob, { contentType: "image/jpeg", upsert: true }).then(function (up) {
+          if (up && up.error) throw up.error;
+          return up;
+        }).catch(function (e) {
+          if (attempt >= 1) throw e;
+          warn("photo upload retry", e);
+          return new Promise(function (r) { setTimeout(r, 500); }).then(function () { return put(attempt + 1); });
         });
+      }
+      return put(0).then(function () {
+        var url = "";
+        try { url = URL.createObjectURL(res.blob); } catch (e) { url = ""; }
+        return {
+          photo: {
+            id: id, date: meta.date, album: meta.album, title: meta.title || "",
+            place: "", memo: "", art: 0, capBg: null, path: path
+          },
+          url: url,
+          blob: res.blob, width: res.width, height: res.height
+        };
+      });
     });
   };
 

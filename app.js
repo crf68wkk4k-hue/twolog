@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v48";
+  var APP_VERSION = "v49";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -2039,6 +2039,9 @@
 
   function viewList(l) {
     if (!l) return '<div class="list" style="margin:0 20px"><div class="empty">리스트를 찾을 수 없어요.</div></div>';
+    /* v49: 지출·정산은 «‹ 11월 ›» 머리부터 — 위 카테고리 칩과 같은 이름이 한 번 더 보이지 않게
+       제목 줄(.note-hd)을 없앴어요 (월 위에 있던 그 메모 타이틀이에요) */
+    if (listKindOf(l) === "expense") return viewListBody(l);
     /* v41: 카테고리 이름 옆에 붙던 속지 배지(모눈 메모·투두리스트…)는 없앴어요 */
     var h = '<div class="note-hd"><div class="nh-l"><span class="t">' + esc(listLabel(l)) + "</span></div></div>";
     return h + viewListBody(l);
@@ -2057,6 +2060,8 @@
   /* v39: 기본 카테고리를 속지로 보기(메모·버킷리스트·영화·먹방 탭에서 고른 경우) */
   function viewBasePage(k) {
     var kind = noteBaseKind(k) || "check";
+    /* v49: 기본 카테고리 » 지출·정산 화면도 월 머리부터 (카테고리 제목 줄 없음) */
+    if (kind === "expense") return viewListBody(baseContainer(k));
     return basePageHead(k, kind) + viewListBody(baseContainer(k));
   }
 
@@ -3564,9 +3569,12 @@
     }
     function live() {
       if (!liveEl) return;
+      /* v49: 그리는 «도중»에도 저장 좌표와 같은 머리 높이(d41Top)를 더해요 —
+         이게 빠져 있어서 손가락보다 위쪽에 선이 그려졌어요 (손을 떼면 d41Paint 가 제자리로) */
+      var T = d41Top();
       var d = "";
       for (var i = 0; i < cur.p.length; i += 2) {
-        d += (i ? "L" : "M") + (cur.p[i] * paper.clientWidth).toFixed(1) + " " + (cur.p[i + 1] * paper.clientWidth).toFixed(1);
+        d += (i ? "L" : "M") + (cur.p[i] * paper.clientWidth).toFixed(1) + " " + (cur.p[i + 1] * paper.clientWidth + T).toFixed(1);
       }
       liveEl.setAttribute("d", d);
     }
@@ -6088,20 +6096,17 @@
       p.album = albumName;
       if (typeof p.title !== "string") p.title = "";
     });
-    var chain = Promise.resolve();
-    seq.forEach(function (it) {
-      if (it.pid || !it.file) return;
-      chain = chain.then(function () {
-        return Store.photos.add(it.file, { album: albumName, date: day, title: "" }).then(function (res) {
-          var rec = res.photo;
-          rec.title = "";
-          if (res.url) PHOTO_URLS[rec.id] = res.url;
-          S.photos.push(rec);
-          it.newId = rec.id;
-        }).catch(function () {});
-      });
-    });
-    return chain.then(function () {
+    /* v49: 새로 더한 사진들도 3장씩 나란히 (한 장씩 기다리지 않게) — 순서는 아래에서 다시 세워요 */
+    var fresh = seq.filter(function (it) { return !it.pid && it.file; });
+    return runLimited(fresh, 3, function (it) {
+      return Store.photos.add(it.file, { album: albumName, date: day, title: "" }).then(function (res) {
+        var rec = res.photo;
+        rec.title = "";
+        if (res.url) PHOTO_URLS[rec.id] = res.url;
+        S.photos.push(rec);
+        it.newId = rec.id;
+      }).catch(function () {});
+    }).then(function () {
       /* 그날 사진만 보이는 순서대로 다시 세워요 */
       var order = seq.map(function (it) { return it.pid || it.newId; }).filter(Boolean);
       var daySet = {};
@@ -6122,32 +6127,62 @@
     });
   }
 
+  /* v49: 여러 개를 «몇 장씩 나란히» 처리하는 작은 도우미 — 사진을 한 장씩 기다리지 않게.
+     order 는 결과를 넘겨줄 때 원래 순서를 지키는 데 씁니다. */
+  function runLimited(list, limit, fn) {
+    var out = new Array(list.length), next = 0;
+    var lanes = Math.max(1, Math.min(limit || 1, list.length));
+    function worker() {
+      if (next >= list.length) return Promise.resolve();
+      var i = next++;
+      return fn(list[i], i).then(function (v) { out[i] = v; return worker(); });
+    }
+    var run = [];
+    for (var k = 0; k < lanes; k++) run.push(worker());
+    return Promise.all(run).then(function () { return out; });
+  }
+
   function addPhotoFiles(files, meta) {
     var total = files.length, done = 0, failed = 0;
     var bar = document.querySelector("#upBar i");
     var btn = sheet.querySelector(".btn-primary");
     if (btn) { btn.disabled = true; btn.textContent = "담는 중…"; }
-    var setBar = function () { if (bar) bar.style.width = Math.round((done + failed) / total * 100) + "%"; };
-    var chain = Promise.resolve();
-    files.forEach(function (f) {
-      chain = chain.then(function () {
-        return Store.photos.add(f, { album: meta.album, date: meta.date, title: meta.title }).then(function (res) {
-          var rec = res.photo;
-          rec.title = String(rec.title || meta.title || fileTitle(f.name) || "").trim();
-          if (res.url) PHOTO_URLS[rec.id] = res.url;
-          /* v40: 고른 순서 그대로 — 시트 맨 위(1번째) 사진이 사진첩에서도 맨 앞(대표) */
-          S.photos.splice(done, 0, rec);
-          done++;
-          setBar();
-          save();
-        }).catch(function (e) {
-          failed++;
-          setBar();
-          console.warn("[투로그] photo add failed", e);
-        });
+    var setBar = function () {
+      if (bar) bar.style.width = Math.round((done + failed) / total * 100) + "%";
+    };
+    /* v49: 3장씩 «나란히» 압축·업로드 — 예전에는 한 장씩 끝나야 다음 장을 시작해서 아주 느렸어요.
+       · 결과는 고른 순서 그대로 slots 에 담아 두었다가 마지막에 한 번에 S.photos 맨 앞에 넣어요
+       · 저장(save)은 장마다 하지 않고, 1장이 처음 담겼을 때 한 번 + 다 끝났을 때 한 번만
+         (장마다 부르면 그때마다 서버와 전체를 주고받느라 업로드가 더 느려졌어요) */
+    var saved = false;
+    var checkpoint = function () {
+      if (saved || !done) return;
+      saved = true;
+      save();
+    };
+    return runLimited(files, 3, function (f) {
+      return Store.photos.add(f, { album: meta.album, date: meta.date, title: meta.title }).then(function (res) {
+        var rec = res.photo;
+        rec.title = String(rec.title || meta.title || fileTitle(f.name) || "").trim();
+        done++;
+        setBar();
+        checkpoint();
+        return { rec: rec, url: res.url || "" };
+      }).catch(function (e) {
+        failed++;
+        setBar();
+        console.warn("[투로그] photo add failed", e);
+        return null;
       });
-    });
-    return chain.then(function () {
+    }).then(function (slots) {
+      /* v40: 고른 순서 그대로 — 시트 맨 위(1번째) 사진이 사진첩에서도 맨 앞(대표) */
+      var ok = (slots || []).filter(Boolean);
+      ok.forEach(function (s) { if (s.url) PHOTO_URLS[s.rec.id] = s.url; });
+      if (ok.length) {
+        S.photos.splice.apply(S.photos, [0, 0].concat(ok.map(function (s) { return s.rec; })));
+        saved = true;
+        save();
+      }
       closeSheet();
       if (current === "photo") renderPhoto();
       if (failed === 0) toast(done + "장을 담았어요");

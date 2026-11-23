@@ -1,6 +1,6 @@
 """투로그 v39 확인 — 카테고리마다 속지 고르기(+ 기본 카테고리도) · 사진 달력 아이폰식.
 
-1) 버전: sw.js 캐시 twolog-v48 · APP_VERSION v48 · My 탭 「버전 v48」
+1) 버전: sw.js 캐시 twolog-v49 · APP_VERSION v49 · My 탭 「버전 v49」
 2) + 시트 — 카테고리 줄마다 지금 속지 배지, 누르면 그 카테고리의 속지를 고치는 모드
    - 메모·버킷리스트·영화·먹방(기본)은 「카드」, 내가 만든 카테고리는 그 속지 이름
    - 줄을 누르면 .active · 제목 「속지 레이아웃 · 버킷리스트」 · 안내에 그 이름
@@ -190,9 +190,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v48", 'const VERSION = "twolog-v48"' in sw,
+    check("sw.js 캐시 버전 twolog-v49", 'const VERSION = "twolog-v49"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v48", 'var APP_VERSION = "v48"' in app_js,
+    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -205,7 +205,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v48」", ver.strip() == "버전 v48", ver)
+    check("My 탭 맨 위에 「버전 v49」", ver.strip() == "버전 v49", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄마다 속지 배지 · 줄을 누르면 그 카테고리 속지 고르기

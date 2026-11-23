@@ -1,6 +1,6 @@
 """투로그 v38 확인 — 노트 + 시트 속지 레이아웃 4종 (투두리스트 · 모눈 메모 · 별점 리뷰 · 지출·정산).
 
-1) 버전: sw.js 캐시 twolog-v48 · APP_VERSION v48 · My 탭 「버전 v48」
+1) 버전: sw.js 캐시 twolog-v49 · APP_VERSION v49 · My 탭 「버전 v49」
 2) + 시트 하단 「속지 레이아웃」
    - 노트 카테고리 목록(#noteOrderList) 아래 · 「저장하기」 버튼 위
    - 카드 4개 · 2×2 (첫 두 장 같은 줄, 셋째 줄에 두 장) · 각진 네모 · 제목 + 한 줄 설명
@@ -199,9 +199,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v48", 'const VERSION = "twolog-v48"' in sw,
+    check("sw.js 캐시 버전 twolog-v49", 'const VERSION = "twolog-v49"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v48", 'var APP_VERSION = "v48"' in app_js,
+    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -214,7 +214,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v48」", ver.strip() == "버전 v48", ver)
+    check("My 탭 맨 위에 「버전 v49」", ver.strip() == "버전 v49", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄 아래로 펼쳐지는 속지 레이아웃 (v40 아코디언)
@@ -423,7 +423,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(420)
     page.locator("#s-diary .d41-new").click()
     page.wait_for_timeout(600)
-    page.fill("#sheet .d41-title", "11월에 해보고 싶은 것")
+    # v48: «새 다이어리» 제목 칸은 없앴어요 — 종이에 바로 씁니다 (제목 없이 본문만)
     mbox38 = page.locator("#d41Paper").bounding_box()
     page.mouse.click(mbox38["x"] + 60, mbox38["y"] + 170)
     page.wait_for_timeout(320)
@@ -438,11 +438,12 @@ with sync_playwright() as p:
       badge: !!document.querySelector('#s-diary .nh-l .k'),
       cards: document.querySelectorAll('#s-diary .d41-card').length,
       title: (document.querySelector('#s-diary .d41-card .nmemo-t') || {}).textContent,
+      body: (document.querySelector('#s-diary .d41-card .nmemo-b') || {}).textContent || '',
       circ: document.querySelectorAll('#s-diary .trow .circ').length,
       prog: !!document.querySelector('#s-diary .progress'),
       date: ((document.querySelector('#s-diary .d41-card .nmemo-date') || {}).textContent || '').trim() })""")
     check("모눈 메모 — 본문 위에는 속지 배지가 없음", mm["badge"] is False, mm["badge"])
-    check("모눈 메모 — 메모 카드로 보임", mm["cards"] == 1 and mm["title"] == "11월에 해보고 싶은 것", mm)
+    check("모눈 메모 — 메모 카드로 보임", mm["cards"] == 1 and "주말마다" in mm["body"], mm)
     check("모눈 메모 — 체크 동그라미·진행률 없음", mm["circ"] == 0 and mm["prog"] is False, mm)
     check("모눈 메모 — 카드 맨 위 왼쪽에 날짜 + 요일", re.match(r"^\d{4}\.\d{2}\.\d{2} [일월화수목금토]요일$", mm["date"] or "") is not None, mm["date"])
     page.locator("#s-diary .d41-card").first.click()
