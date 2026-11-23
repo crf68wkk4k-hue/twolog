@@ -1,7 +1,7 @@
 """투로그 v26 확인 — 폰에 남아 있던 로컬 기록(localStorage·IndexedDB)을 새 커플 공간으로
 자동 1회 이전(merge)하고, 다시 로그인해도 중복되지 않는지 확인합니다.
 
-1) 버전: sw.js 캐시 twolog-v49 · APP_VERSION v49
+1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50
 2) 로컬 모드에서 일정·메모·사진을 만들고 → 원격(remote)에 처음 로그인
    → 자동으로 그 기록들이 살아나고(일정·노트·사진·커플 정보) 플래그가 남음
    → 새로 열기/다시 로그인해도 중복 없음, 폰의 원본 데이터는 그대로
@@ -135,9 +135,9 @@ with sync_playwright() as p:
     page = ctx.new_page()
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v49", 'const VERSION = "twolog-v49"' in sw,
+    check("sw.js 캐시 버전 twolog-v50", 'const VERSION = "twolog-v50"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:1])
-    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js)
+    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js)
     check("sync.js 에 이전 로직(Store.migrate) 있음",
           "migrateLocal" in page.request.get(URL + "sync.js").text())
     ctx.close()

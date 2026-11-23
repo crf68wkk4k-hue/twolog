@@ -1,6 +1,6 @@
 """투로그 v38 확인 — 노트 + 시트 속지 레이아웃 4종 (투두리스트 · 모눈 메모 · 별점 리뷰 · 지출·정산).
 
-1) 버전: sw.js 캐시 twolog-v49 · APP_VERSION v49 · My 탭 「버전 v49」
+1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50 · My 탭 「버전 v50」
 2) + 시트 하단 「속지 레이아웃」
    - 노트 카테고리 목록(#noteOrderList) 아래 · 「저장하기」 버튼 위
    - 카드 4개 · 2×2 (첫 두 장 같은 줄, 셋째 줄에 두 장) · 각진 네모 · 제목 + 한 줄 설명
@@ -199,9 +199,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v49", 'const VERSION = "twolog-v49"' in sw,
+    check("sw.js 캐시 버전 twolog-v50", 'const VERSION = "twolog-v50"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js,
+    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -214,7 +214,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v49」", ver.strip() == "버전 v49", ver)
+    check("My 탭 맨 위에 「버전 v50」", ver.strip() == "버전 v50", ver)
 
     # ==================================================================
     # 2. + 시트 — 카테고리 줄 아래로 펼쳐지는 속지 레이아웃 (v40 아코디언)

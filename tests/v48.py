@@ -1,6 +1,6 @@
-"""투로그 v49 확인 — 모눈 다이어리 세 가지 손질.
+"""투로그 v50 확인 — 모눈 다이어리 세 가지 손질.
 
-1) 버전: sw.js 캐시 twolog-v49 · APP_VERSION v49 · My 탭 「버전 v49」
+1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50 · My 탭 「버전 v50」
 2) 모눈종이가 «화면 맨 위»까지 — 위 줄의 «새 다이어리» 글씨·제목 칸을 없애고,
    모눈이 위 모서리(0)부터 깔림 · ‹ 뒤로는 모눈 위에 떠 있음 (투명한 위 줄)
    글·사진·그림은 위 줄+도구 줄 아래(머리 높이)부터 놓여 겹치지 않음
@@ -10,7 +10,7 @@
    전체화면 보기로 — 끌면 그대로 선이 그려짐 (톡 누른 점은 남지 않아요)
    보기 화면에서 종이를 다시 톡 누르면 도구 줄이 돌아옴
 
-    python3 tests/v49.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
+    python3 tests/v50.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
 """
 import functools, http.server, json, os, re, socketserver, sys, threading, time
 
@@ -147,7 +147,7 @@ TOP = """() => {
 TYPE = """() => {
   const ed = document.querySelector('#d41Nodes .d41-txt');
   if (!ed) return null;
-  ed.innerText = 'v49 완료를 누른 글';
+  ed.innerText = 'v50 완료를 누른 글';
   ed.dispatchEvent(new Event('input', {bubbles: true}));
   try { ed.focus(); } catch (e) {}
   const box = ed.closest('.d41-tx');
@@ -168,11 +168,11 @@ CLEAN = """() => {
   const st = JSON.parse(localStorage.getItem('twolog:v1:state') || '{}');
   const l = (st.lists || []).filter(v => v.id === 'Ld48')[0] || {};
   const items = l.items || [];
-  const it = items.filter(v => (v.texts || []).some(t => String(t.text || '').indexOf('v49') >= 0))[0] || {};
+  const it = items.filter(v => (v.texts || []).some(t => String(t.text || '').indexOf('v50') >= 0))[0] || {};
   return {
     nBox: document.querySelectorAll('#d41Nodes .d41-tx').length,
     selN: document.querySelectorAll('#d41Nodes .d41-tx.sel').length,
-    hasText: !!ed && (ed.innerText || '').indexOf('v49 완료') >= 0,
+    hasText: !!ed && (ed.innerText || '').indexOf('v50 완료') >= 0,
     outlineStyle: cs ? cs.outlineStyle : '',
     xShown: x ? getComputedStyle(x).display !== 'none' : false,
     panelHidden: (document.getElementById('d41Panel') || {}).hidden,
@@ -240,9 +240,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check('sw.js 캐시 버전 twolog-v49', 'const VERSION = "twolog-v49"' in sw,
+    check('sw.js 캐시 버전 twolog-v50', 'const VERSION = "twolog-v50"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js,
+    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v47 문자열이 남아 있지 않음",
           "twolog-v47" not in sw and 'APP_VERSION = "v47"' not in app_js)
@@ -255,7 +255,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(900)
     tab(page, 4, 620)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v49」", ver.strip() == "버전 v49", ver)
+    check("My 탭 맨 위에 「버전 v50」", ver.strip() == "버전 v50", ver)
 
     tab(page, 2, 700)
     page.locator("#s-diary .lchip", has_text="그림판").first.click()
@@ -283,9 +283,9 @@ with sync_playwright() as p:
     check("모눈 무늬가 종이에 깔려 있음 (22px 격자)",
           "linear-gradient" in top["grid"] and top["gridSize"].startswith("22px"),
           (top["grid"][:40], top["gridSize"]))
-    check("글·날짜는 위 줄+도구 줄 아래(머리 높이 약 56px · v49 에서 한 단계 위로)부터",
-          top["nodesTop"] >= 52 and top["dateTop"] >= 52, (top["nodesTop"], top["dateTop"]))
-    page.screenshot(path=os.path.join(SHOT, "diary-v49-fullgrid.png"))
+    check("글·날짜는 위 줄+도구 줄 아래(머리 높이 108px · v50 두 줄)부터",
+          top["nodesTop"] >= 104 and top["dateTop"] >= 104, (top["nodesTop"], top["dateTop"]))
+    page.screenshot(path=os.path.join(SHOT, "diary-v50-fullgrid.png"))
 
     # ==================================================================
     # 3. 글 쓰고 «완료»(blur) — 점선·× 가 사라진 깨끗한 레이아웃
@@ -308,9 +308,9 @@ with sync_playwright() as p:
     check("× 삭제 단추도 함께 사라져 다 쓴 레이아웃 그대로",
           clean["xShown"] is False, clean["xShown"])
     check("글은 그대로 남고 저장도 됨 (상자·내용·자동 저장)",
-          clean["nBox"] == 1 and clean["hasText"] and "v49 완료" in clean["hidden"]
-          and "v49 완료" in clean["savedTexts"], clean)
-    page.screenshot(path=os.path.join(SHOT, "diary-v49-cleanblur.png"))
+          clean["nBox"] == 1 and clean["hasText"] and "v50 완료" in clean["hidden"]
+          and "v50 완료" in clean["savedTexts"], clean)
+    page.screenshot(path=os.path.join(SHOT, "diary-v50-cleanblur.png"))
 
     page.wait_for_timeout(620)
     again = page.evaluate(TAPBOX)
@@ -335,7 +335,7 @@ with sync_playwright() as p:
           and tapst["panelHidden"] and tapst["view"], tapst)
     check("톡 누른 점은 선이 되지 않음 (그린 획 0개)", tapst["nStroke"] == 0 and tapst["nPath"] == 0, tapst)
     check("보기에서는 펜이 잠겨 화면을 밀어 넘길 수 있음", tapst["penOn"] is False, tapst["penOn"])
-    page.screenshot(path=os.path.join(SHOT, "diary-v49-pentap.png"))
+    page.screenshot(path=os.path.join(SHOT, "diary-v50-pentap.png"))
 
     page.locator("#d41Canvas").click(position={"x": 120, "y": 300})
     page.wait_for_timeout(460)
@@ -381,4 +381,4 @@ print("")
 if fails:
     print("FAILED (%d): %s" % (len(fails), ", ".join(fails)))
     sys.exit(1)
-print("ALL PASS — v49")
+print("ALL PASS — v50")

@@ -1,11 +1,11 @@
-"""투로그 v49 확인 — 모눈 다이어리 위 줄 정리 + 그리기 좌표.
+"""투로그 v50 확인 — 모눈 다이어리 위 줄 정리 + 그리기 좌표.
 
-1) 버전: sw.js 캐시 twolog-v49 · APP_VERSION v49 · My 탭 「버전 v49」
+1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50 · My 탭 「버전 v50」
 2) ‹ 뒤로 화살표를 크게 (22 → 28px, 획 2.2)
-3) 도구 줄(↶ ↷ · 펜 · T · 사진)이 ‹ 뒤로와 «같은 줄»로 한 단계 위로 —
-   375·390 폭에서 겹치거나 줄바꿈 없이 한 줄, 뒤로 단추와 나란히
-4) 도구 판(펜 도크 · 글씨 도구)이 도구 줄 바로 아래(한 단계 위, 56px)에 뜸
-   글·날짜도 그 높이(머리 56px)부터 시작
+3) 도구 줄(↶ ↷ · 펜 · T · 사진)은 ‹ 뒤로 «아래» 줄(52px) — 두 줄 구조 (v50 에서 되돌림)
+   375·390 폭에서 겹치거나 줄바꿈 없이 한 줄
+4) 도구 판(펜 도크 · 글씨 도구)이 도구 줄 바로 아래(머리 108px)에 뜸
+   글·날짜도 그 높이(머리 108px)부터 시작
 5) 보기 모드에서는 도구 줄·도구 판이 숨고 ‹ 뒤로만 남음
 6) 그리는 «도중»에도 선이 손가락 자리에 그려짐 (v48은 머리 높이만큼 위에 그려졌어요)
 7) 지출·정산 화면 — «‹ 11월 ›» 위에 한 번 더 보이던 카테고리 제목 줄(.note-hd)을 없앰
@@ -13,7 +13,7 @@
 8) 사진 여러 장 담기 — 3장씩 나란히(압축 1200px·품질 0.78, 서명 URL 왕복 없음, 실패 시 1회 재시도)로
    빨라지고, 3장 이상도 고른 순서 그대로 끝까지 저장 · 진행 막대는 장마다 올라감
 
-    python3 tests/v49.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
+    python3 tests/v50.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
 """
 import functools, http.server, json, os, re, socketserver, sys, threading, time
 
@@ -188,6 +188,8 @@ LAYOUT = """() => {
       ? Math.round(Math.max(...kr.map(r => (r.top + r.bottom) / 2)) - Math.min(...kr.map(r => (r.top + r.bottom) / 2))) : -1,
     kidsBottomMax: kr.length ? Math.round(Math.max(...kr.map(r => r.bottom))) : -1,
     kidWidths: kr.map(r => Math.round(r.width)),
+    undoLeft: kr.length ? Math.round(kr[0].left) : -1,
+    photoRight: kr.length ? Math.round(kr[kr.length - 1].right) : -1,
     panelTop: pr ? Math.round(pr.top) : -1, panelH: pr ? Math.round(pr.height) : 0,
     panelHidden: panel ? panel.hidden : null,
     panelDisplay: panel ? getComputedStyle(panel).display : '',
@@ -200,7 +202,7 @@ PANEL = """() => {
   const p = document.getElementById('d41Panel');
   const r = p.getBoundingClientRect();
   const rows = [...p.querySelectorAll('.d41-prow')].map(e => Math.round(e.getBoundingClientRect().top));
-  return {hidden: p.hidden, top: Math.round(r.top), h: Math.round(r.height), rows: rows,
+  return {hidden: p.hidden, top: Math.round(r.top), h: Math.round(r.height), bottom: Math.round(r.bottom), rows: rows,
     display: getComputedStyle(p).display};
 }"""
 
@@ -273,9 +275,9 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check('sw.js 캐시 버전 twolog-v49', 'const VERSION = "twolog-v49"' in sw,
+    check('sw.js 캐시 버전 twolog-v50', 'const VERSION = "twolog-v50"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js,
+    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v48 문자열이 남아 있지 않음",
           "twolog-v48" not in sw and 'APP_VERSION = "v48"' not in app_js)
@@ -288,7 +290,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(900)
     tab(page, 4, 620)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v49」", ver.strip() == "버전 v49", ver)
+    check("My 탭 맨 위에 「버전 v50」", ver.strip() == "버전 v50", ver)
 
     # ==================================================================
     # 2. 지출·정산 — «‹ 11월 ›» 위의 메모 타이틀(카테고리 이름) 없앰
@@ -305,7 +307,7 @@ with sync_playwright() as p:
           (exp1["expPage"], exp1["monthTxt"], exp1["firstCls"]))
     check("화면 안에 카테고리 이름이 제목으로 한 번 더 나오지 않음",
           "테스트지출" not in exp1["bodyText"], exp1["bodyText"][:60])
-    page.screenshot(path=os.path.join(SHOT, "expense-v49-no-title.png"))
+    page.screenshot(path=os.path.join(SHOT, "expense-v50-no-title.png"))
 
     page.locator("#s-diary .seg-btn", has_text="버킷리스트").first.click()
     page.wait_for_timeout(520)
@@ -331,52 +333,52 @@ with sync_playwright() as p:
           (lay["svgW"], lay["svgH"], lay["svgStroke"]))
     check("‹ 뒤로 단추 자체는 44px 그대로 (누르기 편하게)",
           lay["backW"] == 44 and lay["backH"] == 44, (lay["backW"], lay["backH"]))
-    check("도구 줄이 ‹ 뒤로와 «같은 줄» (위 4px)",
-          abs(lay["toolsTop"] - lay["backTop"]) <= 1 and lay["toolsTop"] <= 6,
-          (lay["toolsTop"], lay["backTop"]))
-    check("도구 줄은 ‹ 뒤로 오른쪽에서 시작 — 겹치지 않음",
-          lay["backRight"] <= lay["toolsLeft"] + 1 and lay["toolsLeft"] <= 60,
-          (lay["backRight"], lay["toolsLeft"]))
+    check("도구 줄은 ‹ 뒤로 «아래» 줄 (위 52px)",
+          lay["toolsTop"] == 52 and lay["toolsTop"] >= lay["topRowTop"] + lay["topRowH"] - 1,
+          (lay["toolsTop"], lay["topRowTop"], lay["topRowH"]))
+    check("도구 줄은 종이 폭 전체 — ‹ 뒤로와 겹치지 않음",
+          lay["toolsLeft"] <= 2 and lay["toolsRight"] <= lay["vw"],
+          (lay["toolsLeft"], lay["toolsRight"], lay["vw"]))
     check("도구 6개(↶ ↷ · 펜 · T · 사진)가 한 줄 — 줄바꿈 없음",
           lay["kidsN"] == 6 and lay["kidsCenterSpread"] <= 1
           and lay["kidsLabels"] == ["되돌리기", "다시 실행", "d41-tools-gap", "펜 그리기", "글씨", "사진 넣기"],
           (lay["kidsN"], lay["kidsCenterSpread"], lay["kidsLabels"]))
-    check("도구 줄이 ‹ 뒤로와 같은 높이에 나란히 (가운데 높이 ±1px)",
-          abs((lay["toolsTop"] + lay["toolsBottom"]) / 2 - (lay["backTop"] + lay["backBottom"]) / 2) <= 1,
-          (lay["toolsTop"], lay["toolsBottom"], lay["backTop"], lay["backBottom"]))
-    check("도구 줄이 화면 폭 안에 들어옴 (390px)",
-          lay["toolsRight"] <= lay["vw"] and lay["kidsBottomMax"] <= lay["backBottom"] + 1,
-          (lay["toolsRight"], lay["vw"], lay["kidsBottomMax"], lay["backBottom"]))
+    check("↶ ↷ 는 도구 줄 왼쪽 · 펜·T·사진은 오른쪽 끝",
+          lay["undoLeft"] <= 20 and lay["vw"] - lay["photoRight"] <= 20,
+          (lay["undoLeft"], lay["photoRight"], lay["vw"]))
     check("되돌리기·다시 실행 44px · 펜·T·사진 46px 그대로 (눌러도 줄지 않음)",
           lay["kidWidths"] == [44, 44, 46, 46, 46], lay["kidWidths"])
-    check("위 줄 전체가 한 단계 위 — 도구 줄이 예전 52px 자리에서 4px 로",
+    check("위 줄은 맨 꼭대기 — 높이 52px",
           lay["topRowTop"] == 0 and lay["topRowH"] == 52, (lay["topRowTop"], lay["topRowH"]))
-    check("글·날짜도 한 단계 위(머리 56px)부터",
-          lay["headH"] == 56 and lay["nodesTop"] == 56 and lay["dateTop"] == 56,
+    check("글·날짜도 두 줄 아래(머리 108px)부터",
+          lay["headH"] == 108 and lay["nodesTop"] == 108 and lay["dateTop"] == 108,
           (lay["headH"], lay["nodesTop"], lay["dateTop"]))
-    page.screenshot(path=os.path.join(SHOT, "diary-v49-toolbar.png"))
+    page.screenshot(path=os.path.join(SHOT, "diary-v50-toolbar.png"))
 
     # ==================================================================
-    # 4. 도구 판(펜 도크) — 도구 줄 바로 아래, 한 단계 위 자리
+    # 4. 도구 판(펜 도크) — 도구 줄 바로 아래, 날짜를 가리지 않음
     # ==================================================================
     page.locator("#sheet .d41-tool[aria-label='펜 그리기']").click()
     page.wait_for_timeout(460)
     pen = page.evaluate(PANEL)
-    check("펜 도크 판이 도구 줄 바로 아래(56px)에 뜸 — 예전 108px 아님",
-          (not pen["hidden"]) and pen["display"] != "none" and pen["top"] == 56 and lay["toolsBottom"] <= pen["top"],
+    layp = page.evaluate(LAYOUT)
+    check("펜 도크 판이 도구 줄 바로 아래(108px)에 뜸",
+          (not pen["hidden"]) and pen["display"] != "none" and pen["top"] == 108 and lay["toolsBottom"] <= pen["top"],
           (pen, lay["toolsBottom"]))
+    check("판이 열려도 날짜는 판 아래로 내려가 가려지지 않음",
+          layp["dateTop"] >= pen["bottom"] - 1, (layp["dateTop"], pen["bottom"]))
     check("펜 도크 판이 한 줄(가는 펜·일반 펜·형광펜·지우개·색·전체 지우기)",
           pen["h"] <= 70, (pen["h"], pen["rows"]))
 
     # ==================================================================
     # 5. 그리는 «도중»에도 선이 손가락 자리에 — v48 좌표 어긋남 고침
     # ==================================================================
-    pts = [[80, 300], [170, 340], [250, 315]]
+    pts = [[80, 320], [170, 360], [250, 335]]
     page.evaluate("(p) => { window.__pts = p; }", pts)
     live = page.evaluate(PEN_LIVE, [pts, 8080])
     check("그리는 도중 선이 생김 (손 떼기 전)", live["d"].startswith("M"), live["d"][:60])
     T = live["T"]
-    check("머리 높이(d41Top) 56px — 예전엔 이만큼 위에 그려졌어요", T == 56, T)
+    check("머리 높이(d41Top) 108px — 두 줄", T == 108, T)
     lp = pairs(live["d"])
     check("그리는 도중 선의 점 개수가 손가락 점 개수와 같음", len(lp) == len(pts),
           (len(lp), len(pts)))
@@ -388,7 +390,7 @@ with sync_playwright() as p:
           all(abs(e) <= 1.5 for e in xerr), xerr)
     check("예전처럼 머리 높이(56px)만큼 위로 어긋나지 않음",
           all(abs(e) < 20 for e in yerr), yerr)
-    page.screenshot(path=os.path.join(SHOT, "diary-v49-pen.png"))
+    page.screenshot(path=os.path.join(SHOT, "diary-v50-pen.png"))
 
     page.evaluate("([pts]) => { document.getElementById('d41Pen').__lastPt = pts[pts.length - 1]; }", [pts])
     up = page.evaluate(PEN_UP, 8080)
@@ -406,8 +408,8 @@ with sync_playwright() as p:
     page.locator("#sheet .d41-tool[aria-label='글씨']").click()
     page.wait_for_timeout(460)
     tp = page.evaluate(PANEL)
-    check("글씨 도구 판도 도구 줄 바로 아래(56px)",
-          (not tp["hidden"]) and tp["display"] != "none" and tp["top"] == 56, tp)
+    check("글씨 도구 판도 도구 줄 바로 아래(108px)",
+          (not tp["hidden"]) and tp["display"] != "none" and tp["top"] == 108, tp)
     page.locator("#sheet .d41-tool[aria-label='글씨']").click()
     page.wait_for_timeout(300)
 
@@ -423,9 +425,9 @@ with sync_playwright() as p:
           and vt["panelHidden"] and vt["panelDisplay"] == "none" and vt["backShown"], vt)
     vlay = page.evaluate(LAYOUT)
     check("보기에서도 ‹ 뒤로 화살표는 28px 그대로", vlay["svgW"] == "28px", vlay["svgW"])
-    check("보기에서도 화살표·도구 줄 자리는 위 그대로 (52px 줄 하나)",
-          vlay["topRowH"] == 52 and vlay["headH"] == 56, (vlay["topRowH"], vlay["headH"]))
-    page.screenshot(path=os.path.join(SHOT, "diary-v49-view.png"))
+    check("보기에서도 자리는 위 그대로 (위 줄 52px · 머리 108px)",
+          vlay["topRowH"] == 52 and vlay["headH"] == 108, (vlay["topRowH"], vlay["headH"]))
+    page.screenshot(path=os.path.join(SHOT, "diary-v50-view.png"))
 
     # ==================================================================
     # 8. 좁은 폰(375px)에서도 도구 줄이 한 줄에
@@ -439,12 +441,11 @@ with sync_playwright() as p:
           n375["toolsDisplay"] != "none" and n375["kidsN"] == 6 and n375["kidsCenterSpread"] <= 1
           and n375["toolsRight"] <= n375["vw"],
           (n375["toolsDisplay"], n375["kidsN"], n375["kidsCenterSpread"], n375["toolsRight"], n375["vw"]))
-    check("375px 폭에서도 ‹ 뒤로와 겹치지 않음",
-          n375["backRight"] <= n375["toolsLeft"] + 1 and n375["toolsLeft"] <= 60,
-          (n375["backRight"], n375["toolsLeft"]))
+    check("375px 폭에서도 ‹ 뒤로 줄과 도구 줄이 따로 (위 줄 52px · 도구 줄 52px)",
+          n375["topRowH"] == 52 and n375["toolsTop"] == 52, (n375["topRowH"], n375["toolsTop"]))
     check("375px 폭에서 도구 단추가 줄지 않음 (44·46px)",
           n375["kidWidths"] == [44, 44, 46, 46, 46], n375["kidWidths"])
-    page.screenshot(path=os.path.join(SHOT, "diary-v49-toolbar-375.png"))
+    page.screenshot(path=os.path.join(SHOT, "diary-v50-toolbar-375.png"))
     page.set_viewport_size({"width": 390, "height": 844})
     page.wait_for_timeout(420)
 
@@ -464,8 +465,8 @@ with sync_playwright() as p:
     pp.wait_for_timeout(900)
     tab(pp, 3, 680)
     shots = []
-    for nm in ["v49a", "v49b", "v49c", "v49d"]:
-        sp = "/tmp/v49-%s.jpg" % nm
+    for nm in ["v50a", "v50b", "v50c", "v50d"]:
+        sp = "/tmp/v50-%s.jpg" % nm
         with open(sp, "wb") as f:
             f.write(bytes.fromhex(JPG_HEX))
         shots.append(sp)
@@ -502,7 +503,7 @@ with sync_playwright() as p:
     check("4장 모두 끝까지 담김 (앱을 닫아도 남게 저장)", savedp["n"] == 4 and len(savedp["ls"]) == 4,
           (savedp["n"], len(savedp["ls"])))
     check("고른 순서 그대로 저장 — 1번째 사진이 맨 앞",
-          savedp["titles"] == ["v49-v49a", "v49-v49b", "v49-v49c", "v49-v49d"], savedp["titles"])
+          savedp["titles"] == ["v50-v50a", "v50-v50b", "v50-v50c", "v50-v50d"], savedp["titles"])
     check("사진 4장을 몇 초 안에 (예전엔 한 장씩 기다려 아주 느렸어요)", elapsed < 6.0, round(elapsed, 2))
     bar = [b for b in savedp["bar"]]
     steps = []
@@ -538,4 +539,4 @@ print("")
 if fails:
     print("FAILED (%d): %s" % (len(fails), ", ".join(fails)))
     sys.exit(1)
-print("ALL PASS — v49")
+print("ALL PASS — v50")

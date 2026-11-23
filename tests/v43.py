@@ -1,6 +1,6 @@
 """투로그 v43 확인 — 모눈 다이어리 손보기.
 
-1) 버전: sw.js 캐시 twolog-v49 · APP_VERSION v49 · My 탭 「버전 v49」
+1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50 · My 탭 「버전 v50」
 2) 글 상자
    - 종이를 톡 누르면 그 자리에 상자가 생기고 바로 입력(포커스)
    - 이미 있는 상자를 한 번 톡 누르면 «고르기»만 — 입력 포커스가 풀려(blur) 아이폰 키보드가 내려가고
@@ -175,9 +175,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v49", 'const VERSION = "twolog-v49"' in sw,
+    check("sw.js 캐시 버전 twolog-v50", 'const VERSION = "twolog-v50"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js,
+    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v42 문자열이 남아 있지 않음",
           "twolog-v42" not in sw and 'APP_VERSION = "v42"' not in app_js)
@@ -191,7 +191,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(900)
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v49」", ver.strip() == "버전 v49", ver)
+    check("My 탭 맨 위에 「버전 v50」", ver.strip() == "버전 v50", ver)
     tab(page, 0, 520)
 
     # ==================================================================
@@ -415,7 +415,7 @@ with sync_playwright() as p:
         title: (c.querySelector('.nmemo-t') || {}).textContent,
         body: (c.querySelector('.nmemo-b') || {}).textContent,
         thumbs: c.querySelectorAll('.d41-th').length} : null; }""")
-    check("저장하면 카드에 날짜·글·사진 미리보기 (v49: 제목 칸이 없어 제목은 비어요)",
+    check("저장하면 카드에 날짜·글·사진 미리보기 (v50: 제목 칸이 없어 제목은 비어요)",
           cardA and (cardA["title"] or "") == "" and "자르기와 핀치" in (cardA["body"] or "")
           and cardA["thumbs"] == 1, cardA)
     pageA.locator("#s-diary .d41-card").first.click()
@@ -758,7 +758,7 @@ with sync_playwright() as p:
     check("기본 카테고리 다이어리의 글·사진이 notes(log) payload 에 실림",
           len(srv["texts"]) == 1 and "서버 왕복에도" in (srv["texts"][0].get("text") or "")
           and len(srv["imgs"]) == 1 and srv["imgs"][0].get("src", "").startswith("data:image"), srv)
-    check("글 상자 좌표·크기도 함께 올라감 (v49: 위 줄 제목 칸 없음)",
+    check("글 상자 좌표·크기도 함께 올라감 (v50: 위 줄 제목 칸 없음)",
           0 <= srv["texts"][0].get("x", -1) <= 1 and srv["texts"][0].get("size", 0) > 0
           and (srv["title"] or "") == "", srv["texts"][0])
     # (b) 사용자 카테고리 「세상 메모」

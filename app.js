@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v49";
+  var APP_VERSION = "v50";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -2162,6 +2162,11 @@
 
   function d41Num(v, d) { var n = Number(v); return isFinite(n) ? n : d; }
   function d41Clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  /* v50: 글 상자의 폭 한도 — 자리(x)에 맞춰 줄여서 오른쪽으로 옮겨도 종이 밖으로 나가 잘리지 않게 */
+  function d41TxMax(x) {
+    var pct = Math.max(14, 100 - d41Clamp(d41Num(x, 0), 0, 1) * 100 - 0.5);
+    return "calc(" + pct.toFixed(2) + "% - 6px)";
+  }
   function d41WPx() {
     var p = document.getElementById("d41Paper");
     return Math.max(1, p ? p.clientWidth : 360);
@@ -2250,7 +2255,8 @@
     var deco = [t.strike ? "line-through" : "", t.underline ? "underline" : ""].filter(Boolean).join(" ");
     /* v44: 보기(스크롤) 모드에서는 글 상자를 고칠 수 없게 — 종이를 톡 누르면 고치기로 바뀌어요 */
     return '<div class="d41-tx' + (sel ? " sel" : "") + '" data-tx="' + esc(t.id) + '"' +
-      ' style="left:' + (t.x * 100).toFixed(2) + "%; top:" + Math.round(t.y * W) + "px; font-size:" + t.size + "px;" +
+      ' style="left:' + (t.x * 100).toFixed(2) + "%; max-width:" + d41TxMax(t.x) +
+      "; top:" + Math.round(t.y * W) + "px; font-size:" + t.size + "px;" +
       (t.color ? "color:" + t.color + ";" : "") +
       (t.bold ? "font-weight:700;" : "") +
       (deco ? "text-decoration:" + deco + ";" : "") +
@@ -2297,6 +2303,8 @@
       diary.sel = null;
     }
     d41RenderNodes();
+    /* v50: 보기로 갈 때는 판이 닫히니 날짜도 머리 높이로 돌아와요 */
+    d41HeadFit();
   }
   function d41NodesHtml() {
     if (!diary) return "";
@@ -2472,6 +2480,7 @@
     if (!p) return;
     if (sel && sel.indexOf("img:") === 0) { p.hidden = false; p.innerHTML = d41ImgPanel(); d41Grow(); }
     else if (sel && sel.indexOf("tx:") === 0) { p.hidden = false; p.innerHTML = d41TextPanel(); d41Grow(); }
+    d41HeadFit();
   }
 
   /* ---------------- v43: 빈 글 상자 정리 · 포커스 · 즉시 삭제 ---------------- */
@@ -2653,14 +2662,25 @@
       "</div>";
   }
   /* v44: T 도구 — 누르면 새 글 상자를 만들어요 (배경을 누르면 이제 글쓰기가 끝나요).
-     이미 글 상자를 고른 채면 지금 글을 마무리하고 그 아래에 새 상자를 만들어요. */
+     이미 글 상자를 고른 채면 지금 글을 마무리하고 그 아래에 새 상자를 만들어요.
+     v50: 사진을 고른 채 T 를 누르면 그 사진 «바로 밑»에 새 상자를 놓아요 (사진 바로 밑에 글씨). */
   function d41TextTool() {
     if (!diary) return;
     if (diary.mode !== "text") { d41PanelOpen("text"); return; }
     d41CommitTexts();
     d41BlurAll();
+    var selImg = d41SelImg(), selTx = d41SelText();
     d41PruneEmpty("");
     var W = d41WPx();
+    var GAP = 14;                 /* 바로 밑에 붙여 놓이게 (px) */
+    var anchor = null, ax = 0.06;
+    if (selImg) anchor = document.querySelector('#d41Nodes .d41-imgb[data-img="' + selImg.id + '"]');
+    if (!anchor && selTx) anchor = document.querySelector('#d41Nodes .d41-tx[data-tx="' + selTx.id + '"]');
+    if (anchor) {
+      ax = selImg ? selImg.x : selTx.x;
+      d41AddTextAt(ax, (anchor.offsetTop + anchor.offsetHeight + GAP) / W);
+      return;
+    }
     var bottom = 0;
     Array.prototype.forEach.call(document.querySelectorAll("#d41Nodes .d41-tx, #d41Nodes .d41-imgb"), function (el) {
       bottom = Math.max(bottom, el.offsetTop + el.offsetHeight);
@@ -2668,9 +2688,8 @@
     (diary.pen || []).forEach(function (s) {
       for (var i = 1; i < s.p.length; i += 2) bottom = Math.max(bottom, s.p[i] * W);
     });
-    var canvas = document.getElementById("d41Canvas");
-    var y = Math.max(0.2, (canvas ? canvas.scrollTop / W : 0) + (bottom ? bottom / W + 0.3 : 0.2));
-    d41AddTextAt(0.06, y);
+    /* v50: 마지막 내용 «바로 밑»에 (예전엔 0.3 폭 ≈ 117px 씩 띄워 놓았어요) */
+    d41AddTextAt(0.06, bottom ? (bottom + GAP) / W : 0.2);
   }
   /* T 패널 — 「작게·보통·크게」 옆에 가로 슬라이더(12~40px)로 세밀하게 */
   /* v44: 글씨 도구 — 가늘고 긴 두 줄: 정렬·B·S·U·색 동그라미 / − 크기 +
@@ -2758,6 +2777,18 @@
   function d41PanelRefresh() {
     var p = document.getElementById("d41Panel");
     if (p && diary) { p.innerHTML = d41PanelHtml(); d41Grow(); }
+    d41HeadFit();
+  }
+  /* v50: 도구 판(펜 도크 · 글씨 도구)이 열려 있으면 날짜(11.23 MON)를 그 «아래»로 내려요 —
+     판이 날짜를 가리지 않게 (닫혀 있으면 머리 높이 그대로) */
+  function d41HeadFit() {
+    var root = document.querySelector("#sheet .d41") || document.querySelector(".d41");
+    if (!root) return;
+    var p = document.getElementById("d41Panel");
+    var h = p && !p.hidden && p.innerHTML ? p.offsetHeight : 0;
+    root.style.setProperty("--d41-ph", Math.max(0, Math.round(h)) + "px");
+    /* v50: 판이 열려 날짜가 내려온 동안에는 날짜 칸이 손가락을 가로채지 않게 (판을 닫으면 다시 눌러요) */
+    root.classList.toggle("panel-open", h > 0);
   }
   /* v44: 배경을 누르면 도구 판을 덮어 — 쓴 내용만 보이게 (도구를 다시 누르면 열려요) */
   function d41PanelHide() {
@@ -2765,6 +2796,7 @@
     if (p) p.hidden = true;
     var tools = document.querySelector(".d41-tools");
     if (tools) Array.prototype.forEach.call(tools.querySelectorAll(".d41-tool.on"), function (el) { el.classList.remove("on"); });
+    d41HeadFit();
   }
 
   /* ========================================================================
@@ -3026,6 +3058,7 @@
     if (tools) tools.outerHTML = d41ToolsHtml();
     if (mode === "pen") d41Paint();
     d41Grow();
+    d41HeadFit();
   }
 
   /* ---------------- 손가락으로 끌기 / 크기 조절 ---------------- */
@@ -3088,9 +3121,14 @@
     function paint() {
       raf = 0;
       if (!diary) return;
-      var x = d41Clamp((qx - offX - pr.left) / W, 0, kind === "img" ? 0.96 : 0.9);
+      /* v50: 사진은 폭만큼, 글은 조금 남기고 — 종이 오른쪽 밖으로 나가 잘리지 않게 막아요 */
+      var maxX = kind === "img"
+        ? Math.max(0, 1 - Math.max(D41_MINW, (start && start.w) || D41_MINW))
+        : 0.82;
+      var x = d41Clamp((qx - offX - pr.left) / W, 0, maxX);
       var y = Math.max(0, (qy - offY - pr.top - d41Top()) / W);
       nx = x; ny = y;
+      if (kind === "tx") node.style.maxWidth = d41TxMax(x);
       node.style.transform = "translate3d(" + (x * W - baseL).toFixed(1) + "px," +
         (y * W - baseT).toFixed(1) + "px,0)";
     }
@@ -3107,6 +3145,7 @@
       node.style.transform = "";
       node.style.left = (nx * 100).toFixed(2) + "%";
       node.style.top = Math.round(ny * W) + "px";
+      if (kind === "tx") node.style.maxWidth = d41TxMax(nx);
       if (!diary) return;
       var o = (kind === "img" ? diary.imgs : diary.texts).filter(function (t) { return t.id === id; })[0];
       if (o) { o.x = nx; o.y = ny; }
@@ -3144,7 +3183,8 @@
     /* v43: 종이를 다시 누를 때, 앞서 만든 빈 상자는 쌓이지 않게 걷어내요 */
     d41CommitTexts();
     d41PruneEmpty("");
-    x = d41Clamp(x, 0, 0.72);
+    /* v50: 오른쪽 끝까지 놓을 수 있게 (폭은 자리에 맞춰 줄어요 — 종이 밖으로 나가지 않게) */
+    x = d41Clamp(x, 0, 0.82);
     y = Math.max(0, y);
     var t = { id: uid(), x: x, y: y, text: "", size: diary.tsize || 16.5,
       color: diary.tcolor || "", align: diary.talign || "left",
@@ -3251,8 +3291,11 @@
         var r = paper.getBoundingClientRect();
         /* v44: 글을 쓰고 난 뒤(고른 상자가 있는 동안) 배경을 누르면 글쓰기를 마칩니다 —
            빈 상자는 정리하고, 고르기를 풀고, 지금 상태를 자동 저장해요.
-           새 글 상자는 T 도구로 만들어요. (예전엔 배경을 누를 때마다 새 상자가 계속 생겨났어요) */
+           새 글 상자는 T 도구로 만들어요. (예전엔 배경을 누를 때마다 새 상자가 계속 생겨났어요)
+           v50: 다만 그 고른 상자가 «글»이 아니었으면(사진·그림을 고르던 중이었으면) 그 자리에
+           글 상자를 만들어요 — 사진 바로 밑·옆에 글씨를 놓으려고 톡 눌렀을 때 «고르기만 풀리던» 것을 고침 */
         var wasSel = !!diary.sel;
+        var wasTx = wasSel && diary.sel.indexOf("tx:") === 0;
         d41PruneEmpty("");
         if (diary.sel) {
           diary.sel = null;
@@ -3262,7 +3305,7 @@
         /* v44: 도구 판(굵기·색 등)도 덮어 — 쓴 내용만 보이게 */
         d41PanelHide();
         if (wasSel) d41AutoSave();
-        else d41AddTextAt((ev.clientX - r.left) / r.width, (ev.clientY - r.top - d41Top()) / r.width);
+        if (!wasTx) d41AddTextAt((ev.clientX - r.left) / r.width, (ev.clientY - r.top - d41Top()) / r.width);
       }
     });
     /* 한글 조합 중에는 빈 상자 정리를 미뤄요 */

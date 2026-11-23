@@ -1,6 +1,6 @@
 """투로그 v44 확인 — 동기화 오류 덮어쓰기 방지 · 기념일·프로필 시트 손보기.
 
-1) 버전: sw.js 캐시 twolog-v49 · APP_VERSION v49 · My 탭 「버전 v49」
+1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50 · My 탭 「버전 v50」
 2) 동기화 오류 덮어쓰기 방지 (v44 핵심)
    - 서버 표(events/notes/photos/settings) 읽기가 하나라도 실패하면 load() 가 실패로 끝나고
      빈 배열로 화면을 덮어쓰지 않음 — Realtime 재읽기(scheduleReload)·당겨오기(store.pull) 뒤에도
@@ -163,9 +163,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v49", 'const VERSION = "twolog-v49"' in sw,
+    check("sw.js 캐시 버전 twolog-v50", 'const VERSION = "twolog-v50"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js,
+    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v44 문자열이 남아 있지 않음",
           "twolog-v44" not in sw and 'APP_VERSION = "v44"' not in app_js)
@@ -173,7 +173,7 @@ with sync_playwright() as p:
     seed_demo(page)
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v49」", ver.strip() == "버전 v49", ver)
+    check("My 탭 맨 위에 「버전 v50」", ver.strip() == "버전 v50", ver)
     ctx.close()
 
     # ==================================================================
@@ -366,9 +366,9 @@ with sync_playwright() as p:
     }""")
     check("«저장» 단추는 없고, 되돌리기·다시 실행 단추가 상단에 (처음엔 모두 비활성)",
           not ed4["saveBtn"] and ed4["undo"] and ed4["redo"] and ed4["undoDis"], ed4)
-    # v49: 도구 줄이 ‹ 뒤로와 «같은 줄»(위 4px)로 한 단계 더 올라갔어요
-    check("아이콘바(펜·글씨·사진)는 맨 위 — ‹ 뒤로와 같은 줄에, 모눈 위로 떠 있음 (v49)",
-          ed4["toolsTop"] <= 8 and ed4["canvasTop"] == 0, ed4)
+    # v50: 도구 줄은 ‹ 뒤로 «아래» 줄(52px) — 두 줄 구조
+    check("아이콘바(펜·글씨·사진)는 위 줄 아래 — 모눈 위로 떠 있음 (v50)",
+          ed4["toolsTop"] >= 48 and ed4["toolsTop"] <= 56 and ed4["canvasTop"] == 0, ed4)
 
     # (a) T 도구 — 바로 새 글 상자, 배경을 누르면 글쓰기 끝(새 상자 안 만듦) + 자동 저장
     pageB.locator("#sheet .d41-tool[aria-label='글씨']").click()

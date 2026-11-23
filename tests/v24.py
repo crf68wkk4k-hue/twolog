@@ -4,7 +4,7 @@
    월 제목·요일·날짜 숫자·장수 배지도 비례해서 커짐 (5주·6주 달력 모두)
 2) 캘린더 한 주에 일정 세 줄이 서로 붙지 않고(6px) 날짜 숫자·다음 주와 부딪히지 않게
 3) v23 기능 그대로: 선택한 날 숫자 동그라미 · 일정 시트 · 노트 카드 제목 · My 버전 표시
-4) My 탭 맨 윗줄 「버전 v49」 · sw.js 캐시 twolog-v49
+4) My 탭 맨 윗줄 「버전 v50」 · sw.js 캐시 twolog-v50
 
     python3 tests/v24.py            # 스크린샷은 downloads/twolog-screens/ 에 저장
 """
@@ -83,11 +83,11 @@ with sync_playwright() as p:
 
     # ---------------- 0. 버전 ----------------
     sw = page.request.get(URL + "sw.js").text()
-    check("sw.js 캐시 버전 twolog-v49", 'const VERSION = "twolog-v49"' in sw,
+    check("sw.js 캐시 버전 twolog-v50", 'const VERSION = "twolog-v50"' in sw,
           [l for l in sw.splitlines() if "VERSION" in l][:2])
     app_js = page.request.get(URL + "app.js").text()
-    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js)
-    check("캐시 목록이 새 버전(shell-twolog-v49)", "shell-" in sw)
+    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js)
+    check("캐시 목록이 새 버전(shell-twolog-v50)", "shell-" in sw)
 
     # 예시 데이터로 상태를 만들고 일반 모드로
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -411,7 +411,7 @@ with sync_playwright() as p:
       return {ok: !!v, txt: v ? v.textContent.trim() : null,
               right: v ? window.innerWidth - v.getBoundingClientRect().right : null};
     })()""")
-    check("My 탭에 버전 v49 표시", my.get("ok") and "v49" in str(my.get("txt")), my.get("txt"))
+    check("My 탭에 버전 v50 표시", my.get("ok") and "v50" in str(my.get("txt")), my.get("txt"))
     page.wait_for_timeout(400)
     page.screenshot(path=os.path.join(SHOT, "my-v24.png"))
 

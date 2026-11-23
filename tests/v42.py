@@ -1,6 +1,6 @@
 """투로그 v42 확인 — 「기념일 & 생일」 시트 정리 + 프로필 편집에서 생일 고치기.
 
-1) 버전: sw.js 캐시 twolog-v49 · APP_VERSION v49 · My 탭 「버전 v49」
+1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50 · My 탭 「버전 v50」
 2) 기념일 & 생일 시트 (홈 D-day 카드를 눌러 열기)
    - 「홈 D-day 위에 이 문구가 그대로 보여요.」 안내 문구가 사라짐
    - 아래쪽 생일 달력 입력칸(.bd-in.js-bday) 두 개가 사라짐 · 「고른 생일은 바로 위에 …」 안내도 사라짐
@@ -129,9 +129,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v49", 'const VERSION = "twolog-v49"' in sw,
+    check("sw.js 캐시 버전 twolog-v50", 'const VERSION = "twolog-v50"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js,
+    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -144,7 +144,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v49」", ver.strip() == "버전 v49", ver)
+    check("My 탭 맨 위에 「버전 v50」", ver.strip() == "버전 v50", ver)
 
     tab(page, 0, 520)
 
@@ -515,11 +515,11 @@ with sync_playwright() as p:
               grid: cs.backgroundImage.indexOf('linear-gradient') >= 0,
               paperH: Math.round(paper.height),
               canvasH: Math.round(document.getElementById('d41Canvas').clientHeight)};}""")
-    # v49: 도구 줄이 위 줄(‹ 뒤로)과 «같은 줄»로 올라가 한 줄이 됐어요 (예전엔 위 줄 아래였습니다)
-    check("모눈종이가 화면 맨 위(0)까지 깔리고 위 줄·도구 줄은 그 위에 떠 있음 (v49)",
+    # v50: 도구 줄은 위 줄(‹ 뒤로) «아래» 줄 — 두 줄 구조로 되돌아갔어요 (v49 는 한 줄)
+    check("모눈종이가 화면 맨 위(0)까지 깔리고 위 줄·도구 줄은 그 위에 떠 있음 (v50)",
           geo4["paperTop"] == 0 and geo4["grid"]
-          and abs(geo4["toolsTop"] - geo4["topTop"]) <= 1
-          and geo4["toolsBottom"] <= geo4["topBottom"] + 2, geo4)
+          and geo4["toolsTop"] >= geo4["topTop"] + 40
+          and geo4["toolsBottom"] <= geo4["topBottom"] + 56, geo4)
     check("큰 날짜도 모눈 위에 얹혀 있음", geo4["dateInPaper"], geo4["dateInPaper"])
     check("종이는 화면 한 장을 채움", geo4["paperH"] >= geo4["canvasH"] - 6, (geo4["paperH"], geo4["canvasH"]))
 

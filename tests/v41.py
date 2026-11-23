@@ -1,6 +1,6 @@
 """투로그 v41 확인 — 모눈 메모가 «모눈종이 풀스크린 다이어리»로 바뀐 것 + + 시트 문구 정리.
 
-1) 버전: sw.js 캐시 twolog-v49 · APP_VERSION v49 · My 탭 「버전 v49」
+1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50 · My 탭 「버전 v50」
 2) + 시트 문구 정리
    - 고른 카테고리 아래 패널 제목은 「속지 · 이름」 (「속지 레이아웃」 아님)
    - 기본 카테고리(메모·버킷리스트·영화·먹방)의 배지와 첫 선택지도 「투두리스트」
@@ -208,9 +208,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v49", 'const VERSION = "twolog-v49"' in sw,
+    check("sw.js 캐시 버전 twolog-v50", 'const VERSION = "twolog-v50"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js,
+    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
 
     page.goto(URL + "?demo=1", wait_until="networkidle")
@@ -223,7 +223,7 @@ with sync_playwright() as p:
 
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v49」", ver.strip() == "버전 v49", ver)
+    check("My 탭 맨 위에 「버전 v50」", ver.strip() == "버전 v50", ver)
 
     # ==================================================================
     # 2. + 시트 문구 — 「속지」 · 기본 카테고리도 「투두리스트」
@@ -313,7 +313,7 @@ with sync_playwright() as p:
     stamp = "%d.%02d %s" % (d.tm_mon, d.tm_mday, ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"][d.tm_wday])
     check("새 다이어리는 화면을 꽉 채움", ed["open"] and ed["full"] and ed["h"] >= int(ed["vh"] * 0.98),
           (ed["h"], ed["vh"]))
-    check("위에 ‹ 뒤로 하나만 — 「새 다이어리」 글씨·제목 칸은 없음(v49) · «저장» 단추도 없음(나가면 자동 저장)",
+    check("위에 ‹ 뒤로 하나만 — 「새 다이어리」 글씨·제목 칸은 없음(v50) · «저장» 단추도 없음(나가면 자동 저장)",
           ed["back"] and ed["noSave"] and not ed["titlePh"], (ed["back"], ed["save"], ed["titlePh"]))
     check("큰 날짜는 「11.21 SAT」 꼴", ed["date"] == stamp, (ed["date"], stamp))
     check("날짜 줄을 눌러 바꿀 수 있는 날짜 칸이 있음",
@@ -512,7 +512,7 @@ with sync_playwright() as p:
                   thumbs: c.querySelectorAll('.d41-th').length,
                   pen: (c.querySelector('.d41-penz') || {}).textContent,
                   del: !!c.querySelector('.nmemo-x')} : null; }""")
-    check("저장하면 카드에 날짜·본문이 보임 (v49: 제목 칸이 없어 제목은 비어요)",
+    check("저장하면 카드에 날짜·본문이 보임 (v50: 제목 칸이 없어 제목은 비어요)",
           card and card["date"] == "2026.11.19 목요일" and (card["title"] or "") == ""
           and "바람이 차가웠다" in (card["body"] or ""), card)
     check("카드에 사진 미리보기와 손그림 표시", card and card["thumbs"] == 2 and "손그림" in (card["pen"] or ""), card)
@@ -530,7 +530,7 @@ with sync_playwright() as p:
       date: document.getElementById('d41DateBig').textContent,
       imgs: document.querySelectorAll('#sheet .d41-imgb').length,
       paths: document.querySelectorAll('#d41Pen path').length})""")
-    check("카드를 누르면 그 다이어리가 그대로 열림 (글·날짜·사진·그림 · v49: 제목 칸 없음)",
+    check("카드를 누르면 그 다이어리가 그대로 열림 (글·날짜·사진·그림 · v50: 제목 칸 없음)",
           (not again["titleInput"]) and "바람이 차가웠다" in (again["texts"][0]["text"] if again["texts"] else "")
           and again["date"] == "11.19 THU" and again["imgs"] == 2 and again["paths"] == 1, again)
     page.screenshot(path=os.path.join(SHOT, "_p41-test-reopen.png"))

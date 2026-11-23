@@ -1,7 +1,7 @@
 """투로그 v46 확인 — 모눈 다이어리 도구 줄 순서(↶ ↷ 왼쪽 · 펜/T/사진 오른쪽)와
 «색상 스펙트럼 판»(아이폰 색상 › 스펙트럼 모양), 글씨 크기 숫자 크게.
 
-1) 버전: sw.js 캐시 twolog-v49 · APP_VERSION v49 · My 탭 「버전 v49」
+1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50 · My 탭 「버전 v50」
 2) 도구 줄 순서 — ↶ 되돌리기 · ↷ 다시 실행이 «맨 왼쪽», 펜 · T · 사진이 «오른쪽»
    (x 좌표 undo < redo < pen < text < photo, 두 묶음 사이는 넓게 벌어짐)
 3) 펜 도크의 색 동그라미는 22px 로 작게 · 누르면 스펙트럼 판이 올라옴
@@ -261,9 +261,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check('sw.js 캐시 버전 twolog-v49', 'const VERSION = "twolog-v49"' in sw,
+    check('sw.js 캐시 버전 twolog-v50', 'const VERSION = "twolog-v50"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v49", 'var APP_VERSION = "v49"' in app_js,
+    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v46 문자열이 남아 있지 않음",
           "twolog-v46" not in sw and 'APP_VERSION = "v46"' not in app_js)
@@ -276,7 +276,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(900)
     tab(page, 4, 620)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v49」", ver.strip() == "버전 v49", ver)
+    check("My 탭 맨 위에 「버전 v50」", ver.strip() == "버전 v50", ver)
 
     tab(page, 2, 700)
     page.locator("#s-diary .lchip", has_text="그림판").first.click()
@@ -297,7 +297,7 @@ with sync_playwright() as p:
           tl["undoGapLeft"] <= 20, (tl["undoGapLeft"], tl["barLeft"]))
     check("펜·T·사진이 오른쪽 끝 (오른쪽 여백 20px 안)",
           tl["photoGapRight"] <= 20, (tl["photoGapRight"], tl["barRight"]))
-    # v49: 도구 줄이 ‹ 뒤로 오른쪽(왼쪽 52px)으로 올라가 폭이 좁아져 사이 간격은 60px 이상이면 충분
+    # v50: 도구 줄은 폭 전체(‹ 뒤로 «아래» 줄) — 사이 간격은 넓음
     check("두 묶음이 한 줄에 있고 사이는 넓게 벌어짐 (>= 60px)",
           tl["sameRow"] and tl["groupGap"] >= 60, (tl["sameRow"], tl["groupGap"]))
     page.screenshot(path=os.path.join(SHOT, "diary-v46-tools.png"))
