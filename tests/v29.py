@@ -1,6 +1,6 @@
 """투로그 v29 확인 — 노트 맨 윗줄의 네모 설정 버튼을 지우고 그 자리에 동그란 +, 알약 탭은 조금 작게.
 
-1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50
+1) 버전: sw.js 캐시 twolog-v51 · APP_VERSION v51
 2) 노트 맨 윗줄(📖 노트) 오른쪽에 동그란 점선 + 가 있고, 누르면 「새 카테고리」 시트가 열림
 3) 예전 네모 설정 버튼(톱니 아이콘)은 사라짐 — 알약 탭 아래 칩 줄에도 + 는 없음
 4) 알약 탭(메모·버킷리스트·영화·먹방)이 조금 작아짐: 높이 40px · 글씨 14px · 글씨 잘림 없음
@@ -184,11 +184,11 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check("sw.js 캐시 버전 twolog-v50", 'const VERSION = "twolog-v50"' in sw,
+    check("sw.js 캐시 버전 twolog-v51", 'const VERSION = "twolog-v51"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
+    check("app.js 버전 상수 v51", 'var APP_VERSION = "v51"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
-    check("sw.js 캐시 목록 이름이 shell-twolog-v50", 'const SHELL = "shell-" + VERSION' in sw)
+    check("sw.js 캐시 목록 이름이 shell-twolog-v51", 'const SHELL = "shell-" + VERSION' in sw)
     check("예전 칩 줄 + 스타일(.lst-new)은 남아 있지 않음", ".lst-new" not in css)
 
     # ==================================================================

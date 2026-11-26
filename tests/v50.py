@@ -1,6 +1,6 @@
 """투로그 v50 확인 — 모눈 다이어리 위 줄 «두 줄» 복원 + 사진과 글씨를 바로 밑·옆에 배치.
 
-1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50 · My 탭 「버전 v50」
+1) 버전: sw.js 캐시 twolog-v51 · APP_VERSION v51 · My 탭 「버전 v51」
 2) 위 줄은 ‹ 뒤로 하나만 (52px) · 도구 줄(↶ ↷ · 펜 · T · 사진)은 그 «아래 줄»(52px 부터,
    ↶ ↷ 왼쪽 · 펜·T·사진 오른쪽) — v50 에서 한 줄로 합쳤던 것을 두 줄로 되돌림
    · ‹ 뒤로 화살표는 v49 의 28px · 획 2.2 그대로
@@ -297,9 +297,9 @@ with sync_playwright() as p:
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
     css = page.request.get(URL + "styles.css").text()
-    check('sw.js 캐시 버전 twolog-v50', 'const VERSION = "twolog-v50"' in sw,
+    check('sw.js 캐시 버전 twolog-v51', 'const VERSION = "twolog-v51"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
+    check("app.js 버전 상수 v51", 'var APP_VERSION = "v51"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v49 문자열이 남아 있지 않음",
           "twolog-v49" not in sw and 'APP_VERSION = "v49"' not in app_js)
@@ -311,7 +311,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(900)
     tab(page, 4, 620)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v50」", ver.strip() == "버전 v50", ver)
+    check("My 탭 맨 위에 「버전 v51」", ver.strip() == "버전 v51", ver)
 
     # 지출·정산 — «‹ 11월 ›» 위 카테고리 제목 줄 없음 (v50 그대로)
     tab(page, 2, 700)

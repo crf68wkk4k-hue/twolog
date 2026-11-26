@@ -1,6 +1,6 @@
 """투로그 v50 확인 — 모눈 다이어리 세 가지 손질.
 
-1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50 · My 탭 「버전 v50」
+1) 버전: sw.js 캐시 twolog-v51 · APP_VERSION v51 · My 탭 「버전 v51」
 2) 모눈종이가 «화면 맨 위»까지 — 위 줄의 «새 다이어리» 글씨·제목 칸을 없애고,
    모눈이 위 모서리(0)부터 깔림 · ‹ 뒤로는 모눈 위에 떠 있음 (투명한 위 줄)
    글·사진·그림은 위 줄+도구 줄 아래(머리 높이)부터 놓여 겹치지 않음
@@ -240,9 +240,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check('sw.js 캐시 버전 twolog-v50', 'const VERSION = "twolog-v50"' in sw,
+    check('sw.js 캐시 버전 twolog-v51', 'const VERSION = "twolog-v51"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
+    check("app.js 버전 상수 v51", 'var APP_VERSION = "v51"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v47 문자열이 남아 있지 않음",
           "twolog-v47" not in sw and 'APP_VERSION = "v47"' not in app_js)
@@ -255,7 +255,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(900)
     tab(page, 4, 620)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v50」", ver.strip() == "버전 v50", ver)
+    check("My 탭 맨 위에 「버전 v51」", ver.strip() == "버전 v51", ver)
 
     tab(page, 2, 700)
     page.locator("#s-diary .lchip", has_text="그림판").first.click()

@@ -1,6 +1,6 @@
 """투로그 v47 확인 — 모눈 다이어리 손보기 세 가지.
 
-1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50 · My 탭 「버전 v50」
+1) 버전: sw.js 캐시 twolog-v51 · APP_VERSION v51 · My 탭 「버전 v51」
 2) ↶ 되돌리기 · ↷ 다시 실행 아이콘을 크게 — 단추 44px · 그림 27px · 획 2.05
    (v46 은 34px·19px 이었어요 — 펜/T/사진 46px·22px 보다도 조금 크게)
 3) 보기 화면은 «풀 사이즈» — 이미 쓴 다이어리를 열면 도구 줄·도구 판이 완전히 사라지고
@@ -315,9 +315,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check('sw.js 캐시 버전 twolog-v50', 'const VERSION = "twolog-v50"' in sw,
+    check('sw.js 캐시 버전 twolog-v51', 'const VERSION = "twolog-v51"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
+    check("app.js 버전 상수 v51", 'var APP_VERSION = "v51"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v46 문자열이 남아 있지 않음",
           "twolog-v46" not in sw and 'APP_VERSION = "v46"' not in app_js)
@@ -330,7 +330,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(900)
     tab(page, 4, 620)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v50」", ver.strip() == "버전 v50", ver)
+    check("My 탭 맨 위에 「버전 v51」", ver.strip() == "버전 v51", ver)
 
     tab(page, 2, 700)
     page.locator("#s-diary .lchip", has_text="그림판").first.click()

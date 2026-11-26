@@ -5,7 +5,7 @@
   /* ------------------------------------------------------------------ utils */
   /* v22: 앱 버전 — 업데이트할 때 sw.js 의 VERSION(twolog-vNN)과 함께 올려 주세요.
      My 탭 맨 윗줄 오른쪽에 「버전 vNN」으로 보입니다. */
-  var APP_VERSION = "v50";
+  var APP_VERSION = "v51";
   var KEY = "couple-app-v1";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var pad = function (n) { return String(n).padStart(2, "0"); };
@@ -3109,10 +3109,13 @@
     if (!paper) return;
     var W = d41WPx();
     var r = node.getBoundingClientRect();
-    var pr = paper.getBoundingClientRect();
+    /* v51: 자리 기준은 «글·사진이 놓이는 칸»(#d41Nodes, 머리 높이만큼 내려 시작)이에요.
+       종이(#d41Paper) 기준으로 재면 머리 높이(d41Top, 108px)만큼 상자가 손가락보다
+       위로 떠서 따라왔어요 — 저장 좌표와 같은 자로 재야 손가락 자리에 붙어 움직입니다. */
+    var nr = (document.getElementById("d41Nodes") || paper).getBoundingClientRect();
     /* 잡은 지점이 상자 안 어디였는지 — 그래야 손가락 아래에서 상자가 튀지 않아요 */
     var offX = ev.clientX - r.left, offY = ev.clientY - r.top;
-    var baseL = r.left - pr.left, baseT = r.top - pr.top;   /* 지금 상자의 자리(px) */
+    var baseL = r.left - nr.left, baseT = r.top - nr.top;   /* 지금 상자의 자리(px) */
     var start = (kind === "img" ? (diary && diary.imgs) || [] : (diary && diary.texts) || [])
       .filter(function (t) { return t.id === id; })[0];
     var nx = start ? start.x : 0.06, ny = start ? start.y : 0;
@@ -3125,8 +3128,8 @@
       var maxX = kind === "img"
         ? Math.max(0, 1 - Math.max(D41_MINW, (start && start.w) || D41_MINW))
         : 0.82;
-      var x = d41Clamp((qx - offX - pr.left) / W, 0, maxX);
-      var y = Math.max(0, (qy - offY - pr.top - d41Top()) / W);
+      var x = d41Clamp((qx - offX - nr.left) / W, 0, maxX);
+      var y = Math.max(0, (qy - offY - nr.top) / W);
       nx = x; ny = y;
       if (kind === "tx") node.style.maxWidth = d41TxMax(x);
       node.style.transform = "translate3d(" + (x * W - baseL).toFixed(1) + "px," +

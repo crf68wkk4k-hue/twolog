@@ -1,6 +1,6 @@
 """투로그 v45 확인 — 지출·정산 가계부 개편 (함께 쓰는 돈 · 내역/달력 · 입금/지출 시트).
 
-1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50 · My 탭 「버전 v50」
+1) 버전: sw.js 캐시 twolog-v51 · APP_VERSION v51 · My 탭 「버전 v51」
 2) 함께 쓰는 돈 카드 — 이번 달 총 입금 · 사용 금액 · 잔액 · 사용률 막대
    소영·준영 입금 두 칸 (함께 넣은 돈은 따로 한 줄)
 3) 내역 — 날짜 최신순 · 카테고리 아이콘 · 카테고리/메모/날짜/누가 · +입금 / -지출
@@ -194,9 +194,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v50", 'const VERSION = "twolog-v50"' in sw,
+    check("sw.js 캐시 버전 twolog-v51", 'const VERSION = "twolog-v51"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
+    check("app.js 버전 상수 v51", 'var APP_VERSION = "v51"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v44 문자열이 남아 있지 않음",
           "twolog-v44" not in sw and 'APP_VERSION = "v44"' not in app_js)
@@ -204,7 +204,7 @@ with sync_playwright() as p:
     seed_expense(page)
     tab(page, 4, 620)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v50」", ver.strip() == "버전 v50", ver)
+    check("My 탭 맨 위에 「버전 v51」", ver.strip() == "버전 v51", ver)
     tab(page, 2, 620)
     page.locator("#s-diary .lchip", has_text="우리 통장").first.click()
     page.wait_for_timeout(560)

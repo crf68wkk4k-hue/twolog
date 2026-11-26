@@ -1,6 +1,6 @@
 """투로그 v44 확인 — 동기화 오류 덮어쓰기 방지 · 기념일·프로필 시트 손보기.
 
-1) 버전: sw.js 캐시 twolog-v50 · APP_VERSION v50 · My 탭 「버전 v50」
+1) 버전: sw.js 캐시 twolog-v51 · APP_VERSION v51 · My 탭 「버전 v51」
 2) 동기화 오류 덮어쓰기 방지 (v44 핵심)
    - 서버 표(events/notes/photos/settings) 읽기가 하나라도 실패하면 load() 가 실패로 끝나고
      빈 배열로 화면을 덮어쓰지 않음 — Realtime 재읽기(scheduleReload)·당겨오기(store.pull) 뒤에도
@@ -163,9 +163,9 @@ with sync_playwright() as p:
 
     sw = page.request.get(URL + "sw.js").text()
     app_js = page.request.get(URL + "app.js").text()
-    check("sw.js 캐시 버전 twolog-v50", 'const VERSION = "twolog-v50"' in sw,
+    check("sw.js 캐시 버전 twolog-v51", 'const VERSION = "twolog-v51"' in sw,
           re.search(r'const VERSION = "[^"]+"', sw))
-    check("app.js 버전 상수 v50", 'var APP_VERSION = "v50"' in app_js,
+    check("app.js 버전 상수 v51", 'var APP_VERSION = "v51"' in app_js,
           re.search(r'var APP_VERSION = "[^"]+"', app_js))
     check("예전 v44 문자열이 남아 있지 않음",
           "twolog-v44" not in sw and 'APP_VERSION = "v44"' not in app_js)
@@ -173,7 +173,7 @@ with sync_playwright() as p:
     seed_demo(page)
     tab(page, 4, 600)
     ver = page.evaluate("(document.querySelector('#s-set .app-ver') || {}).textContent || ''")
-    check("My 탭 맨 위에 「버전 v50」", ver.strip() == "버전 v50", ver)
+    check("My 탭 맨 위에 「버전 v51」", ver.strip() == "버전 v51", ver)
     ctx.close()
 
     # ==================================================================
